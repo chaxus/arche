@@ -21,10 +21,15 @@ We use **Llama 3.2** ~1B as the specimen: production-like dense parts; official 
 | Stage | In plain words | Names you will meet later |
 | --- | --- | --- |
 | **0 Start** | Set up; learn to read a chapter and run one command | — |
-| **1 The model itself** | Hand-write “read tokens → layers → next token” piece by piece | Often called a *dense decoder*: RMSNorm, RoPE, attention, SwiGLU… |
-| **2 Make it faster** | Don’t recompute from scratch; schedule many requests; shrink the model a bit | KV cache, continuous batching, quantization, chat templates |
-| **3 Train a little** | Feel what “pretrain / follow humans” optimize on toy data | pretrain, SFT, DPO |
-| **4 Tip-of-field tricks** | Mixture of experts, compressed attention, paged memory—touch the shape as a map | MoE, MLA, paged KV, CUDA Graph |
+| **1 Build the dense trunk** | How tokenizer/embeds are made → hand-write RMSNorm, RoPE, GQA, SwiGLU… → load or later train → generate → HF check | dense decoder |
+| **2 Train from zero** | Feel how pretrain / SFT / DPO write the weights | pretrain, SFT, DPO |
+| **3 Generate & serve faster** | KV cache, long context, device/quant, continuous batch, paging | KV, RoPE scaling, paged KV… |
+| **4 Frontier structures** | MoE, MLA, checkpoint map—touch the shape | MoE, MLA, shards |
+
+**Two paths (you can interleave):**
+
+- **Path A (specimen):** official Llama tokenizer + weights → verify the handwritten stack  
+- **Path B (from zero):** teach-BPE table → build embeds → Part 2 pretrain/align → then serving  
 
 **Afterward you can roughly:** run the labs; open similar open-source code and know which layer you are in; enter papers or repos like vLLM with a map. In-course = **runnable principles + a frontier map**. Full industrial engines, huge clusters, multimodal—are the next climb *with* that map, not from zero.
 
@@ -158,7 +163,7 @@ In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \
     id: 'start-map',
     ep: '00f',
     title: 'Map of the journey',
-    summary: 'Parts 1–4 and when HF login is needed.',
+    summary: 'Four from-zero stages + specimen/self-train paths; when HF login is needed.',
     script: '',
     partId: 'start',
     estimatedMinutes: 3,
@@ -166,15 +171,22 @@ In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \
 
 \`\`\`mermaid
 flowchart LR
-  p0[0 Setup] --> p1[1 Build the model]
-  p1 --> p2[2 Make it faster]
-  p2 --> p3[3 Train a little]
-  p3 --> p4[4 Newer tricks]
+  p0[0 Setup] --> p1[1 Build trunk]
+  p1 --> p2[2 Train from zero]
+  p2 --> p3[3 Serve faster]
+  p3 --> p4[4 Frontier structures]
 \`\`\`
 
-- **Goal:** write “how the next word appears” → speed-ups and a taste of training → touch newer tricks by shape.  
-- **Specimen:** a small Llama 3.2 (~1B parameters); part names come later.  
-- **HF login** only when downloading the official tokenizer/weights; most labs use tiny random numbers.
+**Two paths:**
+
+| Path | What you do | When |
+| --- | --- | --- |
+| **A Specimen** | Official tokenizer/weights + HF align | Match a shipped model |
+| **B From zero** | Teach BPE, toy embeds, toy pretrain/SFT | Feel how tables and weights are written |
+
+- **Goal:** write “how the next word appears” from zero → train weights → serve faster → frontier structure map.  
+- **Specimen:** Llama 3.2 ~1B.  
+- **HF login** only for path A; teach BPE and most shape labs need no login.
 
 ## Next
 
