@@ -1,32 +1,62 @@
 ## Idea
 
-From-zero at scale: weights are **index.json + shards**. Can’t assemble shards ⇒ can’t take open frontier weights.
+**What:** Open frontier weights arrive as **`index.json` + shards**, not one file. Learn to pack/unpack that layout.
 
-### 1. What it is for
+**Why:** Can’t assemble shards ⇒ can’t load Llama/Qwen/DeepSeek/Mixtral-class hubs. Bad concat ⇒ silent wrong tensors.
 
-Synthetic pack/unpack + `allclose` without multi-tens-of-GB downloads.
+**How:** HF-style index; partition keys; write shard files; aggregate on load—toy size, same protocol.
 
-### 2. From zero: how you build it
+### 1. What — API
 
-HF-style index; shard tensors; aggregate on load.
+[`write_sharded_state` / `load_sharded_state`](https://github.com/chaxus/arche/blob/main/arche/shards.py):
 
-### 3. What “good” means
+```python
+write_sharded_state(directory, state_dict, shard_size=...)
+state = load_sharded_state(directory)  # rebuild full dict via index
+```
 
-Index matches shards; reload aligns; missing pieces fail clearly.
+Synthetic pack/unpack + `allclose` teaches the protocol **without** multi-tens-of-GB downloads.
 
-### 4. Improve · whole-model impact
+### 2. Why — scale reality
 
-Shard policy affects download parallelism and peak RAM; bad concat ⇒ silent bad weights.
+| Single file | Sharded |
+| --- | --- |
+| Simple demos | Hub default for big models |
+| One download stream | Parallel shard fetch |
+| Peak RAM = full model | Still careful—assemble wisely |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-HF Hub sharding standard; Llama/Qwen/DeepSeek/Mixtral; safetensors+index dominant.
+| Step | Do |
+| --- | --- |
+| 1 | Emit index mapping tensor name → shard file |
+| 2 | Split by size/count policy |
+| 3 | Load: read index, pull only needed shards |
+| 4 | Fail clearly on missing pieces |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Index matches shards; reload aligns |
+| **Hard** | Missing shard/key errors are loud |
+| **Soft** | Shard policy balances download vs peak RAM |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Shard policy | Parallelism and memory peaks |
+| Bad concat | Silent bad weights |
+| safetensors + index | Industry dominant pair |
 
 ### 6. This course
 
 ```bash
 python chapters/02-training/ep22_sharded_frontier.py
 ```
+
+Path complete—revisit weak chapters, or re-run HF align with weights.
 
 ## Run
 
@@ -35,6 +65,5 @@ python chapters/02-training/ep22_sharded_frontier.py
 ```
 
 ## Next
-
 
 Path complete—revisit weak chapters, or re-run HF align with weights.

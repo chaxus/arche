@@ -1,26 +1,47 @@
 ## Idea
 
-From-zero MoE/MLA must **speak checkpoint names/shapes** of open weights—or frontier structure stays on paper.
+**What:** Speak **checkpoint names and shapes** for MoE/MLA-style open weights—save/load with a key map, including Mixtral-like `w1/w2/w3` expert tensors.
 
-### 1. What it is for
+**Why:** Frontier structure on paper is useless if you can’t round-trip tensors. Bad maps → silent random experts.
 
-Round-trip teaching ckpts; map Mixtral-like `w1/w2/w3` into our modules.
+**How:** Name map ↔ open names; [`save_checkpoint` / `load_checkpoint`](https://github.com/chaxus/arche/blob/main/arche/checkpoint.py); fail loudly on missing keys.
 
-### 2. From zero: how you build it
+### 1. What — round-trip
 
-Name map ↔ open names; save/load; fail loudly on missing keys.
+Teaching ckpts exercise: write state + meta, reload into a matching module graph, assert alignment. Expert keys must all be present—partial MoE loads look “fine” until one expert is noise.
 
-### 3. What “good” means
+### 2. Why — naming debt
 
-Round-trip align; experts covered; hooks real hubs.
+| Risk | Effect |
+| --- | --- |
+| HF vs local name drift | Missing keys / wrong slots |
+| Expert index off-by-one | One dead expert forever |
+| Strict=False abuse | Hides map bugs |
 
-### 4. Improve · whole-model impact
+### 3. How — from zero
 
-Bad maps ⇒ silent random experts; consistent naming cuts debt.
+| Step | Do |
+| --- | --- |
+| 1 | List open hub key patterns (Mixtral / DeepSeek docs) |
+| 2 | Build explicit map into your modules |
+| 3 | Round-trip on a tiny synthetic ckpt first |
+| 4 | Only then touch multi-GB downloads |
 
-### 5. Industry · open models
+### 4. What “good” means
 
-HF shards + documented keys; Mixtral/DeepSeek naming; converters are standard.
+| Kind | Check |
+| --- | --- |
+| **Hard** | Round-trip `allclose`; no missing experts |
+| **Hard** | Unexpected keys fail or are explicitly ignored |
+| **Soft** | Hooks ready for real hubs |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Consistent naming | Cuts converter debt |
+| Bad maps | Silent quality holes |
+| Converters as standard | Same story as dense HF maps |
 
 ### 6. This course
 
@@ -35,6 +56,5 @@ python chapters/02-training/ep20_frontier_ckpt.py
 ```
 
 ## Next
-
 
 **Sharded MoE / MLA** (`/sharded-frontier/`).

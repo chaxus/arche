@@ -1,26 +1,61 @@
 ## Idea
 
-From zero to serving: a correct generate loop isn’t enough—**without KV cache long decode is unusable**.
+**What:** **KV cache** — after prefill, keep each layer’s Keys/Values and **append** one new step at decode instead of recomputing the whole past.
 
-### 1. What it is for
+**Why:** A correct generate loop without cache recomputes attention over growing history every token → unusable at product lengths. Every production decoder caches KV.
 
-Prefill stores K/V; decode appends one step and attends to the cache.
+**How:** Per-layer `KVCache`; prefill writes full K/V; decode concatenates the new slice; GQA/MLA/paging shrink what you store.
 
-### 2. From zero: how you build it
+### 1. What — structure
 
-Per-layer buffers; prefill write; decode append; later paging + GQA/MLA to shrink.
+[`KVCache`](https://github.com/chaxus/arche/blob/main/arche/cache.py):
 
-### 3. What “good” means
+```python
+@dataclass
+class KVCache:
+    k: torch.Tensor  # (batch, kv_heads, seq, head_dim)
+    v: torch.Tensor
 
-Matches full recompute; no layer mixups; cost grows with new tokens; memory OK.
+    def append(self, k, v):
+        return KVCache(k=torch.cat([self.k, k], dim=-2), v=torch.cat([self.v, v], dim=-2))
+```
 
-### 4. Improve · whole-model impact
+Attention ([`CausalSelfAttention`](https://github.com/chaxus/arche/blob/main/arche/attention.py)) RoPE-applies the new Q/K, merges into cache, then SDPA over **full** cached K/V.
 
-GQA/MLA/paging/KV-quant cut memory; without cache only toy lengths work.
+### 2. Why — cost shape
 
-### 5. Industry · open models
+| Mode | Work per new token |
+| --- | --- |
+| No cache | Re-embed + full stack over all past ids |
+| With cache | One new position’s Q/K/V + attend to cache |
+| Memory | Grows with `layers × n_kv × seq × dim` |
 
-Every production decoder caches KV (vLLM, TGI, llama.cpp…).
+GQA already cut `n_kv`; paging (later) fights fragmentation across users.
+
+### 3. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | One cache slot per layer |
+| 2 | Prefill: `cache=None`, write full prompt K/V |
+| 3 | Decode: pass cache + `start_pos`, append one step |
+| 4 | Never mix layers’ caches |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Matches full recompute numerically (toy check) |
+| **Hard** | No layer mixups; seq dim only grows |
+| **Soft** | Memory fits target context × batch |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| GQA / MLA / KV-quant | Smaller cache |
+| Paging | Multi-user packing |
+| No cache | Toy lengths only |
 
 ### 6. This course
 

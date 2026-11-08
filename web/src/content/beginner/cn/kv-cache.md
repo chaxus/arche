@@ -1,39 +1,61 @@
 ## 要点
 
-从零到可服务：生成循环正确还不够——**无 KV 缓存则长解码不可用**。这是对接业界推理的第一刀。
+**是什么（What）：** **KV cache**——prefill 之后保留每层的 K/V，解码时**追加**一步，而不是每步重算全部历史。
 
-### 1. 有什么作用
+**为什么（Why）：** 没有 cache 的正确生成环会在每个新 token 上对整段历史重算注意力 → 产品长度不可用。生产解码器都会缓存 KV。
 
-Prefill 存每层 K/V；decode 只算新位置并追加，对缓存做注意力。
+**怎么做（How）：** 每层一个 `KVCache`；prefill 写入完整 K/V；decode 拼接新切片；GQA/MLA/paging 再缩小存量。
 
-### 2. 从零开始：怎么生成
+### 1. What — 结构
+
+[`KVCache`](https://github.com/chaxus/arche/blob/main/arche/cache.py)：
+
+```python
+@dataclass
+class KVCache:
+    k: torch.Tensor  # (batch, kv_heads, seq, head_dim)
+    v: torch.Tensor
+
+    def append(self, k, v):
+        return KVCache(k=torch.cat([self.k, k], dim=-2), v=torch.cat([self.v, v], dim=-2))
+```
+
+注意力（[`CausalSelfAttention`](https://github.com/chaxus/arche/blob/main/arche/attention.py)）对新 Q/K 做 RoPE，并入 cache，再对**完整**缓存 K/V 做 SDPA。
+
+### 2. Why — 成本形状
+
+| 模式 | 每个新 token 的活 |
+| --- | --- |
+| 无 cache | 整段过去 id 重跑嵌入 + 全栈 |
+| 有 cache | 只算新位置 Q/K/V + 对 cache 做注意力 |
+| 显存 | 随 `层数 × n_kv × seq × dim` 涨 |
+
+GQA 已砍 `n_kv`；paging（后章）解决多用户碎片。
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 每层预分配/动态 `cat` 的 K/V 缓冲 |
-| **2** | Prefill 写入；decode 追加 |
-| **3** | 注意力改为读缓存 |
-| **4** | 再演进分页（后章）与 GQA/MLA 减体积 |
+| 1 | 每层一个 cache 槽 |
+| 2 | Prefill：`cache=None`，写入整段 prompt K/V |
+| 3 | Decode：传入 cache + `start_pos`，追加一步 |
+| 4 | 绝不串层混用 cache |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 与全量重算等价（浮点差内）；不串层、不丢步 |
-| **软** | 算力随新 token 涨；显存可接受 |
+| **硬** | 玩具上与全量重算数值一致 |
+| **硬** | 不串层；只在 seq 维增长 |
+| **软** | 目标上下文 × batch 装得下 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| GQA/MLA | 缓存更小 |
-| Paged KV | 并发碎片 |
-| 量化 KV | 显存↓、精度权衡 |
-| 无缓存 | 仅玩具长度可行 |
-
-### 5. 业界 · 开源
-
-所有生产 decoder（vLLM、TGI、llama.cpp…）必有 KV 缓存；布局各异。Llama/Qwen 推理默认开启。
+| GQA / MLA / KV 量化 | 更小 cache |
+| Paging | 多用户打包 |
+| 无 cache | 只适合玩具长度 |
 
 ### 6. 本课
 

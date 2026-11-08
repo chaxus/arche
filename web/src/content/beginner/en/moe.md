@@ -1,33 +1,66 @@
 ## Idea
 
-From zero, huge capacity at controlled compute often means **MoE**—sparse experts. **DeepSeek-V3**’s open story is largely **MoE (capacity) + MLA (KV)**; this chapter is the MoE half. Mixtral is another open MoE; our Llama 3.2 example stayed **dense** on purpose.
+**What:** **Mixture-of-Experts (MoE)** — replace the dense SwiGLU with **many experts + a router**; each token runs **top-k** only.
 
-### 1. What it is for
+**Why:** Huge parameter capacity at near-dense **per-token** compute. **DeepSeek-V3**’s open story is largely **MoE (capacity) + MLA (KV)**; Mixtral is another open MoE. This course’s Llama 3.2 example stayed **dense** on purpose—MoE is the map after you can read the dense FFN.
 
-Many SwiGLU experts + router; each token runs top-k only. Replaces the dense FFN you wrote earlier—same decoder spine, different capacity trick.
+**How:** Pick `E` / `top_k`; experts + gate; aux load-balance in real trains; sparse infer; shard experts in checkpoints.
 
-### 2. From zero: how you build it
+### 1. What — forward
 
-Pick E/top-k; experts + router; aux load-balance; sparse infer; shard experts in checkpoints. This lesson is an API primer.
+[`MoESwiGLU`](https://github.com/chaxus/arche/blob/main/arche/moe.py):
 
-### 3. What “good” means
+```python
+logits = self.gate(x)
+probs = F.softmax(logits, dim=-1)
+top_probs, top_idx = probs.topk(self.top_k, dim=-1)
+# weighted sum of selected SwiGLU experts
+```
 
-Valid routes; correct merge; balanced load; quality/capacity trade OK.
+Same decoder spine; only the MLP slot changes.
 
-### 4. Improve · whole-model impact
+### 2. Why — dense vs sparse
 
-More experts/k ⇒ capacity/compute; balance loss fights collapse; replacing dense FFN is architecture-level; multi-GPU expert parallel is the engineering cost.
+| | Dense SwiGLU | MoE |
+| --- | --- | --- |
+| Params | One FFN | `E` × FFN |
+| Per-token FLOPs | Full FFN | ≈ `top_k` experts |
+| Failure mode | — | Expert collapse without balancing |
 
-### 5. Industry · open models
+### 3. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | Keep attention / norms; swap MLP → MoE |
+| 2 | Choose `E`, `top_k` (e.g. Mixtral-like top-2) |
+| 3 | Add load-balance loss in serious training |
+| 4 | Plan expert-parallel / sharded loads |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Valid routes; merge weights sum sanely |
+| **Soft** | Balanced expert load; quality/capacity trade OK |
+| **Soft** | Checkpoint maps cover all experts |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| More `E` / `k` | Capacity vs compute |
+| Balance loss | Fights collapse |
+| Expert parallel | Multi-GPU engineering cost |
+
+### 6. Industry map
 
 | Line | Role |
 | --- | --- |
-| **DeepSeek-V3** | Large **MoE** + **MLA** (next chapter)—flagship open non-dense stack |
-| **Mixtral** | MoE with top-2 SwiGLU experts |
-| **Qwen-MoE** | Own E/k recipes |
-| **Llama 3.2 ~1B (this course)** | Dense first—then you can read DeepSeek’s map |
+| **DeepSeek-V3** | Large MoE + MLA (next) |
+| **Mixtral** | Top-2 SwiGLU experts |
+| **Llama 3.2 ~1B (course)** | Dense first |
 
-### 6. This course
+### 7. This course
 
 ```bash
 python chapters/01-inference/ep14_moe.py
@@ -41,4 +74,4 @@ python chapters/01-inference/ep14_moe.py
 
 ## Next
 
-**MLA** (`/mla/`).
+**MLA** (`/mla/`): compress KV the DeepSeek way.

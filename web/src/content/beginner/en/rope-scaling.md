@@ -1,26 +1,49 @@
 ## Idea
 
-After short-context from-zero training, products want 128K-class windows—**RoPE scaling** is a recipe extension, not casually stretching indices.
+**What:** **RoPE scaling** — adjust rotary frequencies (Llama 3-style wavelength smoothing) so positions beyond the original train window stay usable.
 
-### 1. What it is for
+**Why:** Short-context pretrain + naive long indices → rotations wrap badly; quality collapses far out. Long-context products need a **recipe extension**, not “just set max_seq bigger.”
 
-Llama 3-style wavelength smoothing (large theta + factors) so long positions don’t wrap badly.
+**How:** Match checkpoint `theta` + scale factors; optionally continue-train on long data; eval short and long.
 
-### 2. From zero: how you build it
+### 1. What — code hook
 
-Train at base length → enable checkpoint-matched scaling and/or continue long-data train → eval long context.
+[`llama3_inv_freq`](https://github.com/chaxus/arche/blob/main/arche/rope.py) / `build_rope_cache(..., scale_factor=..., low_freq_factor=..., high_freq_factor=..., original_max_position=...)`.
 
-### 3. What “good” means
+When `scale_factor == 1.0`, plain RoPE. Otherwise wavelength bands are scaled/smoothed the HF Llama-3 way—**same math the 128k-class configs advertise**.
 
-Match checkpoint config; near stable; far usable; long-bench OK.
+### 2. Why — not free length
 
-### 4. Improve · whole-model impact
+| Illusion | Reality |
+| --- | --- |
+| Stretch indices only | High-freq bands misbehave |
+| Bigger window free | KV memory ↑ with length |
+| Scaling = long knowledge | Still need data / continued train for hard long tasks |
 
-Wrong scaling breaks long (and maybe short) context; bigger windows raise KV cost; scaling ≠ free long-range knowledge.
+### 3. How — from zero
 
-### 5. Industry · open models
+| Step | Do |
+| --- | --- |
+| 1 | Read official rope scaling fields from the ckpt config |
+| 2 | Build cos/sin with those factors |
+| 3 | Keep short-context sanity checks |
+| 4 | Long-bench / needle tests before claiming 128k |
 
-Llama 3/3.2 official long-context; Qwen/DeepSeek own recipes; YaRN/NTK in open long-context work.
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Factors match the checkpoint |
+| **Soft** | Near context still stable; far context usable |
+| **Soft** | Long-bench acceptable for the product bar |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Wrong scaling | Breaks long (and maybe short) |
+| YaRN / NTK / … | Other open recipes—don’t mix under Llama weights |
+| Longer windows | Always pay in KV |
 
 ### 6. This course
 
@@ -35,6 +58,5 @@ python chapters/01-inference/ep13_rope_scaling.py
 ```
 
 ## Next
-
 
 **Device · INT8 · chat** (`/device-quant-chat/`).

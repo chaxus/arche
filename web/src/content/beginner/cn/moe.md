@@ -1,48 +1,66 @@
 ## 要点
 
-从零若要「更大容量、可控算力」，dense FFN 会贵——**MoE** 用稀疏专家换参数量。**DeepSeek-V3** 的开源叙事大体是 **MoE（容量）+ MLA（压 KV）**；本章先讲 MoE 这一半。Mixtral 也是开源 MoE；本课 Llama 3.2 例子故意先停在 **dense**。
+**是什么（What）：** **混合专家（MoE）**——用**多个 expert + router**替换稠密 SwiGLU；每个 token 只跑 **top-k**。
 
-### 1. 有什么作用
+**为什么（Why）：** 参数容量可以很大，但**每 token**算力仍接近稠密。**DeepSeek-V3** 开源故事大体是 **MoE（容量）+ MLA（KV）**；Mixtral 是另一条开源 MoE。本课 Llama 3.2 例子故意先走**稠密**——会读稠密 FFN 后再看这张地图。
 
-多专家 SwiGLU + 路由：每 token **top-k** 专家，其余不算。替换的是前面手写的 dense FFN——解码器骨架还在，换的是容量手段。
+**怎么做（How）：** 选 `E` / `top_k`；experts + gate；真训时加负载均衡；稀疏推理；checkpoint 里分片 experts。
 
-### 2. 从零开始：怎么生成
+### 1. What — 前向
+
+[`MoESwiGLU`](https://github.com/chaxus/arche/blob/main/arche/moe.py)：
+
+```python
+logits = self.gate(x)
+probs = F.softmax(logits, dim=-1)
+top_probs, top_idx = probs.topk(self.top_k, dim=-1)
+# 对选中的 SwiGLU expert 加权求和
+```
+
+解码器脊柱不变；只换 MLP 槽位。
+
+### 2. Why — 稠密 vs 稀疏
+
+| | 稠密 SwiGLU | MoE |
+| --- | --- | --- |
+| 参数 | 一个 FFN | `E` × FFN |
+| 每 token FLOPs | 完整 FFN | ≈ `top_k` 个 expert |
+| 失败模式 | — | 无均衡时 expert 坍塌 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 定专家数 E、top-k、是否共享专家 |
-| **2** | 每专家一套 FFN + 路由线性 |
-| **3** | 训练加负载均衡等辅助损失 |
-| **4** | 推理按路由稀疏执行；检查点按专家存 |
+| 1 | 保留注意力 / norm；MLP → MoE |
+| 2 | 选 `E`、`top_k`（如 Mixtral 类 top-2） |
+| 3 | 认真训练时加负载均衡损失 |
+| 4 | 规划 expert 并行 / 分片加载 |
 
-本课是 API 引物，不是完整 Mixtral 训练栈。
-
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 路由合法；top-k 合并形状对 |
-| **软** | 负载不太塌；同算力下质量/容量权衡达标 |
+| **硬** | 路由合法；合并权重合理 |
+| **软** | expert 负载均衡；质量/容量折中 OK |
+| **软** | checkpoint 映射覆盖全部 expert |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 更多专家 / 更大 k | 容量或算力↑ |
-| 均衡损失 | 防专家塌缩 |
-| 替换 dense FFN | 架构级；需按 MoE 重训 |
-| 通信与落地 | 多卡专家并行是工程主成本 |
+| 更大 `E` / `k` | 容量 vs 算力 |
+| 均衡损失 | 对抗坍塌 |
+| Expert 并行 | 多卡工程成本 |
 
-### 5. 业界 · 开源
+### 6. 业界地图
 
-| 系 | 角色 |
+| 线路 | 角色 |
 | --- | --- |
-| **DeepSeek-V3** | 大 **MoE** + **MLA**（下一章）——开源非 dense 旗舰叙事 |
-| **Mixtral** | top-2 专家 SwiGLU 的 MoE |
-| **Qwen-MoE 等** | 各自 E/k 配方 |
-| **Llama 3.2 ~1B（本课）** | 先 dense——再读 DeepSeek 地图 |
+| **DeepSeek-V3** | 大 MoE + MLA（下一章） |
+| **Mixtral** | Top-2 SwiGLU experts |
+| **Llama 3.2 ~1B（本课）** | 先稠密 |
 
-### 6. 本课
+### 7. 本课
 
 ```bash
 python chapters/01-inference/ep14_moe.py
@@ -56,4 +74,4 @@ python chapters/01-inference/ep14_moe.py
 
 ## 下一章
 
-**MLA**（`/cn/mla/`）。
+**MLA**（`/cn/mla/`）：按 DeepSeek 方式压缩 KV。

@@ -1,32 +1,60 @@
 ## Idea
 
-End of Part 3: **paged KV** fights fragmentation; **CUDA Graph** cuts fixed-shape launch tax—toward vLLM-class engines. Next part enters MoE/MLA frontier structures.
+**What:** Two serving accelerators — **paged KV** (block table + shared page pool) fights memory fragmentation; **CUDA Graph** captures a fixed-shape decode step to cut launch tax.
 
-### 1. What it is for
+**Why:** Continuous batching without paging wastes VRAM on ragged lengths; eager CUDA launches tax every tiny decode. Together they point at vLLM-class engines—this lesson is a teaching stand-in, not a drop-in.
 
-Block table + gather; optional CUDA Graph capture. Teaching ≠ drop-in vLLM.
+**How:** Logical KV → alloc/free pages via block table → `gather_kv` for attention; optional graph capture on stable decode shapes.
 
-### 2. From zero: how you build it
+### 1. What — paged KV
 
-Logical KV + continuous batch → block alloc/free → optional graph on decode.
+[`PagedKVPool` / `BlockTable` / `gather_kv`](https://github.com/chaxus/arche/blob/main/arche/paged_kv.py):
 
-### 3. What “good” means
+```python
+# append one step into the next slot; alloc a new page when a page fills
+append_kv(pool, table, k, v)
+# materialize contiguous KVCache for SDPA
+cache = gather_kv(pool, table)
+```
 
-Gather matches logical cache; in-bounds tables; less fragmentation/launch; higher throughput.
+Physical pages are shared; each sequence owns a list of page ids.
 
-### 4. Improve · whole-model impact
+### 2. What — CUDA Graph (optional)
 
-Page size/prealloc change waste vs speed; graphs need stable shapes; doesn’t change weights—raises serving ceiling.
+[`capture_module_step` / `generate_with_optional_graph`](https://github.com/chaxus/arche/blob/main/arche/cuda_graphs.py): capture a module step when CUDA is available; replay instead of re-launching. Needs **stable shapes**—why engines care about batching policy.
 
-### 5. Industry · open models
+### 3. Why — toward engines
 
-vLLM paged attention landmark; TRT-LLM/SGLang variants; pairs with Llama/Qwen/DeepSeek weights.
+| Piece | Pain it hits |
+| --- | --- |
+| Paging | Fragmentation + multi-user packing |
+| Graphs | Per-step CPU launch overhead |
+| Neither changes weights | Raises the serving ceiling only |
+
+### 4. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | Continuous batch mental model first |
+| 2 | Pool + per-seq block table |
+| 3 | Gather before attention (teaching path) |
+| 4 | Optional graph on decode when shapes freeze |
+
+### 5. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Gather matches logical cache; tables in-bounds |
+| **Soft** | Less fragmentation / launch tax; higher throughput |
+| **Soft** | Clear skip when no CUDA |
 
 ### 6. This course
 
 ```bash
 python chapters/01-inference/ep23_paged_cuda_graph.py
 ```
+
+Part 3 ends; Part 4 maps MoE/MLA frontier structures.
 
 ## Run
 
@@ -36,5 +64,4 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## Next
 
-
-**MoE** (`/moe/`): frontier architectures.
+**MoE** (`/moe/`): frontier capacity via sparse experts.

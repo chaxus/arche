@@ -1664,40 +1664,62 @@ python chapters/01-inference/ep21_hf_align.py
     demo: 'kv',
     markdown: `## 要点
 
-从零到可服务：生成循环正确还不够——**无 KV 缓存则长解码不可用**。这是对接业界推理的第一刀。
+**是什么（What）：** **KV cache**——prefill 之后保留每层的 K/V，解码时**追加**一步，而不是每步重算全部历史。
 
-### 1. 有什么作用
+**为什么（Why）：** 没有 cache 的正确生成环会在每个新 token 上对整段历史重算注意力 → 产品长度不可用。生产解码器都会缓存 KV。
 
-Prefill 存每层 K/V；decode 只算新位置并追加，对缓存做注意力。
+**怎么做（How）：** 每层一个 \`KVCache\`；prefill 写入完整 K/V；decode 拼接新切片；GQA/MLA/paging 再缩小存量。
 
-### 2. 从零开始：怎么生成
+### 1. What — 结构
+
+[\`KVCache\`](https://github.com/chaxus/arche/blob/main/arche/cache.py)：
+
+\`\`\`python
+@dataclass
+class KVCache:
+    k: torch.Tensor  # (batch, kv_heads, seq, head_dim)
+    v: torch.Tensor
+
+    def append(self, k, v):
+        return KVCache(k=torch.cat([self.k, k], dim=-2), v=torch.cat([self.v, v], dim=-2))
+\`\`\`
+
+注意力（[\`CausalSelfAttention\`](https://github.com/chaxus/arche/blob/main/arche/attention.py)）对新 Q/K 做 RoPE，并入 cache，再对**完整**缓存 K/V 做 SDPA。
+
+### 2. Why — 成本形状
+
+| 模式 | 每个新 token 的活 |
+| --- | --- |
+| 无 cache | 整段过去 id 重跑嵌入 + 全栈 |
+| 有 cache | 只算新位置 Q/K/V + 对 cache 做注意力 |
+| 显存 | 随 \`层数 × n_kv × seq × dim\` 涨 |
+
+GQA 已砍 \`n_kv\`；paging（后章）解决多用户碎片。
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 每层预分配/动态 \`cat\` 的 K/V 缓冲 |
-| **2** | Prefill 写入；decode 追加 |
-| **3** | 注意力改为读缓存 |
-| **4** | 再演进分页（后章）与 GQA/MLA 减体积 |
+| 1 | 每层一个 cache 槽 |
+| 2 | Prefill：\`cache=None\`，写入整段 prompt K/V |
+| 3 | Decode：传入 cache + \`start_pos\`，追加一步 |
+| 4 | 绝不串层混用 cache |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 与全量重算等价（浮点差内）；不串层、不丢步 |
-| **软** | 算力随新 token 涨；显存可接受 |
+| **硬** | 玩具上与全量重算数值一致 |
+| **硬** | 不串层；只在 seq 维增长 |
+| **软** | 目标上下文 × batch 装得下 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| GQA/MLA | 缓存更小 |
-| Paged KV | 并发碎片 |
-| 量化 KV | 显存↓、精度权衡 |
-| 无缓存 | 仅玩具长度可行 |
-
-### 5. 业界 · 开源
-
-所有生产 decoder（vLLM、TGI、llama.cpp…）必有 KV 缓存；布局各异。Llama/Qwen 推理默认开启。
+| GQA / MLA / KV 量化 | 更小 cache |
+| Paging | 多用户打包 |
+| 无 cache | 只适合玩具长度 |
 
 ### 6. 本课
 
@@ -1727,35 +1749,50 @@ python chapters/01-inference/ep12_kv_cache.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-从零训完短上下文后，产品要 128K 级窗口——**RoPE 缩放**是常见「配方级」扩展，不是随便把下标拉长。
+**是什么（What）：** **RoPE 缩放**——调整旋转频率（Llama 3 风格波长平滑），让超出原训练窗的位置仍可用。
 
-### 1. 有什么作用
+**为什么（Why）：** 短上下文预训练 + 天真拉长下标 → 旋转缠坏，远端质量塌。长上下文产品需要**菜谱扩展**，不是「把 max_seq 改大就行」。
 
-按官方调度（Llama 3：大 \`theta\` + factor/low/high 波长平滑）调整旋转，减轻超长位置「绕坏」。
+**怎么做（How）：** 对齐 checkpoint 的 \`theta\` + scale 因子；可选长数据继续训；短/长都要评。
 
-### 2. 从零开始：怎么做
+### 1. What — 代码钩子
+
+[\`llama3_inv_freq\`](https://github.com/chaxus/arche/blob/main/arche/rope.py) / \`build_rope_cache(..., scale_factor=..., low_freq_factor=..., high_freq_factor=..., original_max_position=...)\`。
+
+\`scale_factor == 1.0\` 时是普通 RoPE；否则按 HF Llama-3 方式缩放/平滑波段——**与宣称 128k 级配置同一套数学**。
+
+### 2. Why — 不是免费变长
+
+| 错觉 | 现实 |
+| --- | --- |
+| 只拉长下标 | 高频带会乱 |
+| 更大窗口免费 | KV 显存随长度涨 |
+| 缩放 = 长程知识 | 硬长程任务仍要数据 / 续训 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 先按训练长度训好 RoPE |
-| **2** | 需要长文时启用与检查点一致的 scaling 配置 |
-| **3** | 或继续用更长数据训 / 用 YaRN 等配方 |
-| **4** | 用长文评测验证 |
+| 1 | 从 ckpt config 读官方 rope scaling 字段 |
+| 2 | 用这些因子建 cos/sin |
+| 3 | 保留短上下文健全性检查 |
+| 4 | 宣称 128k 前做 long-bench / needle |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 与检查点声明一致 |
-| **软** | 近距仍稳；远距可用；长文基准达标 |
+| **硬** | 因子与 checkpoint 一致 |
+| **软** | 近处仍稳；远处可用 |
+| **软** | long-bench 达到产品条 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-错缩放 → 长文崩、短文也可能歪。更大窗口抬高 KV 显存与算力。缩放不能替代「没学过的长程依赖数据」。
-
-### 5. 业界 · 开源
-
-Llama 3/3.2 官方长上下文；Qwen/DeepSeek 各有长文声明；YaRN/NTK 常见于开源长文讨论。
+| 杠杆 | 影响 |
+| --- | --- |
+| 缩放设错 | 长（甚至短）都坏 |
+| YaRN / NTK / … | 其他开源菜谱——别套在 Llama 权重下混用 |
+| 更长窗口 | 永远要付 KV 账 |
 
 ### 6. 本课
 
@@ -1770,7 +1807,6 @@ python chapters/01-inference/ep13_rope_scaling.py
 \`\`\`
 
 ## 下一章
-
 
 **设备 · INT8 · 对话**（\`/cn/device-quant-chat/\`）。
 
@@ -1786,49 +1822,67 @@ python chapters/01-inference/ep13_rope_scaling.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-从零若要「更大容量、可控算力」，dense FFN 会贵——**MoE** 用稀疏专家换参数量。**DeepSeek-V3** 的开源叙事大体是 **MoE（容量）+ MLA（压 KV）**；本章先讲 MoE 这一半。Mixtral 也是开源 MoE；本课 Llama 3.2 例子故意先停在 **dense**。
+**是什么（What）：** **混合专家（MoE）**——用**多个 expert + router**替换稠密 SwiGLU；每个 token 只跑 **top-k**。
 
-### 1. 有什么作用
+**为什么（Why）：** 参数容量可以很大，但**每 token**算力仍接近稠密。**DeepSeek-V3** 开源故事大体是 **MoE（容量）+ MLA（KV）**；Mixtral 是另一条开源 MoE。本课 Llama 3.2 例子故意先走**稠密**——会读稠密 FFN 后再看这张地图。
 
-多专家 SwiGLU + 路由：每 token **top-k** 专家，其余不算。替换的是前面手写的 dense FFN——解码器骨架还在，换的是容量手段。
+**怎么做（How）：** 选 \`E\` / \`top_k\`；experts + gate；真训时加负载均衡；稀疏推理；checkpoint 里分片 experts。
 
-### 2. 从零开始：怎么生成
+### 1. What — 前向
+
+[\`MoESwiGLU\`](https://github.com/chaxus/arche/blob/main/arche/moe.py)：
+
+\`\`\`python
+logits = self.gate(x)
+probs = F.softmax(logits, dim=-1)
+top_probs, top_idx = probs.topk(self.top_k, dim=-1)
+# 对选中的 SwiGLU expert 加权求和
+\`\`\`
+
+解码器脊柱不变；只换 MLP 槽位。
+
+### 2. Why — 稠密 vs 稀疏
+
+| | 稠密 SwiGLU | MoE |
+| --- | --- | --- |
+| 参数 | 一个 FFN | \`E\` × FFN |
+| 每 token FLOPs | 完整 FFN | ≈ \`top_k\` 个 expert |
+| 失败模式 | — | 无均衡时 expert 坍塌 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 定专家数 E、top-k、是否共享专家 |
-| **2** | 每专家一套 FFN + 路由线性 |
-| **3** | 训练加负载均衡等辅助损失 |
-| **4** | 推理按路由稀疏执行；检查点按专家存 |
+| 1 | 保留注意力 / norm；MLP → MoE |
+| 2 | 选 \`E\`、\`top_k\`（如 Mixtral 类 top-2） |
+| 3 | 认真训练时加负载均衡损失 |
+| 4 | 规划 expert 并行 / 分片加载 |
 
-本课是 API 引物，不是完整 Mixtral 训练栈。
-
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 路由合法；top-k 合并形状对 |
-| **软** | 负载不太塌；同算力下质量/容量权衡达标 |
+| **硬** | 路由合法；合并权重合理 |
+| **软** | expert 负载均衡；质量/容量折中 OK |
+| **软** | checkpoint 映射覆盖全部 expert |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 更多专家 / 更大 k | 容量或算力↑ |
-| 均衡损失 | 防专家塌缩 |
-| 替换 dense FFN | 架构级；需按 MoE 重训 |
-| 通信与落地 | 多卡专家并行是工程主成本 |
+| 更大 \`E\` / \`k\` | 容量 vs 算力 |
+| 均衡损失 | 对抗坍塌 |
+| Expert 并行 | 多卡工程成本 |
 
-### 5. 业界 · 开源
+### 6. 业界地图
 
-| 系 | 角色 |
+| 线路 | 角色 |
 | --- | --- |
-| **DeepSeek-V3** | 大 **MoE** + **MLA**（下一章）——开源非 dense 旗舰叙事 |
-| **Mixtral** | top-2 专家 SwiGLU 的 MoE |
-| **Qwen-MoE 等** | 各自 E/k 配方 |
-| **Llama 3.2 ~1B（本课）** | 先 dense——再读 DeepSeek 地图 |
+| **DeepSeek-V3** | 大 MoE + MLA（下一章） |
+| **Mixtral** | Top-2 SwiGLU experts |
+| **Llama 3.2 ~1B（本课）** | 先稠密 |
 
-### 6. 本课
+### 7. 本课
 
 \`\`\`bash
 python chapters/01-inference/ep14_moe.py
@@ -1842,7 +1896,7 @@ python chapters/01-inference/ep14_moe.py
 
 ## 下一章
 
-**MLA**（\`/cn/mla/\`）。
+**MLA**（\`/cn/mla/\`）：按 DeepSeek 方式压缩 KV。
 
 `,
   },
@@ -1856,41 +1910,66 @@ python chapters/01-inference/ep14_moe.py
     estimatedMinutes: 18,
     markdown: `## 要点
 
-从零做长上下文服务：GQA 之后 KV 仍可能爆——**MLA**（Multi-head Latent Attention）用低秩 latent 压缓存。和 **MoE** 合在一起，就是口语里 **DeepSeek-V2 / V3** 的一句话画像：MoE 管容量，MLA 管 KV。
+**是什么（What）：** **多头潜注意力（MLA）**——把 KV 压成低秩**潜变量**（外加一小段 RoPE 流），而不是缓存完整每头 K/V。
 
-### 1. 有什么作用
+**为什么（Why）：** GQA 之后，长上下文 KV 仍可能爆。DeepSeek-V2/V3 用 MLA 砍 cache；Llama/Qwen 稠密主线仍是 **GQA**。与 MoE 合读：**MoE = 容量，MLA = KV**。
 
-缓存 latent（+ 小段 RoPE 流）而非满头 K/V，需要时再展开。Llama / Qwen 主线仍是 **GQA**；DeepSeek 开源前沿线推 **MLA**。
+**怎么做（How）：** 选潜变量秩；投影到 latent；缓存 latent + RoPE key；注意力时再展开。本章是**形状入门**，不是 bit 级 DeepSeek 复刻。
 
-### 2. 从零开始：怎么生成
+### 1. What — cache 形状
+
+[\`MLACache\` / \`MultiHeadLatentAttention\`](https://github.com/chaxus/arche/blob/main/arche/mla.py)：
+
+\`\`\`python
+@dataclass
+class MLACache:
+    kv_latent: torch.Tensor  # (batch, seq, kv_lora_rank)
+    k_rope: torch.Tensor     # (batch, seq, rope_dim)
+\`\`\`
+
+当 rank ≪ heads×dim 时，远小于 \`(batch, kv_heads, seq, head_dim)\` 全量 KV。
+
+### 2. Why — 相对 GQA
+
+| | GQA（Llama 路） | MLA（DeepSeek 路） |
+| --- | --- | --- |
+| 存什么 | 共享 KV 头 | Latent + 小 RoPE |
+| 目标 | 砍头数 | 再砍秩 |
+| 替换成本 | 都是结构级 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 定 latent 维与投影 |
-| **2** | 训练期按 MLA 前向（与论文/开源实现对齐） |
-| **3** | 推理存 latent 缓存 |
-| **4** | 本课只给形状引物，不比特级复刻 |
+| 1 | 选 \`kv_lora_rank\`，可选 \`q_lora_rank\` |
+| 2 | RoPE 维与内容 latent 解耦 |
+| 3 | 解码步间缓存 latent |
+| 4 | 在同等质量条下对比相对 GQA 的显存 |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 缓存更小；前向形状自洽 |
-| **软** | 质量接近满 KV；实现与某正式版对齐（产品级） |
+| **硬** | 形状一致；cache 沿 seq 追加 |
+| **软** | cache 更小；质量接近产品条下的全量 KV |
+| **软** | 引擎对 MLA 的支持在增加 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-更小 latent → 更省、表达风险↑。与 GQA/分页正交可组合。换 MLA = 架构级，需按该配方训。
-
-### 5. 业界 · 开源
-
-| 系 | 注意力 / KV |
+| 杠杆 | 影响 |
 | --- | --- |
-| **DeepSeek-V2 / V3** | **MLA**（+ MoE 本体） |
-| **Llama 3 / Qwen dense** | **GQA** 主线 |
-| 引擎（vLLM 等） | 逐步加 MLA 支持 |
+| 更小 latent | 省显存 / 冒质量风险 |
+| + paging | 与 GQA 栈同一类服务技巧 |
+| 套在 Llama GQA 权重下混用 | 静默错注意力 |
 
-### 6. 本课
+### 6. 业界地图
+
+| 线路 | 注意力 / KV |
+| --- | --- |
+| **DeepSeek-V2 / V3** | MLA（+ MoE 躯干） |
+| **Llama 3 / Qwen 稠密** | GQA 主线 |
+
+### 7. 本课
 
 \`\`\`bash
 python chapters/01-inference/ep15_mla.py
@@ -1903,7 +1982,6 @@ python chapters/01-inference/ep15_mla.py
 \`\`\`
 
 ## 下一章
-
 
 **前沿检查点**（\`/cn/frontier-ckpt/\`）。
 
@@ -1920,37 +1998,55 @@ python chapters/01-inference/ep15_mla.py
     demo: 'chat',
     markdown: `## 要点
 
-从零模型要**给人用**：设备、体积、对话格式是上线胶水——不算新层，但缺一不可。
+**是什么（What）：** 上线胶水——**设备**放置、教学用 **INT8** 缩小，以及把角色变成 token id 的 **chat 模板**。
 
-### 1. 有什么作用
+**为什么（Why）：** 稠密栈写对了，若跑不起来、塞不进显存、或对话格式错，用户仍然失败。这些不是新层，是最后一公里。
 
-1. **设备** CUDA→MPS→CPU  
-2. **量化（教学 INT8）** 缩小权重  
-3. **对话模板** 角色→模型字符串  
+**怎么做（How）：** 探测设备 → 可选量化菜谱 → 套**本模型自己的**模板 → 接入 generate / KV。
 
-### 2. 从零开始：怎么做
+### 1. What — 零件
+
+| 零件 | 仓库里的角色 |
+| --- | --- |
+| 设备回退 | 演示用 CPU/CUDA/MPS |
+| INT8 玩具 | 教学缩小——不是生产 GPTQ/AWQ/FP8 |
+| Chat 模板 | [\`apply_chat_template\` / \`encode_chat\`](https://github.com/chaxus/arche/blob/main/arche/chat.py) |
+
+模板错 ⇒ 权重再完美也会「无视」system/user 结构。
+
+### 2. Why — 产品压力
+
+| 压力 | 应对 |
+| --- | --- |
+| 没 GPU | CPU 通路要能跑（实验慢可接受） |
+| 显存紧 | 量化 / 更小 dtype |
+| 多轮体验 | 官方 chat 模板 + specials |
+| 多后端 | 工程成本，不是新数学 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 探测后端，模块 \`.to(device)\` |
-| **2** | 需要落地时选量化配方（本课 INT8 示意；产品常用 GPTQ/AWQ/FP8…） |
-| **3** | 使用**该模型自带** chat template，勿自创 |
-| **4** | 与生成循环、KV 一起接到服务 |
+| 1 | 探测可用设备 |
+| 2 | 以可跑 dtype 加载权重 |
+| 3 | 用**配对**模板格式化消息 |
+| 4 | 照常带 KV 生成 |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 无 CUDA 可回退；模板与模型配对 |
-| **软** | 量化后质量可接受；多轮角色清晰 |
+| **硬** | 回退能跑；模板对齐分词器/模型 |
+| **软** | 量化质量达到演示条 |
+| **软** | 角色在 prompt 字符串/ids 里清晰 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-更强量化 → 更小更快、质量风险↑。错模板 → 胡话。多后端维护成本在工程不在算法。
-
-### 5. 业界 · 开源
-
-HF \`apply_chat_template\`；vLLM/TGI 内置模板与量化加载；Llama/Qwen 均带官方模板。llama.cpp 系偏 GGML 量化。
+| 杠杆 | 影响 |
+| --- | --- |
+| 更狠的量化 | 更小/更快/更险 |
+| 错模板 | 对话垃圾 |
+| 生产量化 | 引擎地盘（vLLM/TGI/llama.cpp） |
 
 ### 6. 本课
 
@@ -1981,34 +2077,56 @@ python chapters/01-inference/ep16_device_quant_chat.py
     demo: 'batch',
     markdown: `## 要点
 
-从零单用户循环 → 业界要**多用户共用步进**：连续批是服务利用率的核心调度形状。
+**是什么（What）：** **连续批处理**——服务端**调度**形状：多用户共享解码 step；完成的退役；新请求中途准入。
 
-### 1. 有什么作用
+**为什么（Why）：** 单用户 generate 在短序列早结束后浪费 GPU。工业引擎（vLLM、TGI、SGLang…）只对**活跃**请求一起迈步，把设备喂饱。
 
-多任务共享一步；结束退役；新请求填入。教学版**不是**完整 vLLM。
+**怎么做（How）：** 活跃集 → pad/步进 → 采样 → EOS/长度退役 → 重复。教学调度器 ≠ 完整 paged-attention 引擎。
 
-### 2. 从零开始：怎么生成
+### 1. What — 环
+
+[\`generate_continuous\`](https://github.com/chaxus/arche/blob/main/arche/batching.py)：
+
+\`\`\`python
+while any(not item.done for item in live):
+    active = [item for item in live if not item.done]
+    # pad 活跃行 → model(batch) → 逐行采样 → 退役完成者
+\`\`\`
+
+每个请求自带 temperature / top-k / 最大长度。不改权重——纯调度。
+
+### 2. Why — 吞吐
+
+| 单环 | 连续批 |
+| --- | --- |
+| 一人独占 step | 多人共享 step |
+| 短请求结束后空转 | 退役 + 准入保持 GPU 满 |
+| 简单 | 生产要小心 KV 布局 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 维护「活跃序列」集合 |
-| **2** | 每步只前向仍活跃者 |
-| **3** | 结束移除；接入分页 KV（后章）才接近生产 |
+| 1 | 表示每个任务（\`DecodeRequest\`） |
+| 2 | 每步只对**活跃**行组 tensor |
+| 3 | EOS / 长度时退役 |
+| 4 | 随后用 paged KV 让显存匹配调度 |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 结束必退役；序列互不串结果 |
-| **软** | GPU 更满、尾延迟更稳 |
+| **硬** | 完成的会停；行间不串话 |
+| **软** | 长短混合流量下 tokens/s 更高 |
+| **软** | 负载下尾延迟更稳 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-更好调度 → 同硬件更高吞吐。与模型权重无关，但与 KV 布局强耦合。做错会串话或漏停。
-
-### 5. 业界 · 开源
-
-vLLM 连续批 + paged attention 事实标准；TGI、TensorRT-LLM、SGLang 等同思路不同实现。
+| 杠杆 | 影响 |
+| --- | --- |
+| 更好调度 | 同权重更高吞吐 |
+| 耦合 KV 布局 | 生产要 paging / block |
+| 忽略批处理 | GPU 白白闲着 |
 
 ### 6. 本课
 
@@ -2023,7 +2141,6 @@ python chapters/01-inference/ep17_continuous_batching.py
 \`\`\`
 
 ## 下一章
-
 
 **Paged KV · CUDA Graph**（\`/cn/paged-cuda-graph/\`）。
 
@@ -2040,36 +2157,60 @@ python chapters/01-inference/ep17_continuous_batching.py
     demo: 'train',
     markdown: `## 要点
 
-Part 2 收尾：预训练后仍要**对齐**——SFT 教会跟随；DPO/RLHF 一类推向偏好。之后进入 Part 3，把生成做成可服务的解码。
+**是什么（What）：** **预训练之后的对齐**——SFT 教「像示范那样答」；DPO（以及 RLHF 族）在**选中 vs 拒绝**偏好上推一把（本章不做完整 RL）。
 
-### 1. 有什么作用
+**为什么（Why）：** Next-token 预训练做出底座 LM；它本身不会自动听话或贴合产品偏好。对齐是转向，**不是**从零发明猜词能力。
 
-- **SFT**：提示→回答；掩提示；loss 只在回复  
-- **DPO**：相对 reference，抬 chosen、压 rejected  
+**怎么做（How）：** 指令数据 → 从底座 ckpt 做 mask-prompt SFT → 偏好对 → DPO（或 RLHF）→ 回归评测。
 
-### 2. 从零开始：怎么做
+### 1. What — SFT 损失
+
+[\`sft_loss\`](https://github.com/chaxus/arche/blob/main/arche/train/sft.py)：与预训练同样错位，但 **只对回复 token** 算 CE：
+
+\`\`\`python
+mask[i, start:] = True  # start ≈ prompt_len - 1
+return losses[mask].mean()
+\`\`\`
+
+Prompt 是上下文，不是监督目标——否则模型在「学着改写用户」。
+
+### 2. What — DPO 草图
+
+[\`dpo_loss\`](https://github.com/chaxus/arche/blob/main/arche/train/dpo.py)：策略 vs 冻结的 **reference**；相对 ref 拉高 chosen、压低 rejected（β 缩放）。
+
+| 阶段 | 数据 | 目标 |
+| --- | --- | --- |
+| **SFT** | prompt → 好回复 | 回复段 CE |
+| **DPO** | prompt + chosen/rejected | 相对 ref 的 logprob 边际 |
+| **RLHF**（仅地图） | 奖励模型 + PPO 类 | 本章不实现 |
+
+### 3. Why — 顺序与风险
+
+| 选择 | 原因 |
+| --- | --- |
+| 放在预训练后 | 需要会猜词的底座 |
+| Mask prompt | 别把 loss 烧在用户文本上 |
+| DPO 里冻结 ref | 锚定，防策略无界漂 |
+| 数据 > 盲目加步 | 烂示范教出烂习惯 |
+
+过度对齐会钝化底座；常与新 special / chat 模板一起上。
+
+### 4. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 准备指令数据 / 偏好对 |
-| **2** | 从预训练检查点续训 SFT |
-| **3** | 再 DPO/RLHF（配方任选） |
-| **4** | 评估拒答、跟随、回归 |
+| 1 | 从 base（或 instruct）checkpoint 出发 |
+| 2 | 造 prompt/response ids + \`prompt_lens\` |
+| 3 | 玩具 \`train_sft_step\` / \`train_dpo_step\` |
+| 4 | 上线前评 following + 回归 |
 
-### 3. 怎么样算好
+### 5. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | SFT 掩码对；DPO 样本与 reference 形对 |
-| **软** | 更听指令、更安全；少伤预训练能力 |
-
-### 4. 如何改进 · 对整模影响
-
-数据质量 > 盲目步数。过强对齐可能「变傻」。可与扩特殊符、改模板一起做。
-
-### 5. 业界 · 开源
-
-Llama/Qwen 均有 Instruct/Chat 变体；Zephyr 等推 DPO；OpenAI/Anthropic 用 RLHF 变体（细节不全开）。TRL 等库是开源对齐常用工具。
+| **硬** | mask/形状正确；DPO 中 ref 冻结 |
+| **软** | 更听话 / 更安全；能力损失可控 |
+| **软** | 模板与分词器仍配对 |
 
 ### 6. 本课
 
@@ -2085,8 +2226,7 @@ python chapters/02-training/ep19_sft_dpo.py
 
 ## 下一章
 
-
-**KV 缓存**（\`/cn/kv-cache/\`）：生成要能服务，先把解码成本打下来。
+**KV cache**（\`/cn/kv-cache/\`）：服务前先让解码负担得起。
 
 `,
   },
@@ -2100,30 +2240,48 @@ python chapters/02-training/ep19_sft_dpo.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-从零若走上 MoE/MLA，检查点**名字与形状**必须接得住开放权重——否则前沿结构只停留在纸上。
+**是什么（What）：** 会说 MoE/MLA 类开源权重的 **检查点名字与形状**——带键映射地存/取，包括 Mixtral 风格的 \`w1/w2/w3\` expert 张量。
 
-### 1. 有什么作用
+**为什么（Why）：** 前沿结构停在纸上没用，张量来回不过就白搭。映射烂 → expert 静默变随机。
 
-教学往返检查点；Mixtral 风 \`w1/w2/w3\` 映射到本课模块名。
+**怎么做（How）：** 名字映射 ↔ 开源名；[\`save_checkpoint\` / \`load_checkpoint\`](https://github.com/chaxus/arche/blob/main/arche/checkpoint.py)；缺键要大声失败。
 
-### 2. 从零开始：怎么做
+### 1. What — 往返
 
-设计模块名 ↔ 开源名映射；保存/加载；缺 key 失败要响。
+教学 ckpt：写下 state + meta，装回匹配的模块图，断言对齐。Expert 键必须齐全——部分加载的 MoE 看起来「能跑」，直到某个 expert 是噪声。
 
-### 3. 怎么样算好
+### 2. Why — 命名债
+
+| 风险 | 后果 |
+| --- | --- |
+| HF vs 本地名漂移 | 缺键 / 槽位错 |
+| Expert 下标差一 | 一个 expert 永久死亡 |
+| 滥用 strict=False | 藏映射 bug |
+
+### 3. How — 从零
+
+| 步骤 | 做什么 |
+| --- | --- |
+| 1 | 列出开源 hub 键模式（Mixtral / DeepSeek 文档） |
+| 2 | 显式映射进你的模块 |
+| 3 | 先在微型合成 ckpt 上往返 |
+| 4 | 再碰数 GB 下载 |
+
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 往返对齐；专家权重全覆盖 |
-| **软** | 能接真开放权重仓库 |
+| **硬** | 往返 \`allclose\`；expert 不缺 |
+| **硬** | 意外键失败或被显式忽略 |
+| **软** | 钩子能接真 hub |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-映射错 → 静默随机专家。统一命名减少工程债。
-
-### 5. 业界 · 开源
-
-HF 分片 + 文档化 key；Mixtral/DeepSeek 各自命名。转换脚本是生态标配。
+| 杠杆 | 影响 |
+| --- | --- |
+| 命名一致 | 少转换债 |
+| 烂映射 | 静默质量窟窿 |
+| 转换器成标配 | 与稠密 HF 映射同一故事 |
 
 ### 6. 本课
 
@@ -2138,7 +2296,6 @@ python chapters/02-training/ep20_frontier_ckpt.py
 \`\`\`
 
 ## 下一章
-
 
 **分片 MoE / MLA**（\`/cn/sharded-frontier/\`）。
 
@@ -2154,36 +2311,63 @@ python chapters/02-training/ep20_frontier_ckpt.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-从零训到大模型：权重是 **index.json + 分片**。不会拼分片就接不住开放前沿权重。
+**是什么（What）：** 开源前沿权重以 **\`index.json\` + 分片** 到来，不是单文件。学会按这套布局打包/还原。
 
-### 1. 有什么作用
+**为什么（Why）：** 组不齐分片 ⇒ 加载不了 Llama/Qwen/DeepSeek/Mixtral 级 hub。拼接错 ⇒ 张量静默错误。
 
-合成分片练习 pack/unpack，装回 \`allclose\`——免下几十 GB。
+**怎么做（How）：** HF 风格 index；按键分区；写分片文件；加载时聚合——玩具体积，同一协议。
 
-### 2. 从零开始：怎么做
+### 1. What — API
 
-按 HF 习惯写 index；按张量切分保存；加载时按 index 聚合。
+[\`write_sharded_state\` / \`load_sharded_state\`](https://github.com/chaxus/arche/blob/main/arche/shards.py)：
 
-### 3. 怎么样算好
+\`\`\`python
+write_sharded_state(directory, state_dict, shard_size=...)
+state = load_sharded_state(directory)  # 经 index 重建完整 dict
+\`\`\`
+
+合成 pack/unpack + \`allclose\` 教协议，**不必**下几十 GB。
+
+### 2. Why — 规模现实
+
+| 单文件 | 分片 |
+| --- | --- |
+| 演示简单 | 大模型 hub 默认 |
+| 一条下载流 | 可并行拉分片 |
+| 峰值 RAM = 全模 | 仍要小心组装 |
+
+### 3. How — 从零
+
+| 步骤 | 做什么 |
+| --- | --- |
+| 1 | 写出 张量名 → 分片文件 的 index |
+| 2 | 按大小/数量策略切开 |
+| 3 | 加载：读 index，只拉需要的分片 |
+| 4 | 缺件时失败要清楚 |
+
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | index 与分片一致；装回对齐；缺片报错清楚 |
-| **软** | 兼容真仓库格式 |
+| **硬** | index 与分片一致；重载对齐 |
+| **硬** | 缺分片/缺键错误响亮 |
+| **软** | 分片策略在下载并行与峰值 RAM 间折中 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-分片策略影响下载并行与内存峰值；错拼 = 静默坏权。
-
-### 5. 业界 · 开源
-
-HF Hub 分片是标准；Llama/Qwen/DeepSeek/Mixtral 均如此。\`safetensors\` + index 是主格式。
+| 杠杆 | 影响 |
+| --- | --- |
+| 分片策略 | 并行度与内存峰值 |
+| 拼接错 | 静默坏权重 |
+| safetensors + index | 业界主流组合 |
 
 ### 6. 本课
 
 \`\`\`bash
 python chapters/02-training/ep22_sharded_frontier.py
 \`\`\`
+
+整条路径完成——可回看弱章，或带着权重重跑 HF 对齐。
 
 ## 动手
 
@@ -2193,8 +2377,7 @@ python chapters/02-training/ep22_sharded_frontier.py
 
 ## 下一章
 
-
-路径走完——可回看薄弱章，或有权重时再跑 HF 对齐。
+路径完成——回看弱章，或带着权重重跑 HF 对齐。
 
 `,
   },
@@ -2208,33 +2391,51 @@ python chapters/02-training/ep22_sharded_frontier.py
     estimatedMinutes: 18,
     markdown: `## 要点
 
-Part 3 收尾引物：**分页 KV** 管显存碎片，**CUDA Graph** 砍固定形状启动税——对接 vLLM 一类引擎。下一 Part 进入 MoE/MLA 等前沿结构。
+**是什么（What）：** 两件服务加速——**paged KV**（block table + 共享页池）抗显存碎片；**CUDA Graph** 捕获固定形状的 decode 步，砍启动税。
 
-### 1. 有什么作用
+**为什么（Why）：** 连续批没有 paging，长短不齐会浪费显存；每次小小 decode 的 eager 启动也贵。合在一起指向 vLLM 级引擎——本章是教学替身，不是可替换插件。
 
-1. Paged KV：定长块 + 块表 + gather  
-2. CUDA Graph：捕获固定 shape 计算  
+**怎么做（How）：** 逻辑 KV → 经 block table 申请/释放页 → \`gather_kv\` 供注意力；形状稳定时可选用 graph 捕获。
 
-教学 ≠ 可替换 vLLM。
+### 1. What — paged KV
 
-### 2. 从零开始：怎么做
+[\`PagedKVPool\` / \`BlockTable\` / \`gather_kv\`](https://github.com/chaxus/arche/blob/main/arche/paged_kv.py)：
 
-先连续批与逻辑 KV → 引入块表分配/回收 → 可选 Graph 捕获 decode 步。
+\`\`\`python
+append_kv(pool, table, k, v)
+cache = gather_kv(pool, table)
+\`\`\`
 
-### 3. 怎么样算好
+物理页共享；每条序列持有一串 page id。
+
+### 2. What — CUDA Graph（可选）
+
+[\`capture_module_step\` / \`generate_with_optional_graph\`](https://github.com/chaxus/arche/blob/main/arche/cuda_graphs.py)：有 CUDA 时捕获一步并回放。需要**稳定形状**——引擎才在乎批策略。
+
+### 3. Why — 朝引擎迈一步
+
+| 零件 | 打中的痛 |
+| --- | --- |
+| Paging | 碎片 + 多用户打包 |
+| Graph | 每步 CPU 启动开销 |
+| 都不改权重 | 只抬高服务天花板 |
+
+### 4. How — 从零
+
+| 步骤 | 做什么 |
+| --- | --- |
+| 1 | 先有连续批心智模型 |
+| 2 | 页池 + 每序列 block table |
+| 3 | 注意力前 gather（教学路径） |
+| 4 | 形状冻住后可选捕获 decode |
+
+### 5. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | gather 与逻辑缓存一致；块表不越界 |
-| **软** | 更少碎片、更少启动；吞吐↑ |
-
-### 4. 如何改进 · 对整模影响
-
-页大小、预分配策略改吞吐与浪费。Graph 要求形状稳；动态 batch 要小心重捕获。不改模型权重，改服务上限。
-
-### 5. 业界 · 开源
-
-vLLM paged attention 标杆；TensorRT-LLM/SGLang 有图与分页变体；与 Llama/Qwen/DeepSeek 权重搭配使用。
+| **硬** | gather 对齐逻辑 cache；表不越界 |
+| **软** | 更少碎片 / 启动税；更高吞吐 |
+| **软** | 无 CUDA 时干净跳过 |
 
 ### 6. 本课
 
@@ -2242,7 +2443,7 @@ vLLM paged attention 标杆；TensorRT-LLM/SGLang 有图与分页变体；与 Ll
 python chapters/01-inference/ep23_paged_cuda_graph.py
 \`\`\`
 
-路径走完：可回看薄弱章，或有权重时跑 HF 对齐。
+第 3 部分结束；第 4 部分进入 MoE/MLA 前沿结构地图。
 
 ## 动手
 
@@ -2252,8 +2453,7 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## 下一章
 
-
-**MoE**（\`/cn/moe/\`）：进入前沿结构。
+**MoE**（\`/cn/moe/\`）：用稀疏专家换前沿容量。
 
 `,
   },

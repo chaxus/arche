@@ -1623,27 +1623,62 @@ No weights/login → skip means “can’t download,” not “your math is wron
     demo: 'kv',
     markdown: `## Idea
 
-From zero to serving: a correct generate loop isn’t enough—**without KV cache long decode is unusable**.
+**What:** **KV cache** — after prefill, keep each layer’s Keys/Values and **append** one new step at decode instead of recomputing the whole past.
 
-### 1. What it is for
+**Why:** A correct generate loop without cache recomputes attention over growing history every token → unusable at product lengths. Every production decoder caches KV.
 
-Prefill stores K/V; decode appends one step and attends to the cache.
+**How:** Per-layer \`KVCache\`; prefill writes full K/V; decode concatenates the new slice; GQA/MLA/paging shrink what you store.
 
-### 2. From zero: how you build it
+### 1. What — structure
 
-Per-layer buffers; prefill write; decode append; later paging + GQA/MLA to shrink.
+[\`KVCache\`](https://github.com/chaxus/arche/blob/main/arche/cache.py):
 
-### 3. What “good” means
+\`\`\`python
+@dataclass
+class KVCache:
+    k: torch.Tensor  # (batch, kv_heads, seq, head_dim)
+    v: torch.Tensor
 
-Matches full recompute; no layer mixups; cost grows with new tokens; memory OK.
+    def append(self, k, v):
+        return KVCache(k=torch.cat([self.k, k], dim=-2), v=torch.cat([self.v, v], dim=-2))
+\`\`\`
 
-### 4. Improve · whole-model impact
+Attention ([\`CausalSelfAttention\`](https://github.com/chaxus/arche/blob/main/arche/attention.py)) RoPE-applies the new Q/K, merges into cache, then SDPA over **full** cached K/V.
 
-GQA/MLA/paging/KV-quant cut memory; without cache only toy lengths work.
+### 2. Why — cost shape
 
-### 5. Industry · open models
+| Mode | Work per new token |
+| --- | --- |
+| No cache | Re-embed + full stack over all past ids |
+| With cache | One new position’s Q/K/V + attend to cache |
+| Memory | Grows with \`layers × n_kv × seq × dim\` |
 
-Every production decoder caches KV (vLLM, TGI, llama.cpp…).
+GQA already cut \`n_kv\`; paging (later) fights fragmentation across users.
+
+### 3. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | One cache slot per layer |
+| 2 | Prefill: \`cache=None\`, write full prompt K/V |
+| 3 | Decode: pass cache + \`start_pos\`, append one step |
+| 4 | Never mix layers’ caches |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Matches full recompute numerically (toy check) |
+| **Hard** | No layer mixups; seq dim only grows |
+| **Soft** | Memory fits target context × batch |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| GQA / MLA / KV-quant | Smaller cache |
+| Paging | Multi-user packing |
+| No cache | Toy lengths only |
 
 ### 6. This course
 
@@ -1673,27 +1708,50 @@ python chapters/01-inference/ep12_kv_cache.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-After short-context from-zero training, products want 128K-class windows—**RoPE scaling** is a recipe extension, not casually stretching indices.
+**What:** **RoPE scaling** — adjust rotary frequencies (Llama 3-style wavelength smoothing) so positions beyond the original train window stay usable.
 
-### 1. What it is for
+**Why:** Short-context pretrain + naive long indices → rotations wrap badly; quality collapses far out. Long-context products need a **recipe extension**, not “just set max_seq bigger.”
 
-Llama 3-style wavelength smoothing (large theta + factors) so long positions don’t wrap badly.
+**How:** Match checkpoint \`theta\` + scale factors; optionally continue-train on long data; eval short and long.
 
-### 2. From zero: how you build it
+### 1. What — code hook
 
-Train at base length → enable checkpoint-matched scaling and/or continue long-data train → eval long context.
+[\`llama3_inv_freq\`](https://github.com/chaxus/arche/blob/main/arche/rope.py) / \`build_rope_cache(..., scale_factor=..., low_freq_factor=..., high_freq_factor=..., original_max_position=...)\`.
 
-### 3. What “good” means
+When \`scale_factor == 1.0\`, plain RoPE. Otherwise wavelength bands are scaled/smoothed the HF Llama-3 way—**same math the 128k-class configs advertise**.
 
-Match checkpoint config; near stable; far usable; long-bench OK.
+### 2. Why — not free length
 
-### 4. Improve · whole-model impact
+| Illusion | Reality |
+| --- | --- |
+| Stretch indices only | High-freq bands misbehave |
+| Bigger window free | KV memory ↑ with length |
+| Scaling = long knowledge | Still need data / continued train for hard long tasks |
 
-Wrong scaling breaks long (and maybe short) context; bigger windows raise KV cost; scaling ≠ free long-range knowledge.
+### 3. How — from zero
 
-### 5. Industry · open models
+| Step | Do |
+| --- | --- |
+| 1 | Read official rope scaling fields from the ckpt config |
+| 2 | Build cos/sin with those factors |
+| 3 | Keep short-context sanity checks |
+| 4 | Long-bench / needle tests before claiming 128k |
 
-Llama 3/3.2 official long-context; Qwen/DeepSeek own recipes; YaRN/NTK in open long-context work.
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Factors match the checkpoint |
+| **Soft** | Near context still stable; far context usable |
+| **Soft** | Long-bench acceptable for the product bar |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Wrong scaling | Breaks long (and maybe short) |
+| YaRN / NTK / … | Other open recipes—don’t mix under Llama weights |
+| Longer windows | Always pay in KV |
 
 ### 6. This course
 
@@ -1708,7 +1766,6 @@ python chapters/01-inference/ep13_rope_scaling.py
 \`\`\`
 
 ## Next
-
 
 **Device · INT8 · chat** (\`/device-quant-chat/\`).
 
@@ -1724,34 +1781,67 @@ python chapters/01-inference/ep13_rope_scaling.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-From zero, huge capacity at controlled compute often means **MoE**—sparse experts. **DeepSeek-V3**’s open story is largely **MoE (capacity) + MLA (KV)**; this chapter is the MoE half. Mixtral is another open MoE; our Llama 3.2 example stayed **dense** on purpose.
+**What:** **Mixture-of-Experts (MoE)** — replace the dense SwiGLU with **many experts + a router**; each token runs **top-k** only.
 
-### 1. What it is for
+**Why:** Huge parameter capacity at near-dense **per-token** compute. **DeepSeek-V3**’s open story is largely **MoE (capacity) + MLA (KV)**; Mixtral is another open MoE. This course’s Llama 3.2 example stayed **dense** on purpose—MoE is the map after you can read the dense FFN.
 
-Many SwiGLU experts + router; each token runs top-k only. Replaces the dense FFN you wrote earlier—same decoder spine, different capacity trick.
+**How:** Pick \`E\` / \`top_k\`; experts + gate; aux load-balance in real trains; sparse infer; shard experts in checkpoints.
 
-### 2. From zero: how you build it
+### 1. What — forward
 
-Pick E/top-k; experts + router; aux load-balance; sparse infer; shard experts in checkpoints. This lesson is an API primer.
+[\`MoESwiGLU\`](https://github.com/chaxus/arche/blob/main/arche/moe.py):
 
-### 3. What “good” means
+\`\`\`python
+logits = self.gate(x)
+probs = F.softmax(logits, dim=-1)
+top_probs, top_idx = probs.topk(self.top_k, dim=-1)
+# weighted sum of selected SwiGLU experts
+\`\`\`
 
-Valid routes; correct merge; balanced load; quality/capacity trade OK.
+Same decoder spine; only the MLP slot changes.
 
-### 4. Improve · whole-model impact
+### 2. Why — dense vs sparse
 
-More experts/k ⇒ capacity/compute; balance loss fights collapse; replacing dense FFN is architecture-level; multi-GPU expert parallel is the engineering cost.
+| | Dense SwiGLU | MoE |
+| --- | --- | --- |
+| Params | One FFN | \`E\` × FFN |
+| Per-token FLOPs | Full FFN | ≈ \`top_k\` experts |
+| Failure mode | — | Expert collapse without balancing |
 
-### 5. Industry · open models
+### 3. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | Keep attention / norms; swap MLP → MoE |
+| 2 | Choose \`E\`, \`top_k\` (e.g. Mixtral-like top-2) |
+| 3 | Add load-balance loss in serious training |
+| 4 | Plan expert-parallel / sharded loads |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Valid routes; merge weights sum sanely |
+| **Soft** | Balanced expert load; quality/capacity trade OK |
+| **Soft** | Checkpoint maps cover all experts |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| More \`E\` / \`k\` | Capacity vs compute |
+| Balance loss | Fights collapse |
+| Expert parallel | Multi-GPU engineering cost |
+
+### 6. Industry map
 
 | Line | Role |
 | --- | --- |
-| **DeepSeek-V3** | Large **MoE** + **MLA** (next chapter)—flagship open non-dense stack |
-| **Mixtral** | MoE with top-2 SwiGLU experts |
-| **Qwen-MoE** | Own E/k recipes |
-| **Llama 3.2 ~1B (this course)** | Dense first—then you can read DeepSeek’s map |
+| **DeepSeek-V3** | Large MoE + MLA (next) |
+| **Mixtral** | Top-2 SwiGLU experts |
+| **Llama 3.2 ~1B (course)** | Dense first |
 
-### 6. This course
+### 7. This course
 
 \`\`\`bash
 python chapters/01-inference/ep14_moe.py
@@ -1765,7 +1855,7 @@ python chapters/01-inference/ep14_moe.py
 
 ## Next
 
-**MLA** (\`/mla/\`).
+**MLA** (\`/mla/\`): compress KV the DeepSeek way.
 
 `,
   },
@@ -1779,33 +1869,66 @@ python chapters/01-inference/ep14_moe.py
     estimatedMinutes: 18,
     markdown: `## Idea
 
-From-zero long-context serving: after GQA, KV can still explode—**MLA** (Multi-head Latent Attention) compresses cache with latents. Together with **MoE**, this is the usual one-line picture of **DeepSeek-V2 / V3**: MoE for capacity, MLA for KV.
+**What:** **Multi-head Latent Attention (MLA)** — compress KV into low-rank **latents** (+ a small RoPE stream) instead of caching full per-head K/V.
 
-### 1. What it is for
+**Why:** After GQA, long-context KV can still explode. DeepSeek-V2/V3 push MLA for cache; Llama/Qwen dense mainlines stay on **GQA**. Together with MoE: **MoE = capacity, MLA = KV**.
 
-Store low-rank latents (+ small RoPE stream), expand when needed. Llama / Qwen mainlines stay on **GQA**; DeepSeek’s open frontier line pushes **MLA**.
+**How:** Pick latent rank; project to latent; cache latent + RoPE key; expand when attending. This lesson is a **shape primer**, not bit-exact DeepSeek.
 
-### 2. From zero: how you build it
+### 1. What — cache shape
 
-Pick latent dim; train MLA forward; cache latents; this lesson is a shape primer, not bit-exact.
+[\`MLACache\` / \`MultiHeadLatentAttention\`](https://github.com/chaxus/arche/blob/main/arche/mla.py):
 
-### 3. What “good” means
+\`\`\`python
+@dataclass
+class MLACache:
+    kv_latent: torch.Tensor  # (batch, seq, kv_lora_rank)
+    k_rope: torch.Tensor     # (batch, seq, rope_dim)
+\`\`\`
 
-Smaller cache; consistent shapes; quality near full KV at product bar.
+Much smaller than \`(batch, kv_heads, seq, head_dim)\` full KV when rank ≪ heads×dim.
 
-### 4. Improve · whole-model impact
+### 2. Why — vs GQA
 
-Smaller latent ⇒ save memory / risk quality; composable with paging; architecture-level change.
+| | GQA (Llama path) | MLA (DeepSeek path) |
+| --- | --- | --- |
+| Store | Shared KV heads | Latent + tiny RoPE |
+| Goal | Cut heads | Cut rank further |
+| Swap cost | Architecture-level either way |
 
-### 5. Industry · open models
+### 3. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | Choose \`kv_lora_rank\`, optional \`q_lora_rank\` |
+| 2 | Decouple RoPE dims from content latent |
+| 3 | Cache latents across decode steps |
+| 4 | Compare memory vs GQA at same quality bar |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Consistent shapes; cache append along seq |
+| **Soft** | Smaller cache; quality near full KV for the product bar |
+| **Soft** | Engines gaining MLA support over time |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Smaller latent | Save memory / risk quality |
+| + paging | Same serve tricks as GQA stacks |
+| Don’t mix under Llama GQA weights | Silent wrong attention |
+
+### 6. Industry map
 
 | Line | Attention / KV |
 | --- | --- |
-| **DeepSeek-V2 / V3** | **MLA** (+ MoE body) |
-| **Llama 3 / Qwen dense** | **GQA** mainline |
-| Engines (vLLM, …) | Adding MLA support over time |
+| **DeepSeek-V2 / V3** | MLA (+ MoE body) |
+| **Llama 3 / Qwen dense** | GQA mainline |
 
-### 6. This course
+### 7. This course
 
 \`\`\`bash
 python chapters/01-inference/ep15_mla.py
@@ -1818,7 +1941,6 @@ python chapters/01-inference/ep15_mla.py
 \`\`\`
 
 ## Next
-
 
 **Frontier checkpoints** (\`/frontier-ckpt/\`).
 
@@ -1835,27 +1957,55 @@ python chapters/01-inference/ep15_mla.py
     demo: 'chat',
     markdown: `## Idea
 
-From-zero models must **ship to humans**: device, size, chat format—glue, not new layers.
+**What:** Shipping glue — **device** placement, a teaching **INT8** shrink, and **chat templates** that turn roles into token ids.
 
-### 1. What it is for
+**Why:** A correct dense stack still fails users if it can’t run on their box, doesn’t fit memory, or formats chat wrong. These are not new layers; they are the last mile.
 
-Device fallback; teaching INT8 shrink; chat templates.
+**How:** Probe device → optional quant recipe → apply **this model’s** template → wire into generate / KV.
 
-### 2. From zero: how you build it
+### 1. What — pieces
 
-Probe device → pick quant recipe (INT8 toy; GPTQ/AWQ/FP8 in prod) → **model’s own** template → wire with generate/KV.
+| Piece | Role in repo |
+| --- | --- |
+| Device fallback | CPU/CUDA/MPS pick for demos |
+| INT8 toy | Teaching shrink—not GPTQ/AWQ/FP8 production |
+| Chat template | [\`apply_chat_template\` / \`encode_chat\`](https://github.com/chaxus/arche/blob/main/arche/chat.py) |
 
-### 3. What “good” means
+Wrong template ⇒ model “ignores” system/user structure even with perfect weights.
 
-Fallback works; template paired; quant quality OK; clear roles.
+### 2. Why — product constraints
 
-### 4. Improve · whole-model impact
+| Pressure | Response |
+| --- | --- |
+| No GPU | CPU path must work (slow OK for labs) |
+| VRAM tight | Quant / smaller dtype |
+| Multi-turn UX | Official chat template + specials |
+| Multi-backend | Engineering cost, not math |
 
-Harder quant ⇒ smaller/faster/riskier; wrong template ⇒ junk; multi-backend is engineering cost.
+### 3. How — from zero
 
-### 5. Industry · open models
+| Step | Do |
+| --- | --- |
+| 1 | Probe available device |
+| 2 | Load weights in a runnable dtype |
+| 3 | Format messages with the **paired** template |
+| 4 | Generate with KV as usual |
 
-HF chat templates; vLLM/TGI load quant+template; Llama/Qwen ship official templates; llama.cpp/GGML quants.
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Fallback runs; template matches tokenizer/model |
+| **Soft** | Quant quality acceptable for the demo bar |
+| **Soft** | Roles render clearly in the prompt string/ids |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Harder quant | Smaller/faster/riskier |
+| Wrong template | Junk dialogues |
+| Prod quant (GPTQ/AWQ/FP8) | Engine territory (vLLM/TGI/llama.cpp) |
 
 ### 6. This course
 
@@ -1886,27 +2036,56 @@ python chapters/01-inference/ep16_device_quant_chat.py
     demo: 'batch',
     markdown: `## Idea
 
-From zero single-user loops → industry **multi-user shared stepping**: continuous batching is the serving schedule shape.
+**What:** **Continuous batching** — a serving **scheduler** shape: many users share decode steps; finished jobs retire; new ones admit mid-flight.
 
-### 1. What it is for
+**Why:** Single-user generate wastes GPU when one sequence finishes early. Industry engines (vLLM, TGI, SGLang…) keep the device busy by stepping only **active** requests together.
 
-Share a step among jobs; retire finished; admit new. Teaching ≠ full vLLM.
+**How:** Active set → pad/step actives → sample → retire EOS/max → repeat. Teaching scheduler ≠ full paged-attention engine.
 
-### 2. From zero: how you build it
+### 1. What — loop
 
-Active set → step only actives → retire; add paged KV later for production shape.
+[\`generate_continuous\`](https://github.com/chaxus/arche/blob/main/arche/batching.py):
 
-### 3. What “good” means
+\`\`\`python
+while any(not item.done for item in live):
+    active = [item for item in live if not item.done]
+    # pad active rows → model(batch) → sample per row → retire finished
+\`\`\`
 
-Retire finished; no cross-talk; fuller GPU / steadier tail latency.
+Each request carries its own temperature / top-k / max tokens. No weight change—pure scheduling.
 
-### 4. Improve · whole-model impact
+### 2. Why — throughput
 
-Better schedule ⇒ more throughput on same hardware; coupled to KV layout, not weights.
+| Single loop | Continuous batch |
+| --- | --- |
+| One user owns the step | Many share a step |
+| Idle after short finish | Retire + admit keeps GPU full |
+| Simple | Needs careful KV layout in prod |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-vLLM continuous batch + paged attention; TGI/TRT-LLM/SGLang same idea.
+| Step | Do |
+| --- | --- |
+| 1 | Represent each job (\`DecodeRequest\`) |
+| 2 | Each step: build tensor from **active only** |
+| 3 | Retire on EOS / length |
+| 4 | Later: paged KV so memory matches the schedule |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Finished jobs stop; no cross-talk between rows |
+| **Soft** | Higher tokens/s on mixed-length traffic |
+| **Soft** | Steadier tail latency under load |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Better schedule | More throughput, same weights |
+| Coupled to KV layout | Prod needs paging / blocks |
+| Ignoring batching | Leaves GPU on the table |
 
 ### 6. This course
 
@@ -1921,7 +2100,6 @@ python chapters/01-inference/ep17_continuous_batching.py
 \`\`\`
 
 ## Next
-
 
 **Paged KV · CUDA Graph** (\`/paged-cuda-graph/\`).
 
@@ -1938,27 +2116,61 @@ python chapters/01-inference/ep17_continuous_batching.py
     demo: 'train',
     markdown: `## Idea
 
-End of Part 2: after pretrain you still **align**—SFT teaches following; DPO/RLHF-style methods push preferences. Part 3 then makes decode servable.
+**What:** **Alignment after pretrain** — SFT teaches “answer like the demos”; DPO (and RLHF-family methods) push **chosen vs rejected** preferences without a full RL loop in this lesson.
 
-### 1. What it is for
+**Why:** Next-token pretrain makes a base LM; it does not by itself follow instructions or match product prefs. Align steers an already capable net—it does **not** invent the base skill.
 
-SFT mask-prompt loss on replies; DPO prefer chosen vs rejected against a reference.
+**How:** Instruction data → mask-prompt SFT from a base ckpt → preference pairs → DPO (or RLHF) → eval regressions.
 
-### 2. From zero: how you build it
+### 1. What — SFT loss
 
-Instruction/preference data → SFT from base ckpt → DPO/RLHF → eval regressions.
+[\`sft_loss\`](https://github.com/chaxus/arche/blob/main/arche/train/sft.py): same shift as pretrain, but **only response tokens** get CE:
 
-### 3. What “good” means
+\`\`\`python
+# shift_logits vs shift_labels as usual
+mask[i, start:] = True  # start ≈ prompt_len - 1
+return losses[mask].mean()
+\`\`\`
 
-Correct masks/shapes; better following/safety; limited capability loss.
+Prompt tokens are context, not supervised targets—otherwise the model “learns to rewrite the user.”
 
-### 4. Improve · whole-model impact
+### 2. What — DPO sketch
 
-Data quality beats blind steps; over-align can dull the base; often paired with new specials/templates.
+[\`dpo_loss\`](https://github.com/chaxus/arche/blob/main/arche/train/dpo.py): policy vs frozen **reference**; prefer chosen completion over rejected (β-scaled).
 
-### 5. Industry · open models
+| Stage | Data | Objective |
+| --- | --- | --- |
+| **SFT** | prompt → good reply | CE on reply span |
+| **DPO** | prompt + chosen/rejected | Prefer chosen logprob margin vs ref |
+| **RLHF** (map only) | reward model + PPO-like | Not coded here |
 
-Llama/Qwen Instruct/Chat; Zephyr-style DPO; TRL-like tooling; labs use RLHF variants.
+### 3. Why — order and risks
+
+| Choice | Why |
+| --- | --- |
+| After pretrain | Need a next-token-capable base |
+| Mask prompts | Don’t burn loss on user text |
+| Ref model in DPO | Anchor so policy doesn’t drift unbound |
+| Data > blind steps | Bad demos teach bad habits |
+
+Over-align can dull base capability; often paired with new specials / chat templates.
+
+### 4. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | Start from base (or instruct) checkpoint |
+| 2 | Build prompt/response ids + \`prompt_lens\` |
+| 3 | \`train_sft_step\` / \`train_dpo_step\` toys |
+| 4 | Eval following + regressions before ship |
+
+### 5. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Correct masks/shapes; ref frozen in DPO |
+| **Soft** | Better following / safety; limited capability loss |
+| **Soft** | Template + tokenizer stay paired |
 
 ### 6. This course
 
@@ -1973,7 +2185,6 @@ python chapters/02-training/ep19_sft_dpo.py
 \`\`\`
 
 ## Next
-
 
 **KV cache** (\`/kv-cache/\`): make decode affordable before serving.
 
@@ -1989,27 +2200,48 @@ python chapters/02-training/ep19_sft_dpo.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-From-zero MoE/MLA must **speak checkpoint names/shapes** of open weights—or frontier structure stays on paper.
+**What:** Speak **checkpoint names and shapes** for MoE/MLA-style open weights—save/load with a key map, including Mixtral-like \`w1/w2/w3\` expert tensors.
 
-### 1. What it is for
+**Why:** Frontier structure on paper is useless if you can’t round-trip tensors. Bad maps → silent random experts.
 
-Round-trip teaching ckpts; map Mixtral-like \`w1/w2/w3\` into our modules.
+**How:** Name map ↔ open names; [\`save_checkpoint\` / \`load_checkpoint\`](https://github.com/chaxus/arche/blob/main/arche/checkpoint.py); fail loudly on missing keys.
 
-### 2. From zero: how you build it
+### 1. What — round-trip
 
-Name map ↔ open names; save/load; fail loudly on missing keys.
+Teaching ckpts exercise: write state + meta, reload into a matching module graph, assert alignment. Expert keys must all be present—partial MoE loads look “fine” until one expert is noise.
 
-### 3. What “good” means
+### 2. Why — naming debt
 
-Round-trip align; experts covered; hooks real hubs.
+| Risk | Effect |
+| --- | --- |
+| HF vs local name drift | Missing keys / wrong slots |
+| Expert index off-by-one | One dead expert forever |
+| Strict=False abuse | Hides map bugs |
 
-### 4. Improve · whole-model impact
+### 3. How — from zero
 
-Bad maps ⇒ silent random experts; consistent naming cuts debt.
+| Step | Do |
+| --- | --- |
+| 1 | List open hub key patterns (Mixtral / DeepSeek docs) |
+| 2 | Build explicit map into your modules |
+| 3 | Round-trip on a tiny synthetic ckpt first |
+| 4 | Only then touch multi-GB downloads |
 
-### 5. Industry · open models
+### 4. What “good” means
 
-HF shards + documented keys; Mixtral/DeepSeek naming; converters are standard.
+| Kind | Check |
+| --- | --- |
+| **Hard** | Round-trip \`allclose\`; no missing experts |
+| **Hard** | Unexpected keys fail or are explicitly ignored |
+| **Soft** | Hooks ready for real hubs |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Consistent naming | Cuts converter debt |
+| Bad maps | Silent quality holes |
+| Converters as standard | Same story as dense HF maps |
 
 ### 6. This course
 
@@ -2024,7 +2256,6 @@ python chapters/02-training/ep20_frontier_ckpt.py
 \`\`\`
 
 ## Next
-
 
 **Sharded MoE / MLA** (\`/sharded-frontier/\`).
 
@@ -2040,33 +2271,63 @@ python chapters/02-training/ep20_frontier_ckpt.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-From-zero at scale: weights are **index.json + shards**. Can’t assemble shards ⇒ can’t take open frontier weights.
+**What:** Open frontier weights arrive as **\`index.json\` + shards**, not one file. Learn to pack/unpack that layout.
 
-### 1. What it is for
+**Why:** Can’t assemble shards ⇒ can’t load Llama/Qwen/DeepSeek/Mixtral-class hubs. Bad concat ⇒ silent wrong tensors.
 
-Synthetic pack/unpack + \`allclose\` without multi-tens-of-GB downloads.
+**How:** HF-style index; partition keys; write shard files; aggregate on load—toy size, same protocol.
 
-### 2. From zero: how you build it
+### 1. What — API
 
-HF-style index; shard tensors; aggregate on load.
+[\`write_sharded_state\` / \`load_sharded_state\`](https://github.com/chaxus/arche/blob/main/arche/shards.py):
 
-### 3. What “good” means
+\`\`\`python
+write_sharded_state(directory, state_dict, shard_size=...)
+state = load_sharded_state(directory)  # rebuild full dict via index
+\`\`\`
 
-Index matches shards; reload aligns; missing pieces fail clearly.
+Synthetic pack/unpack + \`allclose\` teaches the protocol **without** multi-tens-of-GB downloads.
 
-### 4. Improve · whole-model impact
+### 2. Why — scale reality
 
-Shard policy affects download parallelism and peak RAM; bad concat ⇒ silent bad weights.
+| Single file | Sharded |
+| --- | --- |
+| Simple demos | Hub default for big models |
+| One download stream | Parallel shard fetch |
+| Peak RAM = full model | Still careful—assemble wisely |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-HF Hub sharding standard; Llama/Qwen/DeepSeek/Mixtral; safetensors+index dominant.
+| Step | Do |
+| --- | --- |
+| 1 | Emit index mapping tensor name → shard file |
+| 2 | Split by size/count policy |
+| 3 | Load: read index, pull only needed shards |
+| 4 | Fail clearly on missing pieces |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Index matches shards; reload aligns |
+| **Hard** | Missing shard/key errors are loud |
+| **Soft** | Shard policy balances download vs peak RAM |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Shard policy | Parallelism and memory peaks |
+| Bad concat | Silent bad weights |
+| safetensors + index | Industry dominant pair |
 
 ### 6. This course
 
 \`\`\`bash
 python chapters/02-training/ep22_sharded_frontier.py
 \`\`\`
+
+Path complete—revisit weak chapters, or re-run HF align with weights.
 
 ## Run
 
@@ -2075,7 +2336,6 @@ python chapters/02-training/ep22_sharded_frontier.py
 \`\`\`
 
 ## Next
-
 
 Path complete—revisit weak chapters, or re-run HF align with weights.
 
@@ -2091,33 +2351,61 @@ Path complete—revisit weak chapters, or re-run HF align with weights.
     estimatedMinutes: 18,
     markdown: `## Idea
 
-End of Part 3: **paged KV** fights fragmentation; **CUDA Graph** cuts fixed-shape launch tax—toward vLLM-class engines. Next part enters MoE/MLA frontier structures.
+**What:** Two serving accelerators — **paged KV** (block table + shared page pool) fights memory fragmentation; **CUDA Graph** captures a fixed-shape decode step to cut launch tax.
 
-### 1. What it is for
+**Why:** Continuous batching without paging wastes VRAM on ragged lengths; eager CUDA launches tax every tiny decode. Together they point at vLLM-class engines—this lesson is a teaching stand-in, not a drop-in.
 
-Block table + gather; optional CUDA Graph capture. Teaching ≠ drop-in vLLM.
+**How:** Logical KV → alloc/free pages via block table → \`gather_kv\` for attention; optional graph capture on stable decode shapes.
 
-### 2. From zero: how you build it
+### 1. What — paged KV
 
-Logical KV + continuous batch → block alloc/free → optional graph on decode.
+[\`PagedKVPool\` / \`BlockTable\` / \`gather_kv\`](https://github.com/chaxus/arche/blob/main/arche/paged_kv.py):
 
-### 3. What “good” means
+\`\`\`python
+# append one step into the next slot; alloc a new page when a page fills
+append_kv(pool, table, k, v)
+# materialize contiguous KVCache for SDPA
+cache = gather_kv(pool, table)
+\`\`\`
 
-Gather matches logical cache; in-bounds tables; less fragmentation/launch; higher throughput.
+Physical pages are shared; each sequence owns a list of page ids.
 
-### 4. Improve · whole-model impact
+### 2. What — CUDA Graph (optional)
 
-Page size/prealloc change waste vs speed; graphs need stable shapes; doesn’t change weights—raises serving ceiling.
+[\`capture_module_step\` / \`generate_with_optional_graph\`](https://github.com/chaxus/arche/blob/main/arche/cuda_graphs.py): capture a module step when CUDA is available; replay instead of re-launching. Needs **stable shapes**—why engines care about batching policy.
 
-### 5. Industry · open models
+### 3. Why — toward engines
 
-vLLM paged attention landmark; TRT-LLM/SGLang variants; pairs with Llama/Qwen/DeepSeek weights.
+| Piece | Pain it hits |
+| --- | --- |
+| Paging | Fragmentation + multi-user packing |
+| Graphs | Per-step CPU launch overhead |
+| Neither changes weights | Raises the serving ceiling only |
+
+### 4. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | Continuous batch mental model first |
+| 2 | Pool + per-seq block table |
+| 3 | Gather before attention (teaching path) |
+| 4 | Optional graph on decode when shapes freeze |
+
+### 5. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Gather matches logical cache; tables in-bounds |
+| **Soft** | Less fragmentation / launch tax; higher throughput |
+| **Soft** | Clear skip when no CUDA |
 
 ### 6. This course
 
 \`\`\`bash
 python chapters/01-inference/ep23_paged_cuda_graph.py
 \`\`\`
+
+Part 3 ends; Part 4 maps MoE/MLA frontier structures.
 
 ## Run
 
@@ -2127,8 +2415,7 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## Next
 
-
-**MoE** (\`/moe/\`): frontier architectures.
+**MoE** (\`/moe/\`): frontier capacity via sparse experts.
 
 `,
   },

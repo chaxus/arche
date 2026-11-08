@@ -1,33 +1,55 @@
 ## 要点
 
-从零单用户循环 → 业界要**多用户共用步进**：连续批是服务利用率的核心调度形状。
+**是什么（What）：** **连续批处理**——服务端**调度**形状：多用户共享解码 step；完成的退役；新请求中途准入。
 
-### 1. 有什么作用
+**为什么（Why）：** 单用户 generate 在短序列早结束后浪费 GPU。工业引擎（vLLM、TGI、SGLang…）只对**活跃**请求一起迈步，把设备喂饱。
 
-多任务共享一步；结束退役；新请求填入。教学版**不是**完整 vLLM。
+**怎么做（How）：** 活跃集 → pad/步进 → 采样 → EOS/长度退役 → 重复。教学调度器 ≠ 完整 paged-attention 引擎。
 
-### 2. 从零开始：怎么生成
+### 1. What — 环
+
+[`generate_continuous`](https://github.com/chaxus/arche/blob/main/arche/batching.py)：
+
+```python
+while any(not item.done for item in live):
+    active = [item for item in live if not item.done]
+    # pad 活跃行 → model(batch) → 逐行采样 → 退役完成者
+```
+
+每个请求自带 temperature / top-k / 最大长度。不改权重——纯调度。
+
+### 2. Why — 吞吐
+
+| 单环 | 连续批 |
+| --- | --- |
+| 一人独占 step | 多人共享 step |
+| 短请求结束后空转 | 退役 + 准入保持 GPU 满 |
+| 简单 | 生产要小心 KV 布局 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 维护「活跃序列」集合 |
-| **2** | 每步只前向仍活跃者 |
-| **3** | 结束移除；接入分页 KV（后章）才接近生产 |
+| 1 | 表示每个任务（`DecodeRequest`） |
+| 2 | 每步只对**活跃**行组 tensor |
+| 3 | EOS / 长度时退役 |
+| 4 | 随后用 paged KV 让显存匹配调度 |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 结束必退役；序列互不串结果 |
-| **软** | GPU 更满、尾延迟更稳 |
+| **硬** | 完成的会停；行间不串话 |
+| **软** | 长短混合流量下 tokens/s 更高 |
+| **软** | 负载下尾延迟更稳 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-更好调度 → 同硬件更高吞吐。与模型权重无关，但与 KV 布局强耦合。做错会串话或漏停。
-
-### 5. 业界 · 开源
-
-vLLM 连续批 + paged attention 事实标准；TGI、TensorRT-LLM、SGLang 等同思路不同实现。
+| 杠杆 | 影响 |
+| --- | --- |
+| 更好调度 | 同权重更高吞吐 |
+| 耦合 KV 布局 | 生产要 paging / block |
+| 忽略批处理 | GPU 白白闲着 |
 
 ### 6. 本课
 
@@ -42,6 +64,5 @@ python chapters/01-inference/ep17_continuous_batching.py
 ```
 
 ## 下一章
-
 
 **Paged KV · CUDA Graph**（`/cn/paged-cuda-graph/`）。
