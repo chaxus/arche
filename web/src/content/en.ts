@@ -486,17 +486,34 @@ Part 2 begins: **KV cache** (\`?c=kv-cache\`).
     script: 'chapters/01-inference/ep12_kv_cache.py',
     partId: 'infer',
     estimatedMinutes: 15,
-    markdown: `## Why cache
+    markdown: `## In one sentence
+Prefill the prompt once, then decode new tokens while reusing stored keys and values.
 
-Without a cache, every new token re-runs attention over the whole prefix.
+## Before you start
+- Generation chapter done. Time: ~15 minutes.
 
-With a cache: project only the new token, append its K/V, attend against the stored past.
+## The idea (plain language)
+Without a cache, every new token re-reads the whole prefix in attention—wasteful.
+With a **KV cache**: compute K/V for the prompt once, then for each new token only append its K/V and attend against the past.
 
+## In the code
+- \`arche/cache.py\`, used by attention + \`generate(..., use_cache=True)\`
+- \`chapters/01-inference/ep12_kv_cache.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep12_kv_cache.py
 \`\`\`
 
-\`generate(..., use_cache=True)\` is the default.
+## If something breaks
+- Wrong \`start_pos\` after edits → restore the chapter script.
+
+## Don't worry about yet
+Paged KV (ep23) and production schedulers.
+
+## Next
+**RoPE scaling** (\`?c=rope-scaling\`).
+
 `,
   },
   {
@@ -507,15 +524,34 @@ python chapters/01-inference/ep12_kv_cache.py
     script: 'chapters/01-inference/ep13_rope_scaling.py',
     partId: 'infer',
     estimatedMinutes: 15,
-    markdown: `## Beyond the 8k window
+    markdown: `## In one sentence
+Llama 3.2 stretches long wavelengths so context can grow far past the original window.
 
-Llama 3.2 keeps \`rope_theta=500000\` and applies a **factor / low / high** schedule so long wavelengths stretch toward 128k context.
+## Before you start
+- RoPE + KV cache ideas clear. Time: ~15 minutes.
 
+## The idea (plain language)
+A plain RoPE trained for shorter context misbehaves if you suddenly ask for 100k tokens.
+Llama 3.2 keeps a large \`rope_theta\` and applies a **factor / low / high** schedule: short wavelengths stay, long ones stretch, middle band smooths.
+
+## In the code
+- Scaling lives in \`arche/rope.py\` / attention config
+- \`chapters/01-inference/ep13_rope_scaling.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep13_rope_scaling.py
 \`\`\`
 
-Short wavelengths stay put; long ones divide by \`scale_factor\`; the middle band is smoothed — same idea as Hugging Face's llama3 RoPE.
+## If something breaks
+- Tiny demos may not show 128k—look at printed frequency changes instead.
+
+## Don't worry about yet
+YaRN vs NTK debates; we teach the Llama 3.2 schedule used here.
+
+## Next
+**MoE** (\`?c=moe\`).
+
 `,
   },
   {
@@ -526,15 +562,34 @@ Short wavelengths stay put; long ones divide by \`scale_factor\`; the middle ban
     script: 'chapters/01-inference/ep14_moe.py',
     partId: 'infer',
     estimatedMinutes: 15,
-    markdown: `## Mixture of Experts
+    markdown: `## In one sentence
+Mixture-of-Experts runs only the top-k expert MLPs per token—sparse compute, dense parameter count.
 
-A linear router scores experts per token; only \`top_k\` run. Parameter count can be huge while per-token FLOPs stay near a dense MLP.
+## Before you start
+- SwiGLU understood. Time: ~15 minutes.
 
+## The idea (plain language)
+A **router** scores experts; each token picks \`top_k\` and blends their outputs.
+You can store many experts while each token only pays for a few—ideas behind Mixtral-style stacks.
+
+## In the code
+- \`arche/moe.py\`
+- \`chapters/01-inference/ep14_moe.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep14_moe.py
 \`\`\`
 
-This is the sparse FFN idea behind Mixtral and DeepSeek-style frontier stacks.
+## If something breaks
+- \`top_k > num_experts\` asserts—keep demo defaults.
+
+## Don't worry about yet
+Load-balancing losses and production expert parallelism.
+
+## Next
+**MLA** (\`?c=mla\`).
+
 `,
   },
   {
@@ -545,15 +600,34 @@ This is the sparse FFN idea behind Mixtral and DeepSeek-style frontier stacks.
     script: 'chapters/01-inference/ep15_mla.py',
     partId: 'infer',
     estimatedMinutes: 18,
-    markdown: `## Multi-head Latent Attention
+    markdown: `## In one sentence
+Multi-head Latent Attention compresses KV into a small latent cache (DeepSeek-style).
 
-Instead of caching every head's K/V, MLA stores a low-rank latent (+ a small RoPE stream) and expands on the fly.
+## Before you start
+- KV cache intuition. Time: ~18 minutes.
 
+## The idea (plain language)
+Instead of caching full per-head K/V, **MLA** stores a low-rank latent (+ a small RoPE stream) and expands when attending.
+Same attention idea, cheaper memory at decode.
+
+## In the code
+- \`arche/mla.py\`
+- \`chapters/01-inference/ep15_mla.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep15_mla.py
 \`\`\`
 
-That is the decode-memory win DeepSeek popularized — same attention math, cheaper cache.
+## If something breaks
+- Rank/head_dim mismatches → use the chapter’s constructor args.
+
+## Don't worry about yet
+Exact DeepSeek production kernels—key maps come in Part 4.
+
+## Next
+**Device · INT8 · chat** (\`?c=device-quant-chat\`).
+
 `,
   },
   {
@@ -565,17 +639,36 @@ That is the decode-memory win DeepSeek popularized — same attention math, chea
     partId: 'infer',
     estimatedMinutes: 15,
     demo: 'chat',
-    markdown: `## Inference engineering basics
+    markdown: `## In one sentence
+Pick a device, optionally store weights as INT8, and render chat turns with a template.
 
-\`pick_device\` prefers CUDA → MPS → CPU. \`quantize_llama_int8\` swaps Linear layers for per-channel int8 + scale (educational, not bitsandbytes).
+## Before you start
+- Comfortable running scripts. Time: ~15 minutes.
 
-Chat turns go through \`apply_chat_template\` — HF template when present, a plain role/content fallback otherwise.
+## The idea (plain language)
+\`pick_device\` prefers CUDA → MPS → CPU.
+**INT8 weight-only** keeps weights small and dequantizes for compute (teaching grade, not bitsandbytes).
+**Chat templates** format role/content; HF template if present, else a plain fallback.
 
+## In the code
+- \`arche/device.py\`, \`quantize.py\`, \`chat.py\`
+- \`chapters/01-inference/ep16_device_quant_chat.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep16_device_quant_chat.py
 \`\`\`
+Try the on-page demo too.
 
-HF logits alignment lives in \`tests/test_align_hf.py\` (skipped without gated weights; force with \`ARCH_HF_ALIGN=1\`).
+## If something breaks
+- MPS/CUDA errors → force CPU: the helper accepts \`"cpu"\`.
+
+## Don't worry about yet
+GPTQ/AWQ production quant stacks.
+
+## Next
+**Continuous batching** (\`?c=continuous-batching\`).
+
 `,
   },
   {
@@ -587,15 +680,35 @@ HF logits alignment lives in \`tests/test_align_hf.py\` (skipped without gated w
     partId: 'infer',
     estimatedMinutes: 15,
     demo: 'batch',
-    markdown: `## Teaching scheduler
+    markdown: `## In one sentence
+A teaching scheduler steps many short decode jobs together until each finishes.
 
-Pack active requests each step, sample the next token, retire jobs that hit EOS or \`max_new_tokens\`.
+## Before you start
+- Generation + KV ideas. Time: ~15 minutes.
 
-This is **not** paged attention or a production engine — it teaches the control loop shape behind continuous batching.
+## The idea (plain language)
+Production servers do not run one request after another only. They keep a pool of active sequences, step them together, and retire finished ones.
+Our version pads active rows each step—**not** paged attention, but the control-loop shape.
 
+## In the code
+- \`arche/batching.py\`
+- \`chapters/01-inference/ep17_continuous_batching.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep17_continuous_batching.py
 \`\`\`
+Use the site demo to watch fake jobs share steps.
+
+## If something breaks
+- Empty outputs → ensure \`max_new_tokens >= 1\`.
+
+## Don't worry about yet
+CUDA graphs + paged fusion (ep23 sketches the pieces).
+
+## Next
+Part 3: **Pretrain** (\`?c=pretrain\`).
+
 `,
   },
   {

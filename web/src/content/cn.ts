@@ -483,17 +483,34 @@ KV cache（下一部分）与 chat template（更后）。
     script: 'chapters/01-inference/ep12_kv_cache.py',
     partId: 'infer',
     estimatedMinutes: 15,
-    markdown: `## 为什么要缓存
+    markdown: `## 一句话
+先对 prompt 做一次 prefill，再解码时复用已存的 K/V。
 
-没有 cache 时，每生成一个新 token 都要对整段前缀重算注意力。
+## 开始之前
+- 生成章已完成。约 15 分钟。
 
-有了 cache：只投影新 token，把 K/V 追加进去，再对已存的过去做注意力。
+## 用人话讲
+没有 cache 时，每来一个新 token 都要对整段前缀重算注意力。
+有了 **KV cache**：prompt 的 K/V 算一次；之后每个新 token 只追加自己的 K/V。
 
+## 对应代码
+- \`arche/cache.py\`；\`generate(..., use_cache=True)\`
+- \`chapters/01-inference/ep12_kv_cache.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep12_kv_cache.py
 \`\`\`
 
-\`generate(..., use_cache=True)\` 是默认行为。
+## 如果翻车了
+- \`start_pos\` 乱了：恢复章节脚本。
+
+## 先别深挖
+Paged KV（ep23）与生产调度器。
+
+## 下一章
+**RoPE 缩放**（\`?c=rope-scaling\`）。
+
 `,
   },
   {
@@ -504,15 +521,34 @@ python chapters/01-inference/ep12_kv_cache.py
     script: 'chapters/01-inference/ep13_rope_scaling.py',
     partId: 'infer',
     estimatedMinutes: 15,
-    markdown: `## 超出 8k 窗口
+    markdown: `## 一句话
+Llama 3.2 拉伸长波长，让上下文能远超原始窗口。
 
-Llama 3.2 保留 \`rope_theta=500000\`，再用 **factor / low / high** 调度把长波长拉向 128k 上下文。
+## 开始之前
+- RoPE 与 KV cache。约 15 分钟。
 
+## 用人话讲
+按短上下文训练的 RoPE，突然拉到很长会出问题。
+Llama 3.2 保留大 \`rope_theta\`，再用 **factor / low / high** 调度：短波长不动，长波长拉伸，中间平滑。
+
+## 对应代码
+- \`arche/rope.py\` / attention 配置
+- \`chapters/01-inference/ep13_rope_scaling.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep13_rope_scaling.py
 \`\`\`
 
-短波长不动；长波长除以 \`scale_factor\`；中间带平滑——与 Hugging Face 的 llama3 RoPE 同一思路。
+## 如果翻车了
+- 小 demo 看不到 128k：关注打印的频率变化即可。
+
+## 先别深挖
+YaRN/NTK 争论；这里教本仓库用的 Llama 3.2 日程。
+
+## 下一章
+**MoE**（\`?c=moe\`）。
+
 `,
   },
   {
@@ -523,15 +559,34 @@ python chapters/01-inference/ep13_rope_scaling.py
     script: 'chapters/01-inference/ep14_moe.py',
     partId: 'infer',
     estimatedMinutes: 15,
-    markdown: `## Mixture of Experts
+    markdown: `## 一句话
+MoE 每个 token 只跑 top-k 个专家 MLP——算力稀疏，参数可以很多。
 
-线性路由器给每个 token 打分；只跑 \`top_k\` 个专家。参数量可以很大，但每 token 算力仍接近稠密 MLP。
+## 开始之前
+- 理解 SwiGLU。约 15 分钟。
 
+## 用人话讲
+**路由器**给专家打分；每个 token 选 \`top_k\` 个再加权混合。
+这是 Mixtral 类堆叠背后的稀疏 FFN 思路。
+
+## 对应代码
+- \`arche/moe.py\`
+- \`chapters/01-inference/ep14_moe.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep14_moe.py
 \`\`\`
 
-这就是 Mixtral、DeepSeek 类前沿堆叠背后的稀疏 FFN 思路。
+## 如果翻车了
+- \`top_k\` 不能大于专家数。
+
+## 先别深挖
+负载均衡损失与专家并行。
+
+## 下一章
+**MLA**（\`?c=mla\`）。
+
 `,
   },
   {
@@ -542,15 +597,34 @@ python chapters/01-inference/ep14_moe.py
     script: 'chapters/01-inference/ep15_mla.py',
     partId: 'infer',
     estimatedMinutes: 18,
-    markdown: `## Multi-head Latent Attention
+    markdown: `## 一句话
+MLA 把 KV 压进低秩 latent 缓存（DeepSeek 风格）。
 
-不缓存每个 head 的 K/V，MLA 存低秩 latent（外加一小段 RoPE 流），用时再展开。
+## 开始之前
+- 有 KV cache 直觉。约 18 分钟。
 
+## 用人话讲
+不缓存每个 head 的完整 K/V，**MLA** 存 latent（外加一小段 RoPE 流），用时再展开。
+注意力思路还在，解码更省内存。
+
+## 对应代码
+- \`arche/mla.py\`
+- \`chapters/01-inference/ep15_mla.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep15_mla.py
 \`\`\`
 
-这就是 DeepSeek 推广的解码显存优势——注意力数学还在，缓存更省。
+## 如果翻车了
+- rank/head_dim 不一致：用章节默认构造参数。
+
+## 先别深挖
+DeepSeek 生产内核——key 映射在第 4 部分。
+
+## 下一章
+**设备 · INT8 · 对话**（\`?c=device-quant-chat\`）。
+
 `,
   },
   {
@@ -562,17 +636,36 @@ python chapters/01-inference/ep15_mla.py
     partId: 'infer',
     estimatedMinutes: 15,
     demo: 'chat',
-    markdown: `## 推理工程入门
+    markdown: `## 一句话
+选择设备，可选 INT8 存权重，并用模板渲染对话。
 
-\`pick_device\` 优先 CUDA → MPS → CPU。\`quantize_llama_int8\` 把 Linear 换成按通道 int8 + scale（教学用，不是 bitsandbytes）。
+## 开始之前
+- 会跑脚本。约 15 分钟。
 
-对话走 \`apply_chat_template\`——有 HF 模板就用官方的，否则回退到 role/content 纯文本。
+## 用人话讲
+\`pick_device\` 优先 CUDA → MPS → CPU。
+**INT8 权重量化**更省空间（教学级）。
+**Chat template** 格式化角色对话；有 HF 模板用官方的，否则回退纯文本。
 
+## 对应代码
+- \`arche/device.py\`、\`quantize.py\`、\`chat.py\`
+- \`chapters/01-inference/ep16_device_quant_chat.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep16_device_quant_chat.py
 \`\`\`
+也可点页面上的小 demo。
 
-与 HF logits 对齐见 \`tests/test_align_hf.py\`（无门禁权重时跳过；\`ARCH_HF_ALIGN=1\` 可强制跑）。
+## 如果翻车了
+- 设备错误：强制 \`"cpu"\`。
+
+## 先别深挖
+GPTQ/AWQ 生产量化。
+
+## 下一章
+**连续批处理**（\`?c=continuous-batching\`）。
+
 `,
   },
   {
@@ -584,15 +677,34 @@ python chapters/01-inference/ep16_device_quant_chat.py
     partId: 'infer',
     estimatedMinutes: 15,
     demo: 'batch',
-    markdown: `## 教学版调度器
+    markdown: `## 一句话
+教学调度器让多个短解码任务一起步进，直到各自结束。
 
-每步打包仍活跃的请求，采样下一 token，打到 EOS 或 \`max_new_tokens\` 就退役。
+## 开始之前
+- 生成与 KV。约 15 分钟。
 
-这**不是** paged attention 或生产引擎——只讲清 continuous batching 的控制流形状。
+## 用人话讲
+线上服务不会永远「一个接一个」。它们维护活跃序列池，一起步进，完成的退役。
+我们的版本每步 pad——**不是** paged attention，但控制流同形。
 
+## 对应代码
+- \`arche/batching.py\`
+- \`chapters/01-inference/ep17_continuous_batching.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep17_continuous_batching.py
 \`\`\`
+
+## 如果翻车了
+- 空输出：保证 \`max_new_tokens >= 1\`。
+
+## 先别深挖
+CUDA graph 与 paged 融合（ep23）。
+
+## 下一章
+第 3 部分：**预训练**（\`?c=pretrain\`）。
+
 `,
   },
   {
