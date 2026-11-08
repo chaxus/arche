@@ -2,7 +2,6 @@ import 'ranui/button';
 import 'ranui/card';
 import 'ranui/markdown';
 import 'ranui/math';
-import 'ranui/option';
 import 'ranui/select';
 import 'ranui/theme-switch';
 import { chaptersFor, type Chapter } from './content';
