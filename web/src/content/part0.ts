@@ -14,7 +14,7 @@ export const PART0_EN: Chapter[] = [
 
 **What you will learn:** treat the LLM as something you **train from zero toward frontier-ready**—how tokenizer/embedding tables are made, what “good” means, how to improve them and what that does to the whole model; hand-write the trunk until it runs; then speed, a bit of training, and a map of MoE/MLA-style tips. No jargon required up front.
 
-**One path, one example.** You build from zero; **Llama 3.2 ~1B** is the running example—same dense parts production models still use. Teaching labs show how tables and weights get written; the official Llama tokenizer + checkpoint is that example’s finished pair, used to check your handwritten stack and to hear a real model speak when you load it.
+**One path, one example.** You build from zero; **Llama 3.2 ~1B** is the running example. Why this one: open and downloadable; small enough that depth/heads/`D` stay in your head; same dense bricks production models still use (RMSNorm, RoPE, GQA, SwiGLU—not GPT-2 archaeology); tokenizer+weights ship as a finished pair so you can check your stack. Teaching labs show how tables and weights get written; loading the official files is that example speaking—not a second track.
 
 **The full path (five stages):**
 

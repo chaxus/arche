@@ -19,9 +19,17 @@ In-course = runnable principles + a map into tip papers and engines. Full produc
 
 - License: [Apache-2.0](LICENSE)
 
-## Why Llama 3.2 as the example
+## Why Llama 3.2 ~1B as the example
 
-Small enough to hold in your head (**~1B**), downloadable HF weights, and the same parts production dense models still use. You still build from zero; Llama is the continuous reference—not a second track. Newer tricks (MoE / MLA / …) come after the base path is yours.
+One path needs one recipe. Llama 3.2 ~1B is picked because it is:
+
+1. **Open + downloadable** — HF checkpoint and official tokenizer; load and HF-align work  
+2. **Small enough to hold in your head** — ~1B keeps depth / heads / `D=2048` countable  
+3. **Production-like dense** — RMSNorm, RoPE, GQA, SwiGLU, byte BPE (not GPT-2 archaeology)  
+4. **Finished pair** — tokenizer and weights ship together, so handwritten vs official is fair  
+5. **Dense first** — MoE / MLA stay later primers on the same spine  
+
+Not “best chatbot” and not “train a frontier model on a laptop”—so from-zero writing and industry-shaped reading share one recipe.
 
 ## Quick start
 
