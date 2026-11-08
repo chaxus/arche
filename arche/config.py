@@ -23,6 +23,9 @@ class Llama32Config:
     rope_scale_factor: float
     norm_eps: float
     tie_word_embeddings: bool = True
+    rope_low_freq_factor: float = 1.0
+    rope_high_freq_factor: float = 4.0
+    rope_original_max_position: int = 8192
 
     @property
     def num_query_groups(self) -> int:

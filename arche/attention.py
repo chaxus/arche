@@ -23,6 +23,10 @@ class CausalSelfAttention(nn.Module):
         head_dim: int,
         rope_theta: float = 500_000.0,
         max_seq_len: int = 4096,
+        rope_scale_factor: float = 1.0,
+        rope_low_freq_factor: float = 1.0,
+        rope_high_freq_factor: float = 4.0,
+        rope_original_max_position: int = 8192,
     ) -> None:
         super().__init__()
         assert num_heads % num_kv_heads == 0
@@ -38,7 +42,15 @@ class CausalSelfAttention(nn.Module):
         self.v_proj = nn.Linear(embed_dim, num_kv_heads * head_dim, bias=False)
         self.o_proj = nn.Linear(num_heads * head_dim, embed_dim, bias=False)
 
-        cos, sin = build_rope_cache(max_seq_len, head_dim, theta=rope_theta)
+        cos, sin = build_rope_cache(
+            max_seq_len,
+            head_dim,
+            theta=rope_theta,
+            scale_factor=rope_scale_factor,
+            low_freq_factor=rope_low_freq_factor,
+            high_freq_factor=rope_high_freq_factor,
+            original_max_position=rope_original_max_position,
+        )
         self.register_buffer("rope_cos", cos, persistent=False)
         self.register_buffer("rope_sin", sin, persistent=False)
 

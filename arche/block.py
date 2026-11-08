@@ -22,7 +22,12 @@ class TransformerBlock(nn.Module):
             num_kv_heads=cfg.num_kv_heads,
             head_dim=cfg.head_dim,
             rope_theta=cfg.rope_theta,
+            # Cap the precomputed table for memory; raise when you need longer contexts.
             max_seq_len=min(cfg.max_seq_len, 8192),
+            rope_scale_factor=cfg.rope_scale_factor,
+            rope_low_freq_factor=cfg.rope_low_freq_factor,
+            rope_high_freq_factor=cfg.rope_high_freq_factor,
+            rope_original_max_position=cfg.rope_original_max_position,
         )
         self.post_attention_layernorm = RMSNorm(cfg.embed_dim, eps=cfg.norm_eps)
         self.mlp = SwiGLU(cfg.embed_dim, cfg.intermediate_dim)
