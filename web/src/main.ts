@@ -165,7 +165,7 @@ function renderShell(): void {
       <header class="topbar">
         <div class="brand">
           <a href="${chapterUrl(HOME_ID)}" id="brand-home">arche</a>
-          <span>${ui.brandTagline}</span>
+          <p class="brand-tagline">${ui.brandTagline}</p>
         </div>
         <div class="topbar-actions">
           <r-select
@@ -182,12 +182,16 @@ function renderShell(): void {
         </div>
       </header>
       <div class="layout">
-        <nav class="nav" aria-label="${ui.chaptersNav}" id="nav"></nav>
+        <details class="nav-drawer" id="nav-drawer">
+          <summary class="nav-drawer-summary">${ui.chaptersNav}</summary>
+          <nav class="nav" aria-label="${ui.chaptersNav}" id="nav"></nav>
+        </details>
         <main class="article" id="article"></main>
       </div>
     </div>
   `;
 
+  syncNavDrawerOpen();
   document.querySelector('#repo-link')?.addEventListener('click', () => {
     window.open(SITE.github, '_blank', 'noopener,noreferrer');
   });
@@ -196,6 +200,21 @@ function renderShell(): void {
     selectHome();
   });
   wireLocaleSelect();
+}
+
+function isDesktopNav(): boolean {
+  return window.matchMedia('(min-width: 801px)').matches;
+}
+
+function syncNavDrawerOpen(): void {
+  const drawer = document.querySelector('#nav-drawer') as HTMLDetailsElement | null;
+  if (!drawer) return;
+  drawer.open = isDesktopNav();
+}
+
+function closeNavDrawerOnMobile(): void {
+  const drawer = document.querySelector('#nav-drawer') as HTMLDetailsElement | null;
+  if (drawer && !isDesktopNav()) drawer.open = false;
 }
 
 function renderNav(activeId: string): void {
@@ -557,6 +576,7 @@ function selectHome(push = true): void {
   activeChapterId = HOME_ID;
   if (push) history.pushState(null, '', chapterUrl(HOME_ID));
   else history.replaceState(null, '', chapterUrl(HOME_ID));
+  closeNavDrawerOnMobile();
   renderNav(HOME_ID);
   renderHome();
   syncHead(null);
@@ -574,6 +594,7 @@ function selectChapter(id: string, push = true): void {
   activeChapterId = chapter.id;
   if (push) history.pushState(null, '', chapterUrl(chapter.id));
   else history.replaceState(null, '', chapterUrl(chapter.id));
+  closeNavDrawerOnMobile();
   renderNav(chapter.id);
   renderArticle(chapter);
   syncHead(chapter);
@@ -594,6 +615,10 @@ function onPopState(): void {
 applyDocumentLang();
 renderShell();
 window.addEventListener('popstate', onPopState);
+window.addEventListener('resize', () => {
+  // Keep desktop sidebar expanded; don't fight an intentional mobile open state on tiny resizes.
+  if (isDesktopNav()) syncNavDrawerOpen();
+});
 if (showingHome || !chapters.some((c) => c.id === activeChapterId)) {
   selectHome(false);
 } else {

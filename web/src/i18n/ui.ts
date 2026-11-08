@@ -71,7 +71,7 @@ const EN: UiCopy = {
   minutesLabel: 'min',
   partLabels: {
     start: 'Part 0 — Start here',
-    trunk: 'Part 1 — Tables, next-token train, dense bricks',
+    trunk: 'Part 1 — Tables, next-token train, dense trunk',
     train: 'Part 2 — Align (SFT / DPO)',
     infer: 'Part 3 — Generate & serve faster',
     frontier: 'Part 4 — Frontier structures (MoE / MLA…)',
@@ -87,7 +87,7 @@ const EN: UiCopy = {
 };
 
 const CN: UiCopy = {
-  brandTagline: 'ἀρχή — 从零开始，亲手写出大模型',
+  brandTagline: 'ἀρχή — 从零写出大模型',
   chaptersNav: '章节',
   lessonHeading: '课程',
   companionPython: '配套 Python',
@@ -117,7 +117,7 @@ const CN: UiCopy = {
   minutesLabel: '分钟',
   partLabels: {
     start: '第 0 部分 — 从这里开始',
-    trunk: '第 1 部分 — 表、猜词训练、dense 积木',
+    trunk: '第 1 部分 — 表、猜词训练、稠密主干',
     train: '第 2 部分 — 对齐（SFT / DPO）',
     infer: '第 3 部分 — 生成与服务加速',
     frontier: '第 4 部分 — 前沿结构（MoE / MLA…）',

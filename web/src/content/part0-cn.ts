@@ -16,7 +16,7 @@ export const PART0_CN: Chapter[] = [
 
 按左侧章节读，每章跑实验；「标记已读」只在本机。代码仓库：[github.com/chaxus/arche](https://github.com/chaxus/arche)。
 
-**Llama 3.2 ~1B** 把前沿 dense 积木（RMSNorm、RoPE、GQA、SwiGLU、字节 BPE）缩到可学规模。官方分词 + 权重是后面真对照用的成品一对，不是第二条课。
+**Llama 3.2 ~1B** 把前沿稠密主干（RMSNorm、RoPE、GQA、SwiGLU、字节 BPE）缩到可学规模。官方分词 + 权重是后面真对照用的成品一对，不是第二条课。
 
 | 阶段 | 人话 |
 | --- | --- |
@@ -47,7 +47,7 @@ export const PART0_CN: Chapter[] = [
 
 **推理：** 给词表每个 id 打分 → 选出（argmax/采样）→ 拼上 → 重复。
 
-**训练：** 真下一 id 已知 → 交叉熵 → 反传 → 嵌入行和主干权重移动。嵌入之后走 [\`/cn/pretrain/\`](/cn/pretrain/)（目标→数据→优化→规模），再写 dense 积木。
+**训练：** 真下一 id 已知 → 交叉熵 → 反传 → 嵌入行和主干权重移动。嵌入之后走 [\`/cn/pretrain/\`](/cn/pretrain/)（目标→数据→优化→规模），再写稠密主干。
 
 三个名字先记住：**token** = 小块；**embedding** = 一排小数；**logits** = 下一 id 的分数。
 
@@ -98,13 +98,13 @@ python chapters/00-start/ep00_check_setup.py
 
 ## 下一章
 
-**终端保命**（\`/cn/start-terminal/\`）。
+**终端入门**（\`/cn/start-terminal/\`）。
 `,
   },
   {
     id: 'start-terminal',
     ep: '00d',
-    title: '终端保命',
+    title: '终端入门',
     summary: 'cd、列目录、先看报错最后几行。',
     script: 'chapters/00-start/ep00_check_setup.py',
     partId: 'start',
@@ -177,7 +177,7 @@ flowchart LR
   p3 --> p4[4 前沿]
 \`\`\`
 
-**一条路：** 分词 → 嵌入 → **猜词训练**（目标→数据→优化→规模）→ dense 积木 → 加载/对照 Llama → 对齐 → 服务 → 前沿地图。
+**一条路：** 分词 → 嵌入 → **猜词训练**（目标→数据→优化→规模）→ 稠密主干 → 加载/对照 Llama → 对齐 → 服务 → 前沿地图。
 
 - **贯穿例子：** Llama 3.2 ~1B。  
 - **早点抓住的核心：** 预训练写出嵌入行和主干权重。  

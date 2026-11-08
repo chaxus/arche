@@ -98,13 +98,13 @@ No \`git\`? Download the ZIP from GitHub instead.
 
 ## Next
 
-**Terminal survival** (\`/start-terminal/\`).
+**Terminal basics** (\`/start-terminal/\`).
 `,
   },
   {
     id: 'start-terminal',
     ep: '00d',
-    title: 'Terminal survival',
+    title: 'Terminal basics',
     summary: 'cd, list files, read the last lines of a traceback.',
     script: 'chapters/00-start/ep00_check_setup.py',
     partId: 'start',
