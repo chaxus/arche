@@ -134,4 +134,57 @@ x → RMSNorm → Attn → +x → RMSNorm → SwiGLU → +x
 Llama 3.2 1B stacks this **16** times (3B: 28). Same shape in, same shape out — that is why depth is just a loop.
 `,
   },
+  {
+    id: 'stack',
+    ep: '09',
+    title: 'Stack + LM head',
+    summary: 'embed → blocks → final RMSNorm → tied lm_head.',
+    markdown: `## Full forward
+
+\`\`\`
+ids → Embedding → [Block × N] → RMSNorm → Linear(vocab)
+\`\`\`
+
+Llama 3.2 1B/3B **tie** \`lm_head.weight\` with \`embed_tokens.weight\`.
+
+Run:
+
+\`\`\`bash
+python chapters/01-inference/ep09_stack.py
+\`\`\`
+`,
+  },
+  {
+    id: 'weights',
+    ep: '10',
+    title: 'Load weights',
+    summary: 'Map Hugging Face Llama 3.2 tensors into arche.Llama.',
+    markdown: `## Official weights, hand-written graph
+
+\`from_pretrained\` builds our modules, downloads HF weights, and copies tensors by a small key map (\`model.layers.*\` → \`layers.*\`).
+
+Needs a gated HF login:
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep10_load_weights.py
+\`\`\`
+`,
+  },
+  {
+    id: 'generate',
+    ep: '11',
+    title: 'Text generation',
+    summary: 'Sample the next tokens with temperature and top-k.',
+    markdown: `## Decode loop
+
+Repeatedly take the last-step logits, optionally filter top-k, sample (or greedy), append, stop on EOS.
+
+\`\`\`bash
+python chapters/01-inference/ep11_generate.py
+\`\`\`
+
+Capability now comes from the loaded 1B weights; the code path is still entirely ours.
+`,
+  },
 ];

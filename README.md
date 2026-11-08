@@ -6,7 +6,7 @@ Hand-write a **modern dense** decoder (Llama 3.2 lineage) in PyTorch: RMSNorm, R
 
 - Architecture target: **Llama 3.2 1B** (same family as 3B)
 - Pedagogy: one runnable chapter per module
-- Learning site: **[arche.chaxus.com](https://arche.chaxus.com)** (ranui)
+- Learning site: **[arche.chaxus.com](https://arche.chaxus.com)** (ranui, EN / 中文)
 - License: [Apache-2.0](LICENSE)
 
 ## Why not GPT-2
@@ -42,13 +42,16 @@ python chapters/01-inference/ep05_rope.py
 python chapters/01-inference/ep06_gqa.py
 python chapters/01-inference/ep07_swiglu.py
 python chapters/01-inference/ep08_block.py
+python chapters/01-inference/ep09_stack.py
 ```
 
-Tokenizer chapter needs the official Llama 3.2 tokenizer (Hugging Face gated model). After you accept the license on the model page:
+Tokenizer / weights / generation need the official Llama 3.2 artifacts (Hugging Face gated). After you accept the license:
 
 ```bash
 huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
+python chapters/01-inference/ep10_load_weights.py
+python chapters/01-inference/ep11_generate.py
 ```
 
 Mainland network tip:
@@ -57,9 +60,22 @@ Mainland network tip:
 export HF_ENDPOINT=https://hf-mirror.com
 ```
 
+Library entry points:
+
+```python
+from arche import from_pretrained, generate
+from arche.tokenizer import load_tokenizer
+import torch
+
+tok = load_tokenizer()
+model = from_pretrained("meta-llama/Llama-3.2-1B")
+ids = torch.tensor([tok.encode("Hello")])
+print(tok.decode(generate(model, ids, max_new_tokens=20)[0].tolist()))
+```
+
 ## Learning site
 
-Browse chapters with ranui (`r-theme-switch`, `r-card`, `r-markdown`, `r-math`).
+Browse chapters with ranui (`r-select`, `r-theme-switch`, `r-card`, `r-markdown`, `r-math`).
 Locales follow the same URL shape as [ran.chaxus.com](https://ran.chaxus.com): English at `/`, Chinese under `/cn/`.
 
 - English: https://arche.chaxus.com/
@@ -79,7 +95,6 @@ cd web && npm run build
 npx wrangler pages deploy dist --project-name=arche --branch=main
 ```
 
-
 ## Roadmap
 
 **Inference (modern dense)**
@@ -94,10 +109,10 @@ npx wrangler pages deploy dist --project-name=arche --branch=main
 | 06 | GQA causal attention | [ep06](chapters/01-inference/ep06_gqa.py) |
 | 07 | SwiGLU MLP | [ep07](chapters/01-inference/ep07_swiglu.py) |
 | 08 | Transformer block | [ep08](chapters/01-inference/ep08_block.py) |
-| 09 | Stack + LM head | _next_ |
-| 10 | Load pretrained weights | _next_ |
-| 11 | Text generation | _next_ |
-| — | MoE / MLA / long-context | outlined later |
+| 09 | Stack + LM head | [ep09](chapters/01-inference/ep09_stack.py) |
+| 10 | Load pretrained weights | [ep10](chapters/01-inference/ep10_load_weights.py) |
+| 11 | Text generation | [ep11](chapters/01-inference/ep11_generate.py) |
+| — | MoE / MLA / long-context / KV cache | outlined later |
 
 Library code that chapters grow into lives under [`arche/`](arche/).
 

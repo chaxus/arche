@@ -134,4 +134,57 @@ x → RMSNorm → Attn → +x → RMSNorm → SwiGLU → +x
 Llama 3.2 1B 堆 **16** 次（3B：28 次）。进出租同形状——所以深度只是一个循环。
 `,
   },
+  {
+    id: 'stack',
+    ep: '09',
+    title: '堆叠 + LM head',
+    summary: 'embed → blocks → 最终 RMSNorm → 绑定的 lm_head。',
+    markdown: `## 完整前向
+
+\`\`\`
+ids → Embedding → [Block × N] → RMSNorm → Linear(vocab)
+\`\`\`
+
+Llama 3.2 1B/3B 会把 \`lm_head.weight\` 与 \`embed_tokens.weight\` **绑在一起**。
+
+运行：
+
+\`\`\`bash
+python chapters/01-inference/ep09_stack.py
+\`\`\`
+`,
+  },
+  {
+    id: 'weights',
+    ep: '10',
+    title: '加载权重',
+    summary: '把 Hugging Face Llama 3.2 张量映射进 arche.Llama。',
+    markdown: `## 官方权重，手写计算图
+
+\`from_pretrained\` 搭建我们的模块，下载 HF 权重，再按一小张 key 对照表拷贝张量（\`model.layers.*\` → \`layers.*\`）。
+
+需要通过门禁并登录：
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep10_load_weights.py
+\`\`\`
+`,
+  },
+  {
+    id: 'generate',
+    ep: '11',
+    title: '文本生成',
+    summary: '用 temperature 与 top-k 采样后续 token。',
+    markdown: `## 解码循环
+
+反复取最后一步 logits，可选 top-k，采样（或贪心），拼到序列上，遇 EOS 停。
+
+\`\`\`bash
+python chapters/01-inference/ep11_generate.py
+\`\`\`
+
+能力来自加载的 1B 权重；代码路径仍全部是我们自己的。
+`,
+  },
 ];
