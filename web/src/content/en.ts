@@ -862,36 +862,63 @@ python chapters/02-training/ep18_pretrain.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-From-zero deep nets need scale control after embeddings—RMSNorm is the first “steady the ruler.”
+**What:** **RMSNorm** — per-token scale control: divide by root-mean-square, multiply learnable \`γ\`. No mean subtract, no bias.
 
-### 1. What it is for
+**Why:** Deep next-token stacks blow up or die without steady scales. Llama-style **pre-norm** (norm → attn / MLP) is what makes depth trainable from zero.
 
-**RMSNorm**: divide by RMS, multiply learnable \`γ\`; **no mean subtract**. Llama-style **pre-norm** before attention and MLP.
+**How:** \`RMSNorm(D)\` at each pre-norm site; \`γ ≈ 1\` at init; train with the net.
 
-### 2. From zero: how you build it
+### 1. What — formula
 
-| Step | What you do |
+\\[
+\\mathrm{RMSNorm}(x)=\\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}}\\odot\\gamma
+\\]
+
+Repo ([\`arche/norms.py\`](https://github.com/chaxus/arche/blob/main/arche/norms.py)):
+
+\`\`\`python
+variance = x_f.pow(2).mean(dim=-1, keepdim=True)
+x_normed = x_f * torch.rsqrt(variance + self.eps)
+return (self.weight.float() * x_normed).to(orig_dtype)
+\`\`\`
+
+Math in float32, cast back—same stability trick HF Llama uses.
+
+### 2. Why — vs LayerNorm / placement
+
+| Choice | Why |
 | --- | --- |
-| **1** | \`RMSNorm(D)\` at each entry that needs steadying |
-| **2** | init \`γ\` ≈ 1 |
-| **3** | wire pre-norm before Attention/MLP |
-| **4** | train with the net |
+| No mean center | Slightly cheaper; Llama/Qwen recipe |
+| Learnable \`γ\` only | Scale per channel after unit-RMS |
+| **Pre-norm** | Stabilize *inputs* to attn/MLP so depth survives |
+| After embed, before bricks | First “steady the ruler” once vectors exist |
 
-### 3. What “good” means
+GPT-2-era teaching often: LayerNorm + post-norm. This course’s example is **RMSNorm + pre-norm**.
+
+### 3. How — wire it
+
+| Step | Do |
+| --- | --- |
+| 1 | \`RMSNorm(D)\` before attention and before SwiGLU (see block) |
+| 2 | Final RMSNorm before LM head (see stack) |
+| 3 | Match \`ε\` to the checkpoint (\`norm_eps\`) |
+| 4 | Train / load; don’t swap LN↔RMSN under foreign weights |
+
+### 4. What “good” means
 
 | Kind | Check |
 | --- | --- |
-| **Hard** | same shape; \`ε\`; placement matches recipe |
-| **Soft** | with \`γ=1\`, RMS≈1; fewer NaNs |
-| **Soft** | full-model loss is the judge |
+| **Hard** | Same shape as input; \`ε\` present; pre-norm sites match recipe |
+| **Soft** | With \`γ=1\`, RMS≈1; fewer NaNs in deep forward |
+| **Soft** | Full-model loss / HF align is the real judge |
 
-### 4. Improve · whole-model impact
+### 5. Improve · whole-model impact
 
-LN→RMSN matches Llama/Qwen; pre- vs post-norm decides depth trainability; \`γ\`/lr couple to convergence.
-
-### 5. Industry · open models
-
-Llama 3/3.2 & Qwen: RMSNorm+pre-norm. GPT-2-era teaching stacks: LayerNorm often post-norm.
+| Lever | Impact |
+| --- | --- |
+| LN → RMSN | Architecture change ⇒ retrain |
+| Pre vs post | Depth trainability |
+| \`γ\` / lr | Couples to convergence |
 
 ### 6. This course
 
@@ -907,7 +934,7 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## Next
 
-**RoPE** (\`/rope/\`): write position into Q/K from zero.
+**RoPE** (\`/rope/\`): write position into Q/K.
 
 `,
     latex:
@@ -924,27 +951,56 @@ python chapters/01-inference/ep04_rmsnorm.py
     demo: 'rope',
     markdown: `## Idea
 
-From-zero decoders: embedding says “which token”; **RoPE** (or other PE) writes **position** into attention.
+**What:** **RoPE** (Rotary Position Embedding) — rotate Q and K by token position so **relative distance** enters the attention dot product.
 
-### 1. What it is for
+**Why:** Embeddings say *which* token; attention still needs *where*. Absolute PE tables on embeds are older; modern dense Llama/Qwen/DeepSeek use RoPE on Q/K.
 
-Rotate Q/K by position so relative distance enters the dot product—no absolute PE table on embeds.
+**How:** Pick \`rope_theta\`, cache cos/sin, \`rotate_half\` + combine on Q/K; long-context scaling is a later knob.
 
-### 2. From zero: how you build it
+### 1. What — apply step
 
-Pick \`rope_theta\`, cache cos/sin, \`rotate_half\` + combine on Q/K; scale later for long context.
+Repo ([\`arche/rope.py\`](https://github.com/chaxus/arche/blob/main/arche/rope.py)):
 
-### 3. What “good” means
+\`\`\`python
+def apply_rotary_emb(x, cos, sin):
+    return (x * cos) + (rotate_half(x) * sin)
+\`\`\`
 
-Shape unchanged; relative position affects scores; match checkpoint \`theta\`/scaling.
+\`build_rope_cache\` precomputes cos/sin for \`0 .. seq_len-1\`. Attention slices by \`start_pos\` when decoding with cache.
 
-### 4. Improve · whole-model impact
+### 2. Why — design
 
-Theta/scaling ↔ long context; absolute PE→RoPE is modern default; don’t mix PE families with foreign weights.
+| Choice | Why |
+| --- | --- |
+| Rotate Q/K only | V stays content; positions live in scores |
+| Relative via rotation | Dot(q_m, k_n) depends on \`m-n\` |
+| Large \`theta\` (Llama 3: 500k) | Supports longer contexts than old 10k |
+| Match checkpoint \`theta\`/scale | Wrong PE ⇒ silent quality death under loaded weights |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Llama/Qwen/DeepSeek: RoPE. Classic Transformer: sinusoidal. Some long-context lines: ALiBi/YaRN/NTK.
+| Step | Do |
+| --- | --- |
+| 1 | Even \`head_dim\`; build inv-freq from \`theta\` |
+| 2 | Cache cos/sin up to max seq (memory tradeoff) |
+| 3 | Apply after Q/K project, before SDPA |
+| 4 | Long context: Llama-3 wavelength smoothing (\`rope-scaling\` later) |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Shape unchanged; even head dim; applied to Q and K |
+| **Hard** | Checkpoint \`theta\` / scale factors match |
+| **Soft** | Nearby tokens score differently than far ones |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Theta / scaling | Long-context behavior |
+| Absolute PE → RoPE | Modern default; don’t mix families with foreign weights |
+| Skip RoPE | Model can’t reliably use order |
 
 ### 6. This course
 
@@ -960,7 +1016,7 @@ python chapters/01-inference/ep05_rope.py
 
 ## Next
 
-**GQA** (\`/gqa/\`): choose head counts from zero to save KV cache.
+**GQA** (\`/gqa/\`): head layout that saves KV cache.
 
 `,
     latex:
@@ -977,27 +1033,62 @@ python chapters/01-inference/ep05_rope.py
     demo: 'gqa',
     markdown: `## Idea
 
-From-zero architecture: attention layout sets **decode VRAM** vs quality.
+**What:** **Grouped-Query Attention (GQA)** — more query heads than KV heads; groups of Q heads **share** one KV head. Still causal.
 
-### 1. What it is for
+**Why:** Full MHA stores a KV pair per Q head → decode VRAM explodes with length. GQA cuts cache size with small quality hit. Llama 3.2 ~1B uses **32 Q / 8 KV**.
 
-**GQA**: more Q heads than KV heads; groups share KV; still causal.
+**How:** Choose divisible \`n_q\` / \`n_kv\`, project, RoPE, **repeat_interleave** KV to match Q, then SDPA; cache stores only \`n_kv\`.
 
-### 2. From zero: how you build it
+### 1. What — shapes in this repo
 
-Choose divisible \`n_q\`/\`n_kv\`, broadcast KV, train; cache stores \`n_kv\`. Llama 3.2 1B: **32Q/8KV**.
+[\`CausalSelfAttention\`](https://github.com/chaxus/arche/blob/main/arche/attention.py):
 
-### 3. What “good” means
+\`\`\`python
+q = self.q_proj(x).view(bsz, seq_len, self.num_heads, self.head_dim)
+k = self.k_proj(x).view(bsz, seq_len, self.num_kv_heads, self.head_dim)
+# ... RoPE ...
+k_full = new_cache.k.repeat_interleave(self.n_rep, dim=1)
+v_full = new_cache.v.repeat_interleave(self.n_rep, dim=1)
+attn = F.scaled_dot_product_attention(q, k_full, v_full, is_causal=...)
+\`\`\`
 
-Valid groups; causal; match weight heads; smaller cache than MHA without quality collapse.
+\`n_rep = num_heads // num_kv_heads\`. Cache appends **narrow** K/V; broadcast only for the matmul.
 
-### 4. Improve · whole-model impact
+### 2. Why — MHA / GQA / MQA / MLA
 
-MHA richest/costliest; GQA default open midsize; MQA extreme; MLA further compression. Head-count change ⇒ retrain.
+| Layout | Idea | Cost |
+| --- | --- | --- |
+| **MHA** | \`n_kv = n_q\` | Richest, biggest cache |
+| **GQA** | \`n_kv\` divides \`n_q\` | Open midsize default |
+| **MQA** | \`n_kv = 1\` | Extreme cache save |
+| **MLA** | Compressed latent KV | Frontier (DeepSeek)—later part |
 
-### 5. Industry · open models
+Head-count change ⇒ **retrain** (or lose the checkpoint).
 
-Llama 3/Qwen: GQA. DeepSeek-V3: MLA path. Classic GPT-2 teaching: MHA.
+### 3. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | Fix \`embed_dim = n_q × head_dim\` |
+| 2 | Pick \`n_kv\` that divides \`n_q\` |
+| 3 | Bias-free Q/K/V/O linears (Llama contract) |
+| 4 | Causal mask on prefill; with cache, attend all past keys |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Valid groups; causal; weight head counts match config |
+| **Soft** | Cache bytes ≈ \`n_kv/n_q\` of MHA |
+| **Soft** | Quality holds vs MHA at same width |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Fewer KV heads | Decode memory / speed |
+| Too few | Quality cliff |
+| MLA path | Different compression story (Frontier) |
 
 ### 6. This course
 
@@ -1013,7 +1104,7 @@ python chapters/01-inference/ep06_gqa.py
 
 ## Next
 
-**SwiGLU** (\`/swiglu/\`): wire the FFN from zero.
+**SwiGLU** (\`/swiglu/\`): the dense FFN.
 
 `,
   },
@@ -1027,27 +1118,56 @@ python chapters/01-inference/ep06_gqa.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-From-zero blocks: attention mixes positions; **SwiGLU FFN** transforms each position—modern dense default.
+**What:** **SwiGLU** — gated feed-forward: \`down(silu(gate(x)) * up(x))\` with three **bias-free** linears.
 
-### 1. What it is for
+**Why:** Attention mixes *across* positions; the FFN transforms *each* position. SwiGLU (not plain GELU MLP) is the dense default in Llama/Qwen; MoE experts are often the same unit.
 
-Gated SiLU FFN with three bias-free linears (gate/up/down).
+**How:** Pick \`intermediate_dim\`, three mats, wire after the second pre-norm in the block.
 
-### 2. From zero: how you build it
+### 1. What — code
 
-Pick \`ffn_dim\`, three mats, wire after second pre-norm; MoE experts are often SwiGLUs.
+[\`arche/mlp.py\`](https://github.com/chaxus/arche/blob/main/arche/mlp.py):
 
-### 3. What “good” means
+\`\`\`python
+class SwiGLU(nn.Module):
+    def forward(self, x):
+        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+\`\`\`
 
-In/out \`D\`; no bias (Llama contract); judge gains via full-model metrics.
+Gate and up expand \`D → I\`; down returns \`I → D\`. No bias—matches Llama weight files.
 
-### 4. Improve · whole-model impact
+### 2. Why — gated vs plain MLP
 
-Wider FFN ⇒ capacity/cost; GELU→SwiGLU needs retrain; MoE multiplies experts.
+| Choice | Why |
+| --- | --- |
+| SiLU gate × up | Soft gating; empirically strong for LMs |
+| Three mats | Slightly more params than two-mat GELU MLP at same \`I\` |
+| No bias | Smaller, matches open Llama/Qwen tensors |
+| Position-wise | Parallelizable; pairs with residual |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Llama/Qwen dense: SwiGLU. Mixtral-style MoE: SwiGLU experts. GPT-2 teaching: GELU MLP.
+| Step | Do |
+| --- | --- |
+| 1 | Choose \`I\` (Llama 3.2 1B-style intermediate from config) |
+| 2 | \`gate_proj\`, \`up_proj\`, \`down_proj\` bias=False |
+| 3 | Place after \`post_attention_layernorm\` |
+| 4 | MoE later: many SwiGLUs + router |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | In/out dim \`D\`; no bias; activation is SiLU on gate |
+| **Soft** | Judge via full-model loss / quality, not isolated FFN |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Wider \`I\` | Capacity and FLOPs |
+| GELU → SwiGLU | Needs retrain |
+| MoE experts | Same brick × E, sparse fire |
 
 ### 6. This course
 
@@ -1063,7 +1183,7 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## Next
 
-**Transformer block** (\`/block/\`).
+**Transformer block** (\`/block/\`): sandwich the pieces.
 
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
@@ -1078,27 +1198,66 @@ python chapters/01-inference/ep07_swiglu.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-From zero: parts become one **repeatable layer** so you can stack depth.
+**What:** One **Transformer block** — the repeatable layer: pre-RMSNorm → attention → residual → pre-RMSNorm → SwiGLU → residual.
 
-### 1. What it is for
+**Why:** Bricks only become a deep net when packaged with **residuals**. Same shape in and out so you can stack \`N\` times (Llama 3.2 ~1B: **N=16**).
 
-Pre-norm sandwich: RMSNorm→attn→res→RMSNorm→SwiGLU→res. Same shape in/out.
+**How:** Wire the sandwich once; each layer gets its own weights; stack and train (or load).
 
-### 2. From zero: how you build it
+### 1. What — forward
 
-Wire the sandwich; per-block weights; pick depth N (Llama 3.2 1B = **16**); stack and train.
+[\`TransformerBlock\`](https://github.com/chaxus/arche/blob/main/arche/block.py):
 
-### 3. What “good” means
+\`\`\`python
+h, new_cache = self.self_attn(self.input_layernorm(x), cache=cache, start_pos=start_pos)
+x = x + h
+x = x + self.mlp(self.post_attention_layernorm(x))
+return x, new_cache
+\`\`\`
 
-Residuals add; pre-norm placement; isolated caches; still trainable when deep.
+\`\`\`mermaid
+flowchart LR
+  x[x] --> n1[RMSNorm]
+  n1 --> attn[GQA_RoPE]
+  attn --> add1[x_plus_h]
+  add1 --> n2[RMSNorm]
+  n2 --> ffn[SwiGLU]
+  ffn --> add2[x_plus_ffn]
+\`\`\`
 
-### 4. Improve · whole-model impact
+### 2. Why — residuals + pre-norm
 
-Deeper N ⇒ capability/cost; post→pre-norm enables deep from-zero training; parallel attn∥MLP isn’t Llama’s main line.
+| Choice | Why |
+| --- | --- |
+| Residual add | Gradient highway; identity path if sublayer ≈0 |
+| Pre-norm (not post) | Modern deep training stability |
+| Attn then MLP | Llama/Qwen mainline (not parallel attn∥MLP) |
+| Per-layer KV cache | Decode reuses past K/V per block |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Llama/Qwen: repeat pre-norm blocks. DeepSeek variants change insides; block boundary remains.
+| Step | Do |
+| --- | --- |
+| 1 | Instantiatate norms, \`CausalSelfAttention\`, \`SwiGLU\` from config |
+| 2 | Keep in/out \`embed_dim\` |
+| 3 | Thread \`cache\` / \`start_pos\` for generate |
+| 4 | Repeat \`N\` times in the stack |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Residuals are adds; pre-norm placement; shape \`(B,T,D)\` |
+| **Hard** | Cache isolated per layer |
+| **Soft** | Deep stack still trains / loads without NaNs |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Larger \`N\` | Capability and cost |
+| Post → pre-norm | Enables deep from-zero training |
+| Swap insides (MLA/MoE) | Frontier variants; block boundary stays |
 
 ### 6. This course
 
@@ -1128,27 +1287,58 @@ python chapters/01-inference/ep08_block.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-From zero: one block isn’t an LM—you need **embed + N blocks + final norm + LM head**.
+**What:** The full **dense causal LM shell**: \`ids → embed → Block×N → final RMSNorm → Linear(V) → logits\`.
 
-### 1. What it is for
+**Why:** One block is not a language model. The stack is what \`model(batch)\` in pretrain called—a black box until now.
 
-\`ids → embed → Block×N → final RMSNorm → Linear(V) → logits\`. Small Llamas often **tie** head↔embed.
+**How:** Build from config (\`V,D,N,heads,…\`); optional **tie** LM head ↔ embed (small Llamas often do); init, then load or pretrain.
 
-### 2. From zero: how you build it
+### 1. What — forward
 
-Build shell from V/D/N/heads; wire stack; choose tying; init then load or pretrain.
+[\`Llama\`](https://github.com/chaxus/arche/blob/main/arche/model.py):
 
-### 3. What “good” means
+\`\`\`python
+x = self.embed_tokens(input_ids)
+for layer, cache in zip(self.layers, caches):
+    x, new_cache = layer(x, cache=cache, start_pos=start_pos)
+x = self.norm(x)
+return self.lm_head(x), new_caches
+\`\`\`
 
-Logits \`(B,T,V)\`; config matches weights; tying consistent; quality after load/train.
+Logits shape \`(B, T, V)\` — exactly what \`lm_loss\` consumes after shift.
 
-### 4. Improve · whole-model impact
+### 2. Why — tying and final norm
 
-Depth/width/tie/V are architecture-level—retrain or careful migration. Optimize modules + training, not “stack alone.”
+| Choice | Why |
+| --- | --- |
+| Final RMSNorm | Stabilize before vocab projection |
+| Tie head↔embed | Fewer params; common at ~1B |
+| Untied head | More freedom at larger scales |
+| Shared config object | One source of truth for HF map |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Llama/Qwen dense share this skeleton; MoE swaps FFN for experts inside blocks.
+| Step | Do |
+| --- | --- |
+| 1 | Fill \`Llama32Config\` (vocab, dims, heads, rope, …) |
+| 2 | \`ModuleList\` of \`N\` blocks |
+| 3 | Set \`tie_word_embeddings\` before init/load |
+| 4 | Train with pretrain loop **or** \`from_pretrained\` |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Logits \`(B,T,V)\`; config ↔ weights; tying consistent |
+| **Soft** | Quality after load or enough pretrain steps |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Depth / width / V | Architecture-level; retrain or migrate carefully |
+| MoE swap | Replaces SwiGLU inside blocks—skeleton stays |
+| Optimize modules | Don’t “tune the stack alone” without data/optim |
 
 ### 6. This course
 
@@ -1164,7 +1354,7 @@ python chapters/01-inference/ep09_stack.py
 
 ## Next
 
-**Load weights** (\`/weights/\`).
+**Load weights** (\`/weights/\`): fill the shell with Llama floats.
 
 `,
   },
@@ -1178,31 +1368,55 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-Still one path from zero. This chapter loads the **Llama example’s** open checkpoint so your handwritten stack can speak now. Part 2 is where you feel how those floats get **written by training**—most numbers are trained, not hand-filled. Bad loads waste the handwritten stack.
+**What:** **Load** an open Llama 3.2 checkpoint into your handwritten stack via a **key map** (safetensors / HF → \`state_dict\`).
 
-### 1. What it is for
+**Why:** Random weights = correct graph, nonsense text. Official floats make the same forward a language model *now*. You already saw how pretrain *writes* floats; this chapter **borrows** a finished run so generate/align work without a cluster.
 
-Copy tensors via a key map. Random weights are a correct graph with nonsense outputs; Llama 3.2 weights make the same forward pass behave like a language model.
+**How:** Accept license → download → map keys → pair the **official tokenizer** → sanity-check shapes.
 
-### 2. From zero: how you do it
+### 1. What — entry
 
-| Step on the same path | What you do |
+[\`from_pretrained\`](https://github.com/chaxus/arche/blob/main/arche/load_weights.py) builds \`Llama(cfg)\` and copies HF tensors into matching names.
+
+| Path | Role |
 | --- | --- |
-| **Load the example (this chapter)** | license→download→key map→official tokenizer |
-| **Train later (Part 2)** | toy/real pretrain writes \`state_dict\`; record tokenizer version |
-| **Validate** | shapes/missing keys; **HF align** after generate compares short-prompt logits |
+| **Load (this chapter)** | Example checkpoint → speak immediately |
+| **Pretrain (earlier)** | How those floats get written from zero |
+| **HF align (next-next)** | Proof map + formulas match HF logits |
 
-### 3. What “good” means
+### 2. Why — map carefully
 
-Shapes/counts; full map; tokenizer pair; optional HF logit align.
+| Risk | Effect |
+| --- | --- |
+| Wrong key / transpose | Silent garbage or crash |
+| Wrong tokenizer | Ids point at wrong embed rows |
+| Dtype / device slip | Slow or NaN |
+| Partial load | “Runs” but broken layers |
 
-### 4. Improve · whole-model impact
+### 3. How — checklist
 
-Fix maps; dtype; resume carefully; wrong tokenizer destroys meaning.
+| Step | Do |
+| --- | --- |
+| 1 | \`huggingface-cli login\` if gated |
+| 2 | Resolve model id (course default Llama 3.2 ~1B) |
+| 3 | Config → empty \`Llama\` → copy weights |
+| 4 | Always use the **same** tokenizer as the checkpoint |
 
-### 5. Industry · open models
+### 4. What “good” means
 
-HF + safetensors standard; Llama/Qwen/DeepSeek ship that way; engines consume the same.
+| Kind | Check |
+| --- | --- |
+| **Hard** | No missing/unexpected keys; shapes match |
+| **Hard** | Tokenizer vocabulary size = embed rows |
+| **Soft** | Short generate looks like language; HF align later |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Fix key map | Unlocks all downstream demos |
+| Resume your own ckpt | Same API, your floats |
+| Quantized loads | Later serve chapters |
 
 ### 6. This course
 
@@ -1220,11 +1434,11 @@ python chapters/01-inference/ep10_load_weights.py
 
 ## Fix
 
-License, login, mirror—same as tokenizer.
+License, login, mirror—same class of issues as tokenizer download.
 
 ## Next
 
-**Text generation** (\`/generate/\`).
+**Text generation** (\`/generate/\`): loop sample on logits.
 
 `,
   },
@@ -1238,27 +1452,59 @@ License, login, mirror—same as tokenizer.
     estimatedMinutes: 15,
     markdown: `## Idea
 
-From zero: logits aren’t generation until you **loop sample**. Products differ in stopping/sampling, not in having a loop.
+**What:** **Autoregressive generation** — turn logits into text by looping: score → pick next id → append → stop.
 
-### 1. What it is for
+**Why:** A trained/loaded stack only emits scores. Products differ in sampling and stop rules; they share this loop. Without it you have a classifier-shaped forward, not a chatbot.
 
-Last-position logits → optional temperature/top-k → greedy/sample → append → stop on EOS/length.
+**How:** Last-position logits → optional temperature / top-k → greedy or sample → append → halt on EOS or max length. KV cache (next part) makes the same loop fast.
 
-### 2. From zero: how you build it
+### 1. What — skeleton
 
-Forward→sample→stop; add KV cache next; chat templates later.
+[\`arche/generate.py\`](https://github.com/chaxus/arche/blob/main/arche/generate.py) roughly:
 
-### 3. What “good” means
+\`\`\`python
+# each step
+logits, caches = model(ids_or_last_token, caches=caches, start_pos=...)
+next_id = sample(logits[:, -1, :], temperature=..., top_k=...)  # or argmax
+# append; break on EOS / max_new_tokens
+\`\`\`
 
-Stops; past-only; valid ids; sensible sampling; coherence with real weights.
+Prefill runs the full prompt once; decode feeds one new token at a time when cache is on.
 
-### 4. Improve · whole-model impact
+### 2. Why — knobs ≠ weights
 
-Sampling knobs don’t change weights; stop rules shape UX; constrained decoding for structure; without KV the loop is correct but too slow.
+| Knob | Changes |
+| --- | --- |
+| Temperature / top-k / top-p | Style of picks—not the model floats |
+| Greedy argmax | Deterministic, often dull |
+| EOS / max length | UX and safety bounds |
+| Chat template | How roles become ids (later device/quant/chat) |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Every chat stack loops; vLLM/TGI speed cache/batching. Llama/Qwen APIs expose sampling.
+| Step | Do |
+| --- | --- |
+| 1 | Encode prompt with the **paired** tokenizer |
+| 2 | Forward → take last time’s logits |
+| 3 | Sample or argmax → append id |
+| 4 | Repeat until stop; decode ids → text |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Stops; only past tokens visible; valid vocab ids |
+| **Soft** | With real weights, coherent short completions |
+| **Soft** | Same prompt + greedy ≈ stable across runs |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Sampling only | Behavior without retraining |
+| No KV cache | Correct but O(T²) feel—fix next |
+| Constrained decoding | Structured outputs |
+| Bad stop rules | Runaway or clipped answers |
 
 ### 6. This course
 
@@ -1274,8 +1520,7 @@ python chapters/01-inference/ep11_generate.py
 
 ## Next
 
-
-**HF align** (\`/hf-align/\`): verify the handwritten stack against HF.
+**HF align** (\`/hf-align/\`): prove the handwritten stack matches HF.
 
 `,
   },
@@ -1289,27 +1534,57 @@ python chapters/01-inference/ep11_generate.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-End of Part 1: **match authoritative HF logits** on a short prompt—proof the map and formulas are sound. Then Part 2 shows how weights get written from zero.
+**What:** **Numeric check** — same short prompt through arche vs Hugging Face Llama 3.2; compare logits (max abs diff + argmax match).
 
-### 1. What it is for
+**Why:** End of Part 1 proof: key map, RMSNorm, RoPE, GQA, SwiGLU, stack layout aren’t “shape-right but wrong.” Catch bugs before serve/optim chapters hide them.
 
-Same prompt through arche vs HF Llama 3.2; compare argmax / max abs diff.
+**How:** Fixed dtype; load both models; encode one prompt; forward; report. Skip cleanly if weights/login unavailable.
 
-### 2. From zero: how you build it
+### 1. What — report
 
-Fixed seed/dtype; same weights; short seq; clean skip without weights.
+[\`compare_logits_to_hf\`](https://github.com/chaxus/arche/blob/main/arche/align_hf.py):
 
-### 3. What “good” means
+\`\`\`python
+hf_logits = hf(ids).logits
+arche_logits, _ = arche(ids)
+max_abs = (arche_logits - hf_logits).abs().max()
+argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
+\`\`\`
 
-Close enough with weights; explicit skip without; longer coverage later.
+\`run_align_or_explain\` returns \`None\` when HF weights aren’t reachable—**skip ≠ broken lesson logic**.
 
-### 4. Improve · whole-model impact
+### 2. Why — this gate
 
-Fail ⇒ revisit maps/RoPE/norm. Pass before optimize/serve.
+| Failure mode | Likely cause |
+| --- | --- |
+| Huge \`max_abs\` | Wrong map, RoPE theta, norm, or head layout |
+| Argmax mismatch | Same—plus dtype / device mismatch |
+| Skip | No login / gated / offline—fix env, not formulas |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Repro CI often gates on HF/official match; engines keep numeric regressions.
+| Step | Do |
+| --- | --- |
+| 1 | Login if needed; same model id as weights chapter |
+| 2 | float32 CPU compare for stability in the lab |
+| 3 | Short prompt (“The cat sat”) |
+| 4 | Assert within tolerance or print skip reason |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | With weights: argmax match; \`max_abs\` under lab tol |
+| **Hard** | Without weights: explicit skip, not a fake pass |
+| **Soft** | Longer prompts / more positions in CI later |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Fail → revisit | Maps / RoPE / norms before “optimizing” |
+| Pass | Safe to move to align (SFT/DPO) and serve |
+| Engine CI | Same idea gates vLLM-class numeric regs |
 
 ### 6. This course
 
@@ -1317,6 +1592,8 @@ Repro CI often gates on HF/official match; engines keep numeric regressions.
 huggingface-cli login
 python chapters/01-inference/ep21_hf_align.py
 \`\`\`
+
+Part 1 closes here. Part 2 steers the base next-token skill (SFT/DPO).
 
 ## Run
 
@@ -1327,10 +1604,9 @@ python chapters/01-inference/ep21_hf_align.py
 
 ## Fix
 
-No weights/login → skip ≠ broken logic.
+No weights/login → skip means “can’t download,” not “your math is wrong.”
 
 ## Next
-
 
 **SFT · DPO** (\`/sft-dpo/\`): align after the base next-token skill.
 

@@ -1,35 +1,62 @@
 ## Idea
 
-From-zero deep nets need scale control after embeddings—RMSNorm is the first “steady the ruler.”
+**What:** **RMSNorm** — per-token scale control: divide by root-mean-square, multiply learnable `γ`. No mean subtract, no bias.
 
-### 1. What it is for
+**Why:** Deep next-token stacks blow up or die without steady scales. Llama-style **pre-norm** (norm → attn / MLP) is what makes depth trainable from zero.
 
-**RMSNorm**: divide by RMS, multiply learnable `γ`; **no mean subtract**. Llama-style **pre-norm** before attention and MLP.
+**How:** `RMSNorm(D)` at each pre-norm site; `γ ≈ 1` at init; train with the net.
 
-### 2. From zero: how you build it
+### 1. What — formula
 
-| Step | What you do |
+\[
+\mathrm{RMSNorm}(x)=\frac{x}{\sqrt{\mathrm{mean}(x^2)+\varepsilon}}\odot\gamma
+\]
+
+Repo ([`arche/norms.py`](https://github.com/chaxus/arche/blob/main/arche/norms.py)):
+
+```python
+variance = x_f.pow(2).mean(dim=-1, keepdim=True)
+x_normed = x_f * torch.rsqrt(variance + self.eps)
+return (self.weight.float() * x_normed).to(orig_dtype)
+```
+
+Math in float32, cast back—same stability trick HF Llama uses.
+
+### 2. Why — vs LayerNorm / placement
+
+| Choice | Why |
 | --- | --- |
-| **1** | `RMSNorm(D)` at each entry that needs steadying |
-| **2** | init `γ` ≈ 1 |
-| **3** | wire pre-norm before Attention/MLP |
-| **4** | train with the net |
+| No mean center | Slightly cheaper; Llama/Qwen recipe |
+| Learnable `γ` only | Scale per channel after unit-RMS |
+| **Pre-norm** | Stabilize *inputs* to attn/MLP so depth survives |
+| After embed, before bricks | First “steady the ruler” once vectors exist |
 
-### 3. What “good” means
+GPT-2-era teaching often: LayerNorm + post-norm. This course’s example is **RMSNorm + pre-norm**.
+
+### 3. How — wire it
+
+| Step | Do |
+| --- | --- |
+| 1 | `RMSNorm(D)` before attention and before SwiGLU (see block) |
+| 2 | Final RMSNorm before LM head (see stack) |
+| 3 | Match `ε` to the checkpoint (`norm_eps`) |
+| 4 | Train / load; don’t swap LN↔RMSN under foreign weights |
+
+### 4. What “good” means
 
 | Kind | Check |
 | --- | --- |
-| **Hard** | same shape; `ε`; placement matches recipe |
-| **Soft** | with `γ=1`, RMS≈1; fewer NaNs |
-| **Soft** | full-model loss is the judge |
+| **Hard** | Same shape as input; `ε` present; pre-norm sites match recipe |
+| **Soft** | With `γ=1`, RMS≈1; fewer NaNs in deep forward |
+| **Soft** | Full-model loss / HF align is the real judge |
 
-### 4. Improve · whole-model impact
+### 5. Improve · whole-model impact
 
-LN→RMSN matches Llama/Qwen; pre- vs post-norm decides depth trainability; `γ`/lr couple to convergence.
-
-### 5. Industry · open models
-
-Llama 3/3.2 & Qwen: RMSNorm+pre-norm. GPT-2-era teaching stacks: LayerNorm often post-norm.
+| Lever | Impact |
+| --- | --- |
+| LN → RMSN | Architecture change ⇒ retrain |
+| Pre vs post | Depth trainability |
+| `γ` / lr | Couples to convergence |
 
 ### 6. This course
 
@@ -45,4 +72,4 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## Next
 
-**RoPE** (`/rope/`): write position into Q/K from zero.
+**RoPE** (`/rope/`): write position into Q/K.

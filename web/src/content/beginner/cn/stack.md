@@ -1,36 +1,57 @@
 ## 要点
 
-从零：一块不是语言模型；要 **嵌入 + N 块 + 最终 norm + LM head** 才有 next-token 分布。
+**是什么（What）：** 完整的 **稠密因果 LM 壳**：`ids → embed → Block×N → 最终 RMSNorm → Linear(V) → logits`。
 
-### 1. 有什么作用
+**为什么（Why）：** 单层 block 还不是语言模型。这就是预训练里 `model(batch)` 调用的东西——此前是黑盒。
 
-`ids → 嵌入 → Block×N → 最终 RMSNorm → Linear(V) → logits`
+**怎么做（How）：** 按 config（`V,D,N,heads,…`）搭建；可选 **绑定** LM head ↔ embed（小 Llama 常绑）；初始化后加载或预训练。
 
-小 Llama 常 **tie** LM head ↔ 嵌入。
+### 1. What — 前向
 
-### 2. 从零开始：怎么生成
+[`Llama`](https://github.com/chaxus/arche/blob/main/arche/model.py)：
+
+```python
+x = self.embed_tokens(input_ids)
+for layer, cache in zip(self.layers, caches):
+    x, new_cache = layer(x, cache=cache, start_pos=start_pos)
+x = self.norm(x)
+return self.lm_head(x), new_caches
+```
+
+Logits 形状 `(B, T, V)`——正是 `lm_loss` 错位后吃的东西。
+
+### 2. Why — 绑定与最终 norm
+
+| 选择 | 原因 |
+| --- | --- |
+| 最终 RMSNorm | 投向词表前再稳住 |
+| 绑定 head↔embed | 参数更少；~1B 常见 |
+| 不绑定 | 更大模型更自由 |
+| 共享 config | HF 映射的唯一真相源 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 用已定 V、D、N、头数建空壳 |
-| **2** | 串嵌入→块→最终 norm→head |
-| **3** | 决定 tie 与否 |
-| **4** | 随机初始化后要么加载权重，要么开预训练 |
+| 1 | 填好 `Llama32Config` |
+| 2 | `ModuleList` 放 `N` 个 block |
+| 3 | 在 init/load 前设 `tie_word_embeddings` |
+| 4 | 用预训练环训，或 `from_pretrained` |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | logits `(B,T,V)`；配置与权重可对上；tie 约定一致 |
-| **软** | 装权/训完后文字与指标达标 |
+| **硬** | Logits `(B,T,V)`；config ↔ 权重；绑定一致 |
+| **软** | 加载后或足够预训练步后质量可读 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-加深加宽、改 tie、改词表 V——都是架构级，需重训或严格迁移。堆叠本身不「单独优化」，优化的是各子模块与训练。
-
-### 5. 业界 · 开源
-
-开放 dense（Llama/Qwen）同一骨架；差异在超参与数据。MoE 则把块内 FFN 换成路由专家，骨架仍在。
+| 杠杆 | 影响 |
+| --- | --- |
+| 深度 / 宽度 / V | 结构级；重训或谨慎迁移 |
+| 换成 MoE | 替换 block 内 SwiGLU——骨架仍在 |
+| 只拧栈 | 没有数据/优化配合意义有限 |
 
 ### 6. 本课
 
@@ -46,4 +67,4 @@ python chapters/01-inference/ep09_stack.py
 
 ## 下一章
 
-**加载权重**（`/cn/weights/`）。
+**加载权重**（`/cn/weights/`）：用 Llama 小数填满空壳。

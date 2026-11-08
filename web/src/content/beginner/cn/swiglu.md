@@ -1,44 +1,55 @@
 ## 要点
 
-从零搭块：注意力混合位置；**FFN** 在每个位置做非线性——现代 dense 默认 SwiGLU。
+**是什么（What）：** **SwiGLU**——门控前馈：`down(silu(gate(x)) * up(x))`，三张**无 bias** 线性层。
 
-### 1. 有什么作用
+**为什么（Why）：** 注意力在位置*之间*混合；FFN 在*每个*位置上变换。SwiGLU（而非纯 GELU MLP）是 Llama/Qwen 稠密默认；MoE 的 expert 常常就是同一块。
 
-$$\\mathrm{FFN}(x)=W_d(\\mathrm{SiLU}(W_g x)\\odot W_u x)$$
+**怎么做（How）：** 选定 `intermediate_dim`，三张矩阵，接在 block 里第二次 pre-norm 之后。
 
-三条无 bias 线性：gate / up / down。
+### 1. What — 代码
 
-### 2. 从零开始：怎么生成
+[`arche/mlp.py`](https://github.com/chaxus/arche/blob/main/arche/mlp.py)：
+
+```python
+class SwiGLU(nn.Module):
+    def forward(self, x):
+        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+```
+
+gate / up 把 `D → I`；down 回到 `I → D`。无 bias——对齐 Llama 权重文件。
+
+### 2. Why — 门控 vs 普通 MLP
+
+| 选择 | 原因 |
+| --- | --- |
+| SiLU(gate)×up | 软门控；LM 上经验强 |
+| 三矩阵 | 同 `I` 下比两矩阵 GELU MLP 参数略多 |
+| 无 bias | 更省，对齐开源 Llama/Qwen 张量 |
+| 按位置 | 易并行；配残差 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 定 `ffn_dim`（通常 > `D`） |
-| **2** | 建三套权重，无 bias |
-| **3** | 接在块内第二段（pre-norm 后） |
-| **4** | 整网训；MoE 时每个专家往往是一个 SwiGLU |
+| 1 | 选 `I`（Llama 3.2 1B 由 config 给出） |
+| 2 | `gate_proj` / `up_proj` / `down_proj` 均 bias=False |
+| 3 | 放在 `post_attention_layernorm` 后 |
+| 4 | 以后 MoE：许多 SwiGLU + router |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 进出 `D`；无 bias（Llama 契约）；形状与权重一致 |
-| **软** | 相对 GELU MLP 的收益看整模 |
+| **硬** | 进出维 `D`；无 bias；gate 上 SiLU |
+| **软** | 用整模 loss / 质量评判，不孤立看 FFN |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 加宽 `ffn_dim` | 容量↑、算力↑ |
-| GELU MLP→SwiGLU | 与 Llama/Qwen 对齐；要重训 |
-| 改成 MoE 专家 | 参数总量↑、单 token 稀疏算 |
-
-### 5. 业界 · 开源
-
-| 系 | 做法 |
-| --- | --- |
-| **Llama / Qwen dense** | SwiGLU |
-| **Mixtral 等 MoE** | 专家为 SwiGLU 类 |
-| **GPT-2 风教学** | GELU MLP |
+| 更宽 `I` | 容量与算力 |
+| GELU → SwiGLU | 需重训 |
+| MoE experts | 同一砖 × E，稀疏点火 |
 
 ### 6. 本课
 
@@ -54,4 +65,4 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## 下一章
 
-**Transformer 块**（`/cn/block/`）。
+**Transformer block**（`/cn/block/`）：把零件夹成一层。

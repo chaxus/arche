@@ -1,45 +1,65 @@
 ## 要点
 
-从零搭模型：零件齐了要收成**可重复的一层**，才能叠深度。
+**是什么（What）：** 一层可重复的 **Transformer block**——pre-RMSNorm → 注意力 → 残差 → pre-RMSNorm → SwiGLU → 残差。
 
-### 1. 有什么作用
+**为什么（Why）：** 积木只有配上**残差**才能堆成深网。进出同形状，才能叠 `N` 次（Llama 3.2 ~1B：**N=16**）。
 
-**Transformer 块**（pre-norm 三明治）：
+**怎么做（How）：** 三明治接一次；每层自有权重；再堆叠训或加载。
 
+### 1. What — 前向
+
+[`TransformerBlock`](https://github.com/chaxus/arche/blob/main/arche/block.py)：
+
+```python
+h, new_cache = self.self_attn(self.input_layernorm(x), cache=cache, start_pos=start_pos)
+x = x + h
+x = x + self.mlp(self.post_attention_layernorm(x))
+return x, new_cache
 ```
-x → RMSNorm → 注意力 → + 残差
-  → RMSNorm → SwiGLU → + 残差
+
+```mermaid
+flowchart LR
+  x[x] --> n1[RMSNorm]
+  n1 --> attn[GQA_RoPE]
+  attn --> add1[残差加]
+  add1 --> n2[RMSNorm]
+  n2 --> ffn[SwiGLU]
+  ffn --> add2[残差加]
 ```
 
-进出同形状；注意力可接 KV cache。
+### 2. Why — 残差 + pre-norm
 
-### 2. 从零开始：怎么生成
+| 选择 | 原因 |
+| --- | --- |
+| 残差相加 | 梯度高速路；子层≈0 时近恒等 |
+| Pre-norm（非 post） | 现代深训稳定 |
+| 先 attn 后 MLP | Llama/Qwen 主线（非并行 attn∥MLP） |
+| 每层 KV cache | 解码复用该层过去的 K/V |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 按上图接线（本课布局） |
-| **2** | 每块独立一套权重 |
-| **3** | 定深度 N（Llama 3.2 1B = **16**） |
-| **4** | 堆叠进模型，整网训 |
+| 1 | 按 config 建 norm、`CausalSelfAttention`、`SwiGLU` |
+| 2 | 保持进出 `embed_dim` |
+| 3 | 贯通 `cache` / `start_pos` 供生成 |
+| 4 | 在 stack 里重复 `N` 次 |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 残差可加；pre-norm 位置对；有 cache 时每层隔离 |
-| **软** | 加深仍可训（残差+norm）；深度由算力与目标定 |
+| **硬** | 残差是加；pre-norm 位置对；形状 `(B,T,D)` |
+| **硬** | 每层 cache 独立 |
+| **软** | 深栈仍能训 / 加载且无 NaN |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 加深 N | 能力↑、显存/算力↑，需重训 |
-| post→pre-norm | 现代默认，利于从零训深 |
-| 注意力∥MLP 并行 | 非 Llama 主线；换布局要重训 |
-
-### 5. 业界 · 开源
-
-Llama/Qwen dense：pre-norm 块重复 N 次。DeepSeek 等在块内换注意力/FFN 变体，**块边界**仍在。
+| 更大 `N` | 能力与成本 |
+| Post → pre-norm | 从零深训成为可能 |
+| 换内脏（MLA/MoE） | 前沿变体；block 边界仍在 |
 
 ### 6. 本课
 
@@ -55,4 +75,4 @@ python chapters/01-inference/ep08_block.py
 
 ## 下一章
 
-**堆叠 + LM head**（`/cn/stack/`）。
+**整网 + LM head**（`/cn/stack/`）。

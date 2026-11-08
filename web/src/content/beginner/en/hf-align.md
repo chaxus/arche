@@ -1,26 +1,56 @@
 ## Idea
 
-End of Part 1: **match authoritative HF logits** on a short prompt—proof the map and formulas are sound. Then Part 2 shows how weights get written from zero.
+**What:** **Numeric check** — same short prompt through arche vs Hugging Face Llama 3.2; compare logits (max abs diff + argmax match).
 
-### 1. What it is for
+**Why:** End of Part 1 proof: key map, RMSNorm, RoPE, GQA, SwiGLU, stack layout aren’t “shape-right but wrong.” Catch bugs before serve/optim chapters hide them.
 
-Same prompt through arche vs HF Llama 3.2; compare argmax / max abs diff.
+**How:** Fixed dtype; load both models; encode one prompt; forward; report. Skip cleanly if weights/login unavailable.
 
-### 2. From zero: how you build it
+### 1. What — report
 
-Fixed seed/dtype; same weights; short seq; clean skip without weights.
+[`compare_logits_to_hf`](https://github.com/chaxus/arche/blob/main/arche/align_hf.py):
 
-### 3. What “good” means
+```python
+hf_logits = hf(ids).logits
+arche_logits, _ = arche(ids)
+max_abs = (arche_logits - hf_logits).abs().max()
+argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
+```
 
-Close enough with weights; explicit skip without; longer coverage later.
+`run_align_or_explain` returns `None` when HF weights aren’t reachable—**skip ≠ broken lesson logic**.
 
-### 4. Improve · whole-model impact
+### 2. Why — this gate
 
-Fail ⇒ revisit maps/RoPE/norm. Pass before optimize/serve.
+| Failure mode | Likely cause |
+| --- | --- |
+| Huge `max_abs` | Wrong map, RoPE theta, norm, or head layout |
+| Argmax mismatch | Same—plus dtype / device mismatch |
+| Skip | No login / gated / offline—fix env, not formulas |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Repro CI often gates on HF/official match; engines keep numeric regressions.
+| Step | Do |
+| --- | --- |
+| 1 | Login if needed; same model id as weights chapter |
+| 2 | float32 CPU compare for stability in the lab |
+| 3 | Short prompt (“The cat sat”) |
+| 4 | Assert within tolerance or print skip reason |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | With weights: argmax match; `max_abs` under lab tol |
+| **Hard** | Without weights: explicit skip, not a fake pass |
+| **Soft** | Longer prompts / more positions in CI later |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Fail → revisit | Maps / RoPE / norms before “optimizing” |
+| Pass | Safe to move to align (SFT/DPO) and serve |
+| Engine CI | Same idea gates vLLM-class numeric regs |
 
 ### 6. This course
 
@@ -28,6 +58,8 @@ Repro CI often gates on HF/official match; engines keep numeric regressions.
 huggingface-cli login
 python chapters/01-inference/ep21_hf_align.py
 ```
+
+Part 1 closes here. Part 2 steers the base next-token skill (SFT/DPO).
 
 ## Run
 
@@ -38,9 +70,8 @@ python chapters/01-inference/ep21_hf_align.py
 
 ## Fix
 
-No weights/login → skip ≠ broken logic.
+No weights/login → skip means “can’t download,” not “your math is wrong.”
 
 ## Next
-
 
 **SFT · DPO** (`/sft-dpo/`): align after the base next-token skill.

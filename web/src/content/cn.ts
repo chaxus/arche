@@ -903,51 +903,65 @@ python chapters/02-training/ep18_pretrain.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-从零训深网时，没有归一化，数值很容易炸或塌——嵌入之后第一道「稳住尺子」就是它。
+**是什么（What）：** **RMSNorm**——按 token 稳住尺度：除以均方根，再乘可学习 \`γ\`。不减均值、无 bias。
 
-### 1. 有什么作用
+**为什么（Why）：** 深 next-token 栈没有归一化容易炸或塌。Llama 风格 **pre-norm**（先 norm 再 attn / MLP）让从零堆深度训得动。
 
-**RMSNorm**：对每个 token 向量算 RMS，除掉它，再乘可学习 \`γ\`；**不减均值**（异于 LayerNorm）。Llama 风格 **pre-norm**：注意力前、MLP 前各一次。
+**怎么做（How）：** 每个 pre-norm 位点放 \`RMSNorm(D)\`；\`γ\` 初值约 1；与整网一起训。
 
-$$\\\\mathrm{RMSNorm}(x)=x/\\\\sqrt{\\\\mathrm{mean}(x^2)+\\\\varepsilon}\\\\odot\\\\gamma$$
+### 1. What — 公式
 
-### 2. 从零开始：怎么生成 / 接到哪
+\\[
+\\mathrm{RMSNorm}(x)=\\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}}\\odot\\gamma
+\\]
+
+仓库（[\`arche/norms.py\`](https://github.com/chaxus/arche/blob/main/arche/norms.py)）：
+
+\`\`\`python
+variance = x_f.pow(2).mean(dim=-1, keepdim=True)
+x_normed = x_f * torch.rsqrt(variance + self.eps)
+return (self.weight.float() * x_normed).to(orig_dtype)
+\`\`\`
+
+在 float32 里算再 cast 回去——与 HF Llama 同一类稳定性手法。
+
+### 2. Why — 相对 LayerNorm / 位置
+
+| 选择 | 原因 |
+| --- | --- |
+| 不减均值 | 稍省；对齐 Llama/Qwen 菜谱 |
+| 只有可学习 \`γ\` | 单位 RMS 后再按通道缩放 |
+| **Pre-norm** | 稳住 attn/MLP *输入*，深度才活 |
+| 嵌入之后、积木之前 | 有了向量就要先「稳住尺子」 |
+
+GPT-2 教学常是 LayerNorm + post-norm。本课例子是 **RMSNorm + pre-norm**。
+
+### 3. How — 怎么接
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 每个需要稳住的入口建一个 \`RMSNorm(D)\`，\`γ\` 长度 = \`D\` |
-| **2** | \`γ\` 常初始化为 1 |
-| **3** | 按 pre-norm 接到 Attention / MLP 前 |
-| **4** | 与整网一起训；推理原样前向 |
+| 1 | 注意力前、SwiGLU 前各一个（见 block） |
+| 2 | LM head 前再一个最终 RMSNorm（见 stack） |
+| 3 | \`ε\` 对齐 checkpoint（\`norm_eps\`） |
+| 4 | 训或加载；勿在外来权重下 LN↔RMSN 混用 |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 进出同形状；\`ε\` 防除零；位置符合配方（pre vs post） |
-| **软** | \`γ=1\` 时 RMS≈1（公式体检）；训练少炸、少 NaN |
-| **软** | 最终看整模 loss——Norm 很少单独打分 |
+| **硬** | 形状不变；有 \`ε\`；pre-norm 位点对齐菜谱 |
+| **软** | \`γ=1\` 时 RMS≈1；深前向更少 NaN |
+| **软** | 整模 loss / HF 对齐才是终审 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| LayerNorm→RMSNorm | 少算均值，Llama/Qwen 默认；换了要和权重匹配 |
-| pre-norm vs post-norm | 现代深网几乎 pre；post 更难训深 |
-| 学 \`γ\` / 冻 \`γ\` | 微调策略；乱改易伤稳定性 |
-| 与 lr/初始化搭配 | 从零训能否收敛的关键 |
-
-### 5. 业界 · 开源
-
-| 系 | 做法 |
-| --- | --- |
-| **Llama 3/3.2、Qwen** | RMSNorm + pre-norm |
-| **GPT-2 教学老栈** | LayerNorm + 常 post-norm |
-| **DeepSeek 等** | 主干仍 RMS/pre 一族（细节看配方） |
+| LN → RMSN | 结构级变更 ⇒ 重训 |
+| Pre vs post | 深度可训性 |
+| \`γ\` / lr | 耦合收敛 |
 
 ### 6. 本课
-
-\`arche/norms.py\`：
 
 \`\`\`bash
 python chapters/01-inference/ep04_rmsnorm.py
@@ -961,7 +975,7 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## 下一章
 
-**RoPE**（\`/cn/rope/\`）：从零把位置写进 Q/K。
+**RoPE**（\`/cn/rope/\`）：把位置写进 Q/K。
 
 `,
     latex:
@@ -978,45 +992,56 @@ python chapters/01-inference/ep04_rmsnorm.py
     demo: 'rope',
     markdown: `## 要点
 
-从零做 decoder：嵌入只回答「是谁」；**位置**要用 RoPE（或别的 PE）写进注意力，否则顺序无关。
+**是什么（What）：** **RoPE**（旋转位置编码）——按 token 位置旋转 Q、K，让**相对距离**进入注意力点积。
 
-### 1. 有什么作用
+**为什么（Why）：** 嵌入说明「是哪个词」；注意力还要「在哪」。嵌绝对位置表是旧派；现代稠密 Llama/Qwen/DeepSeek 在 Q/K 上用 RoPE。
 
-**RoPE** 按位置旋转 Q/K，相对距离进入点积——**不必**在嵌入上加绝对位置表。
+**怎么做（How）：** 选定 \`rope_theta\`，缓存 cos/sin，\`rotate_half\` 后与 Q/K 组合；长上下文缩放是后话。
 
-### 2. 从零开始：怎么生成
+### 1. What — 施加一步
+
+仓库（[\`arche/rope.py\`](https://github.com/chaxus/arche/blob/main/arche/rope.py)）：
+
+\`\`\`python
+def apply_rotary_emb(x, cos, sin):
+    return (x * cos) + (rotate_half(x) * sin)
+\`\`\`
+
+\`build_rope_cache\` 预计算 \`0 .. seq_len-1\` 的 cos/sin。带 cache 解码时按 \`start_pos\` 切片。
+
+### 2. Why — 设计理由
+
+| 选择 | 原因 |
+| --- | --- |
+| 只旋 Q/K | V 保持内容；位置进分数 |
+| 旋转带来相对性 | Dot(q_m, k_n) 依赖 \`m-n\` |
+| 大 \`theta\`（Llama 3: 50 万） | 比旧 10k 更能撑长上下文 |
+| 对齐 checkpoint 的 theta/scale | PE 错了，加载权重后会静默变差 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 选 \`rope_theta\`（Llama 3 很大） |
-| **2** | 预计算各位置 cos/sin 缓存 |
-| **3** | 对 Q/K：\`rotate_half\` 后与 cos/sin 组合 |
-| **4** | 与注意力一起训；长上下文再考虑缩放（后章） |
+| 1 | \`head_dim\` 偶数；由 \`theta\` 建 inv-freq |
+| 2 | 缓存到最大序列（显存折中） |
+| 3 | Q/K 投影之后、SDPA 之前施加 |
+| 4 | 长上下文：Llama-3 波长平滑（后章 \`rope-scaling\`） |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | Q/K 形状不变；相对位置改变则分数变；与检查点 \`theta\`/缩放一致 |
-| **软** | 训练长度内稳定；超长靠缩放或继续训 |
+| **硬** | 形状不变；头维偶数；Q、K 都施加 |
+| **硬** | checkpoint 的 \`theta\` / scale 一致 |
+| **软** | 近邻与远邻分数有别 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 更大 \`theta\` / 缩放 | 长文能力；错配置毁长上下文 |
-| 绝对 PE → RoPE | 现代默认；换了要整栈一致 |
-| ALiBi 等 | 另一路线；与 RoPE 权重不混用 |
-
-### 5. 业界 · 开源
-
-| 系 | 做法 |
-| --- | --- |
-| **Llama 3/3.2、Qwen、DeepSeek** | RoPE（+ 各自长文配方） |
-| **原版 Transformer** | 正弦 PE |
-| **部分长文工作** | ALiBi / YaRN / NTK 等 |
-
-本页可拖互动图。
+| Theta / scaling | 长上下文表现 |
+| 绝对 PE → RoPE | 现代默认；勿与外来权重混家族 |
+| 跳过 RoPE | 模型难以可靠用顺序 |
 
 ### 6. 本课
 
@@ -1032,7 +1057,7 @@ python chapters/01-inference/ep05_rope.py
 
 ## 下一章
 
-**GQA**（\`/cn/gqa/\`）：从零定头数，省 KV 缓存。
+**GQA**（\`/cn/gqa/\`）：省 KV cache 的头布局。
 
 `,
     latex:
@@ -1049,48 +1074,62 @@ python chapters/01-inference/ep05_rope.py
     demo: 'gqa',
     markdown: `## 要点
 
-从零定架构时，注意力头布局直接决定**解码显存**与质量上限。
+**是什么（What）：** **分组查询注意力（GQA）**——Q 头多于 KV 头；多组 Q **共享**一组 KV。仍是因果注意力。
 
-### 1. 有什么作用
+**为什么（Why）：** 纯 MHA 每个 Q 头存一对 KV → 解码显存随长度爆。GQA 大幅砍 cache，质量损失通常可控。Llama 3.2 ~1B：**32 Q / 8 KV**。
 
-**GQA**：Q 头多于 KV 头，多组 Q **共用**一组 KV；仍因果。流程：投影→拆头→RoPE→扩 KV→SDPA→输出投影。
+**怎么做（How）：** 选可整除的 \`n_q\` / \`n_kv\`，投影，RoPE，对 KV **repeat_interleave** 对齐 Q，再 SDPA；cache 只存 \`n_kv\`。
 
-### 2. 从零开始：怎么生成
+### 1. What — 本仓库形状
+
+[\`CausalSelfAttention\`](https://github.com/chaxus/arche/blob/main/arche/attention.py)：
+
+\`\`\`python
+q = self.q_proj(x).view(bsz, seq_len, self.num_heads, self.head_dim)
+k = self.k_proj(x).view(bsz, seq_len, self.num_kv_heads, self.head_dim)
+# ... RoPE ...
+k_full = new_cache.k.repeat_interleave(self.n_rep, dim=1)
+v_full = new_cache.v.repeat_interleave(self.n_rep, dim=1)
+attn = F.scaled_dot_product_attention(q, k_full, v_full, is_causal=...)
+\`\`\`
+
+\`n_rep = num_heads // num_kv_heads\`。Cache 追加**窄** K/V；只在 matmul 时广播。
+
+### 2. Why — MHA / GQA / MQA / MLA
+
+| 布局 | 想法 | 代价 |
+| --- | --- | --- |
+| **MHA** | \`n_kv = n_q\` | 最强，cache 最大 |
+| **GQA** | \`n_kv\` 整除 \`n_q\` | 开源中型默认 |
+| **MQA** | \`n_kv = 1\` | 极致省 cache |
+| **MLA** | 压缩潜变量 KV | 前沿（DeepSeek）—后部 |
+
+改头数 ⇒ **重训**（否则对不上 checkpoint）。
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 选 \`n_q\`、\`n_kv\`（\`n_q % n_kv == 0\`） |
-| **2** | 实现广播/重复 KV 再与 Q 注意力 |
-| **3** | 与整网训；推理接 KV 缓存按 \`n_kv\` 存 |
+| 1 | 固定 \`embed_dim = n_q × head_dim\` |
+| 2 | 选能整除 \`n_q\` 的 \`n_kv\` |
+| 3 | 无 bias 的 Q/K/V/O（Llama 约定） |
+| 4 | Prefill 用因果；有 cache 时看全部过去 key |
 
-Llama 3.2 1B 例子：**32 Q / 8 KV**。
-
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 头数整除；因果正确；与权重头数一致 |
-| **软** | 缓存明显小于满 MHA；质量相对 MHA 可接受 |
+| **硬** | 分组合法；因果；权重头数对齐 config |
+| **软** | Cache 字节约 MHA 的 \`n_kv/n_q\` |
+| **软** | 同宽度下相对 MHA 质量站得住 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-| 布局 | 影响 |
+| 杠杆 | 影响 |
 | --- | --- |
-| MHA | 质量上限高，KV 最贵 |
-| **GQA** | 折中——开放 7B–70B 常用 |
-| MQA | 最省，质量压力大 |
-| MLA | 进一步压缓存（后章） |
-
-改头数 = 改架构 = **重训**；不能把 MHA 权重塞进 GQA 形状。
-
-### 5. 业界 · 开源
-
-| 系 | 做法 |
-| --- | --- |
-| **Llama 3/3.2** | GQA |
-| **许多 Qwen/同类** | GQA |
-| **DeepSeek-V3** | MLA 路线（不同压缩） |
-| **经典论文/老** | 满 MHA |
+| 更少 KV 头 | 解码显存 / 速度 |
+| 太少 | 质量断崖 |
+| MLA 路线 | 另一套压缩（Frontier） |
 
 ### 6. 本课
 
@@ -1106,7 +1145,7 @@ python chapters/01-inference/ep06_gqa.py
 
 ## 下一章
 
-**SwiGLU**（\`/cn/swiglu/\`）：从零接 FFN。
+**SwiGLU**（\`/cn/swiglu/\`）：稠密 FFN。
 
 `,
   },
@@ -1120,45 +1159,56 @@ python chapters/01-inference/ep06_gqa.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-从零搭块：注意力混合位置；**FFN** 在每个位置做非线性——现代 dense 默认 SwiGLU。
+**是什么（What）：** **SwiGLU**——门控前馈：\`down(silu(gate(x)) * up(x))\`，三张**无 bias** 线性层。
 
-### 1. 有什么作用
+**为什么（Why）：** 注意力在位置*之间*混合；FFN 在*每个*位置上变换。SwiGLU（而非纯 GELU MLP）是 Llama/Qwen 稠密默认；MoE 的 expert 常常就是同一块。
 
-$$\\\\mathrm{FFN}(x)=W_d(\\\\mathrm{SiLU}(W_g x)\\\\odot W_u x)$$
+**怎么做（How）：** 选定 \`intermediate_dim\`，三张矩阵，接在 block 里第二次 pre-norm 之后。
 
-三条无 bias 线性：gate / up / down。
+### 1. What — 代码
 
-### 2. 从零开始：怎么生成
+[\`arche/mlp.py\`](https://github.com/chaxus/arche/blob/main/arche/mlp.py)：
+
+\`\`\`python
+class SwiGLU(nn.Module):
+    def forward(self, x):
+        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+\`\`\`
+
+gate / up 把 \`D → I\`；down 回到 \`I → D\`。无 bias——对齐 Llama 权重文件。
+
+### 2. Why — 门控 vs 普通 MLP
+
+| 选择 | 原因 |
+| --- | --- |
+| SiLU(gate)×up | 软门控；LM 上经验强 |
+| 三矩阵 | 同 \`I\` 下比两矩阵 GELU MLP 参数略多 |
+| 无 bias | 更省，对齐开源 Llama/Qwen 张量 |
+| 按位置 | 易并行；配残差 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 定 \`ffn_dim\`（通常 > \`D\`） |
-| **2** | 建三套权重，无 bias |
-| **3** | 接在块内第二段（pre-norm 后） |
-| **4** | 整网训；MoE 时每个专家往往是一个 SwiGLU |
+| 1 | 选 \`I\`（Llama 3.2 1B 由 config 给出） |
+| 2 | \`gate_proj\` / \`up_proj\` / \`down_proj\` 均 bias=False |
+| 3 | 放在 \`post_attention_layernorm\` 后 |
+| 4 | 以后 MoE：许多 SwiGLU + router |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 进出 \`D\`；无 bias（Llama 契约）；形状与权重一致 |
-| **软** | 相对 GELU MLP 的收益看整模 |
+| **硬** | 进出维 \`D\`；无 bias；gate 上 SiLU |
+| **软** | 用整模 loss / 质量评判，不孤立看 FFN |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 加宽 \`ffn_dim\` | 容量↑、算力↑ |
-| GELU MLP→SwiGLU | 与 Llama/Qwen 对齐；要重训 |
-| 改成 MoE 专家 | 参数总量↑、单 token 稀疏算 |
-
-### 5. 业界 · 开源
-
-| 系 | 做法 |
-| --- | --- |
-| **Llama / Qwen dense** | SwiGLU |
-| **Mixtral 等 MoE** | 专家为 SwiGLU 类 |
-| **GPT-2 风教学** | GELU MLP |
+| 更宽 \`I\` | 容量与算力 |
+| GELU → SwiGLU | 需重训 |
+| MoE experts | 同一砖 × E，稀疏点火 |
 
 ### 6. 本课
 
@@ -1174,7 +1224,7 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## 下一章
 
-**Transformer 块**（\`/cn/block/\`）。
+**Transformer block**（\`/cn/block/\`）：把零件夹成一层。
 
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
@@ -1189,46 +1239,66 @@ python chapters/01-inference/ep07_swiglu.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-从零搭模型：零件齐了要收成**可重复的一层**，才能叠深度。
+**是什么（What）：** 一层可重复的 **Transformer block**——pre-RMSNorm → 注意力 → 残差 → pre-RMSNorm → SwiGLU → 残差。
 
-### 1. 有什么作用
+**为什么（Why）：** 积木只有配上**残差**才能堆成深网。进出同形状，才能叠 \`N\` 次（Llama 3.2 ~1B：**N=16**）。
 
-**Transformer 块**（pre-norm 三明治）：
+**怎么做（How）：** 三明治接一次；每层自有权重；再堆叠训或加载。
 
+### 1. What — 前向
+
+[\`TransformerBlock\`](https://github.com/chaxus/arche/blob/main/arche/block.py)：
+
+\`\`\`python
+h, new_cache = self.self_attn(self.input_layernorm(x), cache=cache, start_pos=start_pos)
+x = x + h
+x = x + self.mlp(self.post_attention_layernorm(x))
+return x, new_cache
 \`\`\`
-x → RMSNorm → 注意力 → + 残差
-  → RMSNorm → SwiGLU → + 残差
+
+\`\`\`mermaid
+flowchart LR
+  x[x] --> n1[RMSNorm]
+  n1 --> attn[GQA_RoPE]
+  attn --> add1[残差加]
+  add1 --> n2[RMSNorm]
+  n2 --> ffn[SwiGLU]
+  ffn --> add2[残差加]
 \`\`\`
 
-进出同形状；注意力可接 KV cache。
+### 2. Why — 残差 + pre-norm
 
-### 2. 从零开始：怎么生成
+| 选择 | 原因 |
+| --- | --- |
+| 残差相加 | 梯度高速路；子层≈0 时近恒等 |
+| Pre-norm（非 post） | 现代深训稳定 |
+| 先 attn 后 MLP | Llama/Qwen 主线（非并行 attn∥MLP） |
+| 每层 KV cache | 解码复用该层过去的 K/V |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 按上图接线（本课布局） |
-| **2** | 每块独立一套权重 |
-| **3** | 定深度 N（Llama 3.2 1B = **16**） |
-| **4** | 堆叠进模型，整网训 |
+| 1 | 按 config 建 norm、\`CausalSelfAttention\`、\`SwiGLU\` |
+| 2 | 保持进出 \`embed_dim\` |
+| 3 | 贯通 \`cache\` / \`start_pos\` 供生成 |
+| 4 | 在 stack 里重复 \`N\` 次 |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 残差可加；pre-norm 位置对；有 cache 时每层隔离 |
-| **软** | 加深仍可训（残差+norm）；深度由算力与目标定 |
+| **硬** | 残差是加；pre-norm 位置对；形状 \`(B,T,D)\` |
+| **硬** | 每层 cache 独立 |
+| **软** | 深栈仍能训 / 加载且无 NaN |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 加深 N | 能力↑、显存/算力↑，需重训 |
-| post→pre-norm | 现代默认，利于从零训深 |
-| 注意力∥MLP 并行 | 非 Llama 主线；换布局要重训 |
-
-### 5. 业界 · 开源
-
-Llama/Qwen dense：pre-norm 块重复 N 次。DeepSeek 等在块内换注意力/FFN 变体，**块边界**仍在。
+| 更大 \`N\` | 能力与成本 |
+| Post → pre-norm | 从零深训成为可能 |
+| 换内脏（MLA/MoE） | 前沿变体；block 边界仍在 |
 
 ### 6. 本课
 
@@ -1244,7 +1314,7 @@ python chapters/01-inference/ep08_block.py
 
 ## 下一章
 
-**堆叠 + LM head**（\`/cn/stack/\`）。
+**整网 + LM head**（\`/cn/stack/\`）。
 
 `,
   },
@@ -1258,37 +1328,58 @@ python chapters/01-inference/ep08_block.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-从零：一块不是语言模型；要 **嵌入 + N 块 + 最终 norm + LM head** 才有 next-token 分布。
+**是什么（What）：** 完整的 **稠密因果 LM 壳**：\`ids → embed → Block×N → 最终 RMSNorm → Linear(V) → logits\`。
 
-### 1. 有什么作用
+**为什么（Why）：** 单层 block 还不是语言模型。这就是预训练里 \`model(batch)\` 调用的东西——此前是黑盒。
 
-\`ids → 嵌入 → Block×N → 最终 RMSNorm → Linear(V) → logits\`
+**怎么做（How）：** 按 config（\`V,D,N,heads,…\`）搭建；可选 **绑定** LM head ↔ embed（小 Llama 常绑）；初始化后加载或预训练。
 
-小 Llama 常 **tie** LM head ↔ 嵌入。
+### 1. What — 前向
 
-### 2. 从零开始：怎么生成
+[\`Llama\`](https://github.com/chaxus/arche/blob/main/arche/model.py)：
+
+\`\`\`python
+x = self.embed_tokens(input_ids)
+for layer, cache in zip(self.layers, caches):
+    x, new_cache = layer(x, cache=cache, start_pos=start_pos)
+x = self.norm(x)
+return self.lm_head(x), new_caches
+\`\`\`
+
+Logits 形状 \`(B, T, V)\`——正是 \`lm_loss\` 错位后吃的东西。
+
+### 2. Why — 绑定与最终 norm
+
+| 选择 | 原因 |
+| --- | --- |
+| 最终 RMSNorm | 投向词表前再稳住 |
+| 绑定 head↔embed | 参数更少；~1B 常见 |
+| 不绑定 | 更大模型更自由 |
+| 共享 config | HF 映射的唯一真相源 |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | 用已定 V、D、N、头数建空壳 |
-| **2** | 串嵌入→块→最终 norm→head |
-| **3** | 决定 tie 与否 |
-| **4** | 随机初始化后要么加载权重，要么开预训练 |
+| 1 | 填好 \`Llama32Config\` |
+| 2 | \`ModuleList\` 放 \`N\` 个 block |
+| 3 | 在 init/load 前设 \`tie_word_embeddings\` |
+| 4 | 用预训练环训，或 \`from_pretrained\` |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | logits \`(B,T,V)\`；配置与权重可对上；tie 约定一致 |
-| **软** | 装权/训完后文字与指标达标 |
+| **硬** | Logits \`(B,T,V)\`；config ↔ 权重；绑定一致 |
+| **软** | 加载后或足够预训练步后质量可读 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-加深加宽、改 tie、改词表 V——都是架构级，需重训或严格迁移。堆叠本身不「单独优化」，优化的是各子模块与训练。
-
-### 5. 业界 · 开源
-
-开放 dense（Llama/Qwen）同一骨架；差异在超参与数据。MoE 则把块内 FFN 换成路由专家，骨架仍在。
+| 杠杆 | 影响 |
+| --- | --- |
+| 深度 / 宽度 / V | 结构级；重训或谨慎迁移 |
+| 换成 MoE | 替换 block 内 SwiGLU——骨架仍在 |
+| 只拧栈 | 没有数据/优化配合意义有限 |
 
 ### 6. 本课
 
@@ -1304,7 +1395,7 @@ python chapters/01-inference/ep09_stack.py
 
 ## 下一章
 
-**加载权重**（\`/cn/weights/\`）。
+**加载权重**（\`/cn/weights/\`）：用 Llama 小数填满空壳。
 
 `,
   },
@@ -1318,39 +1409,55 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## 要点
 
-仍是一条从零主线。本章加载 **Llama 例子**的开源检查点，让手写栈立刻能说话。Part 2 才体会这些小数怎样被**训练写出来**——真正的权重多半不是手填的。加载错 = 前面手写全白费。
+**是什么（What）：** 通过 **键名映射** 把开源 Llama 3.2 检查点 **加载** 进你手写的栈（safetensors / HF → \`state_dict\`）。
 
-### 1. 有什么作用
+**为什么（Why）：** 随机权重 = 图对、字胡说。官方小数让同一次前向立刻像语言模型。你已见过预训练怎样*写出*小数；本章**借用**一次跑完的结果，不必自己上集群也能生成 / 对齐。
 
-按 key 映射把张量拷进模块。随机权重图对但无意义；装上 Llama 3.2 权重后，同前向才像语言模型。
+**怎么做（How）：** 接受协议 → 下载 → 映射键 → 配对**官方分词器** → 核对形状。
 
-### 2. 从零开始：怎么做
+### 1. What — 入口
 
-| 同一条路上的步骤 | 做什么 |
+[\`from_pretrained\`](https://github.com/chaxus/arche/blob/main/arche/load_weights.py) 建 \`Llama(cfg)\`，把 HF 张量拷进对应名字。
+
+| 路径 | 作用 |
 | --- | --- |
-| **加载例子（本章）** | 许可 + 登录 → 下 HF 检查点 → **key 映射**进 arche → 配官方分词 |
-| **稍后训练（Part 2）** | 玩具/真预训练写出 \`state_dict\`；记下分词版本 |
-| **校验** | 参数量、缺 key；生成后一章 **HF 对齐**比短 prompt logits |
+| **加载（本章）** | 例子 checkpoint → 马上能说话 |
+| **预训练（更早）** | 这些小数从零怎么被写出 |
+| **HF 对齐（稍后）** | 证明映射 + 公式对齐 HF logits |
 
-### 3. 怎么样算好
+### 2. Why — 映射要小心
+
+| 风险 | 后果 |
+| --- | --- |
+| 键错 / 转置错 | 静默垃圾或崩溃 |
+| 分词器错 | id 指到错误嵌入行 |
+| dtype / 设备滑 | 慢或 NaN |
+| 只加载一部分 | 「能跑」但层是坏的 |
+
+### 3. How — 清单
+
+| 步骤 | 做什么 |
+| --- | --- |
+| 1 | 若门禁：\`huggingface-cli login\` |
+| 2 | 解析模型 id（课默认 Llama 3.2 ~1B） |
+| 3 | Config → 空 \`Llama\` → 拷权重 |
+| 4 | **永远**用与 checkpoint 同一套分词器 |
+
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 形状/数量对；映射无漏；分词配对 |
-| **软** | 与 HF 对齐接近；生成可读 |
+| **硬** | 无 missing/unexpected；形状对齐 |
+| **硬** | 词表大小 = 嵌入行数 |
+| **软** | 短生成像人话；随后 HF 对齐 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 修映射 | 消除静默错层 |
-| 精度（fp16/bf16） | 速度/显存/数值 |
-| 从中间检查点恢复 | 续训；步数与 RNG 要一致 |
-| 错分词 | 整模语义崩 |
-
-### 5. 业界 · 开源
-
-HF \`transformers\` + safetensors 是事实标准；Llama/Qwen/DeepSeek 均如此分发。引擎（vLLM）读同一类检查点。
+| 修键映射 | 解锁后续全部演示 |
+| 恢复自己的 ckpt | 同一 API，你的小数 |
+| 量化加载 | 见后部服务章 |
 
 ### 6. 本课
 
@@ -1368,11 +1475,11 @@ python chapters/01-inference/ep10_load_weights.py
 
 ## 翻车
 
-许可、登录、镜像——同分词章。
+协议、登录、镜像——与分词器下载同类问题。
 
 ## 下一章
 
-**文本生成**（\`/cn/generate/\`）。
+**文本生成**（\`/cn/generate/\`）：在 logits 上循环采样。
 
 `,
   },
@@ -1386,40 +1493,59 @@ python chapters/01-inference/ep10_load_weights.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-从零：有了 logits 还要**循环采样**，才是生成；产品差异多在停止与采样，不在「有没有循环」。
+**是什么（What）：** **自回归生成**——把 logits 变成文本的循环：打分 → 选下一 id → 拼上 → 停止。
 
-### 1. 有什么作用
+**为什么（Why）：** 训好/加载好的栈只吐分数。产品差在采样与停止规则；共同点是这条环。没有它只有「分类器形」前向，没有聊天。
 
-取最后位置 logits → 温度/top-k（可选）→ 贪心或采样 → append → EOS/长度停止。
+**怎么做（How）：** 最后位置 logits → 可选 temperature / top-k → 贪心或采样 → 追加 → 遇 EOS 或达长度停下。KV cache（下一部分）让同一环变快。
 
-### 2. 从零开始：怎么生成这套逻辑
+### 1. What — 骨架
+
+[\`arche/generate.py\`](https://github.com/chaxus/arche/blob/main/arche/generate.py) 大致：
+
+\`\`\`python
+# 每一步
+logits, caches = model(ids_or_last_token, caches=caches, start_pos=...)
+next_id = sample(logits[:, -1, :], temperature=..., top_k=...)  # 或 argmax
+# 追加；EOS / max_new_tokens 时 break
+\`\`\`
+
+Prefill 一次跑完 prompt；开 cache 时 decode 每次只喂新 token。
+
+### 2. Why — 旋钮 ≠ 权重
+
+| 旋钮 | 改变的是 |
+| --- | --- |
+| Temperature / top-k / top-p | 挑选风格——不是模型小数 |
+| 贪心 argmax | 确定、常偏闷 |
+| EOS / 最大长度 | 体验与安全边界 |
+| Chat template | 角色如何变成 id（后章） |
+
+### 3. How — 从零
 
 | 步骤 | 做什么 |
 | --- | --- |
-| **1** | Prefill/前向得 logits |
-| **2** | 实现采样与停止条件 |
-| **3** | 接上 KV 缓存（下章）降本 |
-| **4** | 再接对话模板（后章）才像聊天 |
+| 1 | 用**配对**分词器编码 prompt |
+| 2 | 前向 → 取最后时刻 logits |
+| 3 | 采样或 argmax → 追加 id |
+| 4 | 直到停止；id 解码回文本 |
 
-### 3. 怎么样算好
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 能停；只看过去；id 落在词表 |
-| **软** | 温度行为符合预期；有真权重时连贯 |
+| **硬** | 会停；只见过去；合法词表 id |
+| **软** | 真权重下短补全连贯 |
+| **软** | 同 prompt + 贪心 ≈ 可复现 |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| temperature / top-p / top-k | 多样性 vs 可信；不改权重 |
-| 停止符 / 最大长度 | 产品体验 |
+| 只改采样 | 不重训也能改行为 |
+| 无 KV cache | 正确但体感 O(T²)—下一部分修 |
 | 约束解码 | 结构化输出 |
-| 无缓存的循环 | 正确但太慢——必须上 KV |
-
-### 5. 业界 · 开源
-
-所有聊天栈同一循环；vLLM/TGI 等加速的是缓存与批处理，不是取消循环。Llama/Qwen 推理 API 都暴露采样旋钮。
+| 停止规则差 | 跑飞或截断 |
 
 ### 6. 本课
 
@@ -1435,8 +1561,7 @@ python chapters/01-inference/ep11_generate.py
 
 ## 下一章
 
-
-**HF logits 对齐**（\`/cn/hf-align/\`）：对照官方实现，验收手写栈。
+**HF 对齐**（\`/cn/hf-align/\`）：证明手写栈对齐 HF。
 
 `,
   },
@@ -1450,30 +1575,57 @@ python chapters/01-inference/ep11_generate.py
     estimatedMinutes: 20,
     markdown: `## 要点
 
-Part 1 收尾验收：**与权威 HF 实现对短 prompt logits**——证明映射与公式没大错。过关后再进入 Part 2，体会权重如何从零训练出来。
+**是什么（What）：** **数值核对**——同一短 prompt 分别过 arche 与 Hugging Face Llama 3.2，比较 logits（最大绝对差 + argmax 是否一致）。
 
-### 1. 有什么作用
+**为什么（Why）：** 第 1 部分收官证明：键映射、RMSNorm、RoPE、GQA、SwiGLU、整网布局不是「形状对、公式错」。别让后面的服务/优化章把 bug 藏起来。
 
-同 prompt 跑 arche vs HF Llama 3.2；比 argmax 与 max abs diff。
+**怎么做（How）：** 固定 dtype；两边加载；编码一条 prompt；前向；出报告。无权重/未登录时干净跳过。
 
-### 2. 从零开始：怎么做
+### 1. What — 报告
 
-固定种子与精度；加载同一权重；比短序列；无权重则干净跳过。
+[\`compare_logits_to_hf\`](https://github.com/chaxus/arche/blob/main/arche/align_hf.py)：
 
-### 3. 怎么样算好
+\`\`\`python
+hf_logits = hf(ids).logits
+arche_logits, _ = arche(ids)
+max_abs = (arche_logits - hf_logits).abs().max()
+argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
+\`\`\`
+
+\`run_align_or_explain\` 在 HF 权重不可达时返回 \`None\`——**跳过 ≠ 课逻辑坏了**。
+
+### 2. Why — 这道门
+
+| 失败形态 | 常见原因 |
+| --- | --- |
+| \`max_abs\` 很大 | 映射、RoPE theta、norm 或头布局错 |
+| Argmax 不一致 | 同上——外加 dtype / 设备不一致 |
+| 跳过 | 未登录 / 门禁 / 离线——修环境，不是公式 |
+
+### 3. How — 从零
+
+| 步骤 | 做什么 |
+| --- | --- |
+| 1 | 需要则登录；模型 id 与加载章相同 |
+| 2 | 实验用 float32 CPU 比较更稳 |
+| 3 | 短 prompt（如“The cat sat”） |
+| 4 | 在容差内断言，或打印跳过原因 |
+
+### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 有权时足够接近；无权时明确跳过 |
-| **软** | 覆盖更长序列/更多算子 |
+| **硬** | 有权重：argmax 一致；\`max_abs\` 低于实验容差 |
+| **硬** | 无权重：显式跳过，不当假通过 |
+| **软** | 更长 prompt / 更多位置留给以后 CI |
 
-### 4. 如何改进 · 对整模影响
+### 5. 如何改进 · 对整模影响
 
-对齐失败 → 回查映射/RoPE/norm。通过对齐再谈优化与服务。
-
-### 5. 业界 · 开源
-
-开源复现常把「对上 HF/官方」当 CI 门禁；vLLM 等也有数值回归测。
+| 杠杆 | 影响 |
+| --- | --- |
+| 失败 → 回头查 | 映射 / RoPE / norm，先别「优化」 |
+| 通过 | 可进对齐（SFT/DPO）与服务 |
+| 引擎 CI | 同类门禁卡 vLLM 级数回归 |
 
 ### 6. 本课
 
@@ -1481,6 +1633,8 @@ Part 1 收尾验收：**与权威 HF 实现对短 prompt logits**——证明映
 huggingface-cli login
 python chapters/01-inference/ep21_hf_align.py
 \`\`\`
+
+第 1 部分至此结束。第 2 部分转向底座猜词能力（SFT/DPO）。
 
 ## 动手
 
@@ -1491,10 +1645,9 @@ python chapters/01-inference/ep21_hf_align.py
 
 ## 翻车
 
-无权/未登录 → 跳过 ≠ 逻辑坏。
+无权重/未登录 → 跳过表示「下不下来」，不是「数学错了」。
 
 ## 下一章
-
 
 **SFT · DPO**（\`/cn/sft-dpo/\`）：在会猜词之后做对齐。
 

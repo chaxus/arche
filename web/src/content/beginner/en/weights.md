@@ -1,30 +1,54 @@
 ## Idea
 
-Still one path from zero. This chapter loads the **Llama example’s** open checkpoint so your handwritten stack can speak now. Part 2 is where you feel how those floats get **written by training**—most numbers are trained, not hand-filled. Bad loads waste the handwritten stack.
+**What:** **Load** an open Llama 3.2 checkpoint into your handwritten stack via a **key map** (safetensors / HF → `state_dict`).
 
-### 1. What it is for
+**Why:** Random weights = correct graph, nonsense text. Official floats make the same forward a language model *now*. You already saw how pretrain *writes* floats; this chapter **borrows** a finished run so generate/align work without a cluster.
 
-Copy tensors via a key map. Random weights are a correct graph with nonsense outputs; Llama 3.2 weights make the same forward pass behave like a language model.
+**How:** Accept license → download → map keys → pair the **official tokenizer** → sanity-check shapes.
 
-### 2. From zero: how you do it
+### 1. What — entry
 
-| Step on the same path | What you do |
+[`from_pretrained`](https://github.com/chaxus/arche/blob/main/arche/load_weights.py) builds `Llama(cfg)` and copies HF tensors into matching names.
+
+| Path | Role |
 | --- | --- |
-| **Load the example (this chapter)** | license→download→key map→official tokenizer |
-| **Train later (Part 2)** | toy/real pretrain writes `state_dict`; record tokenizer version |
-| **Validate** | shapes/missing keys; **HF align** after generate compares short-prompt logits |
+| **Load (this chapter)** | Example checkpoint → speak immediately |
+| **Pretrain (earlier)** | How those floats get written from zero |
+| **HF align (next-next)** | Proof map + formulas match HF logits |
 
-### 3. What “good” means
+### 2. Why — map carefully
 
-Shapes/counts; full map; tokenizer pair; optional HF logit align.
+| Risk | Effect |
+| --- | --- |
+| Wrong key / transpose | Silent garbage or crash |
+| Wrong tokenizer | Ids point at wrong embed rows |
+| Dtype / device slip | Slow or NaN |
+| Partial load | “Runs” but broken layers |
 
-### 4. Improve · whole-model impact
+### 3. How — checklist
 
-Fix maps; dtype; resume carefully; wrong tokenizer destroys meaning.
+| Step | Do |
+| --- | --- |
+| 1 | `huggingface-cli login` if gated |
+| 2 | Resolve model id (course default Llama 3.2 ~1B) |
+| 3 | Config → empty `Llama` → copy weights |
+| 4 | Always use the **same** tokenizer as the checkpoint |
 
-### 5. Industry · open models
+### 4. What “good” means
 
-HF + safetensors standard; Llama/Qwen/DeepSeek ship that way; engines consume the same.
+| Kind | Check |
+| --- | --- |
+| **Hard** | No missing/unexpected keys; shapes match |
+| **Hard** | Tokenizer vocabulary size = embed rows |
+| **Soft** | Short generate looks like language; HF align later |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Fix key map | Unlocks all downstream demos |
+| Resume your own ckpt | Same API, your floats |
+| Quantized loads | Later serve chapters |
 
 ### 6. This course
 
@@ -42,8 +66,8 @@ python chapters/01-inference/ep10_load_weights.py
 
 ## Fix
 
-License, login, mirror—same as tokenizer.
+License, login, mirror—same class of issues as tokenizer download.
 
 ## Next
 
-**Text generation** (`/generate/`).
+**Text generation** (`/generate/`): loop sample on logits.

@@ -1,26 +1,61 @@
 ## Idea
 
-From-zero architecture: attention layout sets **decode VRAM** vs quality.
+**What:** **Grouped-Query Attention (GQA)** — more query heads than KV heads; groups of Q heads **share** one KV head. Still causal.
 
-### 1. What it is for
+**Why:** Full MHA stores a KV pair per Q head → decode VRAM explodes with length. GQA cuts cache size with small quality hit. Llama 3.2 ~1B uses **32 Q / 8 KV**.
 
-**GQA**: more Q heads than KV heads; groups share KV; still causal.
+**How:** Choose divisible `n_q` / `n_kv`, project, RoPE, **repeat_interleave** KV to match Q, then SDPA; cache stores only `n_kv`.
 
-### 2. From zero: how you build it
+### 1. What — shapes in this repo
 
-Choose divisible `n_q`/`n_kv`, broadcast KV, train; cache stores `n_kv`. Llama 3.2 1B: **32Q/8KV**.
+[`CausalSelfAttention`](https://github.com/chaxus/arche/blob/main/arche/attention.py):
 
-### 3. What “good” means
+```python
+q = self.q_proj(x).view(bsz, seq_len, self.num_heads, self.head_dim)
+k = self.k_proj(x).view(bsz, seq_len, self.num_kv_heads, self.head_dim)
+# ... RoPE ...
+k_full = new_cache.k.repeat_interleave(self.n_rep, dim=1)
+v_full = new_cache.v.repeat_interleave(self.n_rep, dim=1)
+attn = F.scaled_dot_product_attention(q, k_full, v_full, is_causal=...)
+```
 
-Valid groups; causal; match weight heads; smaller cache than MHA without quality collapse.
+`n_rep = num_heads // num_kv_heads`. Cache appends **narrow** K/V; broadcast only for the matmul.
 
-### 4. Improve · whole-model impact
+### 2. Why — MHA / GQA / MQA / MLA
 
-MHA richest/costliest; GQA default open midsize; MQA extreme; MLA further compression. Head-count change ⇒ retrain.
+| Layout | Idea | Cost |
+| --- | --- | --- |
+| **MHA** | `n_kv = n_q` | Richest, biggest cache |
+| **GQA** | `n_kv` divides `n_q` | Open midsize default |
+| **MQA** | `n_kv = 1` | Extreme cache save |
+| **MLA** | Compressed latent KV | Frontier (DeepSeek)—later part |
 
-### 5. Industry · open models
+Head-count change ⇒ **retrain** (or lose the checkpoint).
 
-Llama 3/Qwen: GQA. DeepSeek-V3: MLA path. Classic GPT-2 teaching: MHA.
+### 3. How — from zero
+
+| Step | Do |
+| --- | --- |
+| 1 | Fix `embed_dim = n_q × head_dim` |
+| 2 | Pick `n_kv` that divides `n_q` |
+| 3 | Bias-free Q/K/V/O linears (Llama contract) |
+| 4 | Causal mask on prefill; with cache, attend all past keys |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Valid groups; causal; weight head counts match config |
+| **Soft** | Cache bytes ≈ `n_kv/n_q` of MHA |
+| **Soft** | Quality holds vs MHA at same width |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Fewer KV heads | Decode memory / speed |
+| Too few | Quality cliff |
+| MLA path | Different compression story (Frontier) |
 
 ### 6. This course
 
@@ -36,4 +71,4 @@ python chapters/01-inference/ep06_gqa.py
 
 ## Next
 
-**SwiGLU** (`/swiglu/`): wire the FFN from zero.
+**SwiGLU** (`/swiglu/`): the dense FFN.

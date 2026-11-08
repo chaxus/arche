@@ -1,26 +1,65 @@
 ## Idea
 
-From zero: parts become one **repeatable layer** so you can stack depth.
+**What:** One **Transformer block** — the repeatable layer: pre-RMSNorm → attention → residual → pre-RMSNorm → SwiGLU → residual.
 
-### 1. What it is for
+**Why:** Bricks only become a deep net when packaged with **residuals**. Same shape in and out so you can stack `N` times (Llama 3.2 ~1B: **N=16**).
 
-Pre-norm sandwich: RMSNorm→attn→res→RMSNorm→SwiGLU→res. Same shape in/out.
+**How:** Wire the sandwich once; each layer gets its own weights; stack and train (or load).
 
-### 2. From zero: how you build it
+### 1. What — forward
 
-Wire the sandwich; per-block weights; pick depth N (Llama 3.2 1B = **16**); stack and train.
+[`TransformerBlock`](https://github.com/chaxus/arche/blob/main/arche/block.py):
 
-### 3. What “good” means
+```python
+h, new_cache = self.self_attn(self.input_layernorm(x), cache=cache, start_pos=start_pos)
+x = x + h
+x = x + self.mlp(self.post_attention_layernorm(x))
+return x, new_cache
+```
 
-Residuals add; pre-norm placement; isolated caches; still trainable when deep.
+```mermaid
+flowchart LR
+  x[x] --> n1[RMSNorm]
+  n1 --> attn[GQA_RoPE]
+  attn --> add1[x_plus_h]
+  add1 --> n2[RMSNorm]
+  n2 --> ffn[SwiGLU]
+  ffn --> add2[x_plus_ffn]
+```
 
-### 4. Improve · whole-model impact
+### 2. Why — residuals + pre-norm
 
-Deeper N ⇒ capability/cost; post→pre-norm enables deep from-zero training; parallel attn∥MLP isn’t Llama’s main line.
+| Choice | Why |
+| --- | --- |
+| Residual add | Gradient highway; identity path if sublayer ≈0 |
+| Pre-norm (not post) | Modern deep training stability |
+| Attn then MLP | Llama/Qwen mainline (not parallel attn∥MLP) |
+| Per-layer KV cache | Decode reuses past K/V per block |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Llama/Qwen: repeat pre-norm blocks. DeepSeek variants change insides; block boundary remains.
+| Step | Do |
+| --- | --- |
+| 1 | Instantiatate norms, `CausalSelfAttention`, `SwiGLU` from config |
+| 2 | Keep in/out `embed_dim` |
+| 3 | Thread `cache` / `start_pos` for generate |
+| 4 | Repeat `N` times in the stack |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Residuals are adds; pre-norm placement; shape `(B,T,D)` |
+| **Hard** | Cache isolated per layer |
+| **Soft** | Deep stack still trains / loads without NaNs |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Larger `N` | Capability and cost |
+| Post → pre-norm | Enables deep from-zero training |
+| Swap insides (MLA/MoE) | Frontier variants; block boundary stays |
 
 ### 6. This course
 

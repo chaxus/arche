@@ -1,26 +1,57 @@
 ## Idea
 
-From zero: one block isn’t an LM—you need **embed + N blocks + final norm + LM head**.
+**What:** The full **dense causal LM shell**: `ids → embed → Block×N → final RMSNorm → Linear(V) → logits`.
 
-### 1. What it is for
+**Why:** One block is not a language model. The stack is what `model(batch)` in pretrain called—a black box until now.
 
-`ids → embed → Block×N → final RMSNorm → Linear(V) → logits`. Small Llamas often **tie** head↔embed.
+**How:** Build from config (`V,D,N,heads,…`); optional **tie** LM head ↔ embed (small Llamas often do); init, then load or pretrain.
 
-### 2. From zero: how you build it
+### 1. What — forward
 
-Build shell from V/D/N/heads; wire stack; choose tying; init then load or pretrain.
+[`Llama`](https://github.com/chaxus/arche/blob/main/arche/model.py):
 
-### 3. What “good” means
+```python
+x = self.embed_tokens(input_ids)
+for layer, cache in zip(self.layers, caches):
+    x, new_cache = layer(x, cache=cache, start_pos=start_pos)
+x = self.norm(x)
+return self.lm_head(x), new_caches
+```
 
-Logits `(B,T,V)`; config matches weights; tying consistent; quality after load/train.
+Logits shape `(B, T, V)` — exactly what `lm_loss` consumes after shift.
 
-### 4. Improve · whole-model impact
+### 2. Why — tying and final norm
 
-Depth/width/tie/V are architecture-level—retrain or careful migration. Optimize modules + training, not “stack alone.”
+| Choice | Why |
+| --- | --- |
+| Final RMSNorm | Stabilize before vocab projection |
+| Tie head↔embed | Fewer params; common at ~1B |
+| Untied head | More freedom at larger scales |
+| Shared config object | One source of truth for HF map |
 
-### 5. Industry · open models
+### 3. How — from zero
 
-Llama/Qwen dense share this skeleton; MoE swaps FFN for experts inside blocks.
+| Step | Do |
+| --- | --- |
+| 1 | Fill `Llama32Config` (vocab, dims, heads, rope, …) |
+| 2 | `ModuleList` of `N` blocks |
+| 3 | Set `tie_word_embeddings` before init/load |
+| 4 | Train with pretrain loop **or** `from_pretrained` |
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Logits `(B,T,V)`; config ↔ weights; tying consistent |
+| **Soft** | Quality after load or enough pretrain steps |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Depth / width / V | Architecture-level; retrain or migrate carefully |
+| MoE swap | Replaces SwiGLU inside blocks—skeleton stays |
+| Optimize modules | Don’t “tune the stack alone” without data/optim |
 
 ### 6. This course
 
@@ -36,4 +67,4 @@ python chapters/01-inference/ep09_stack.py
 
 ## Next
 
-**Load weights** (`/weights/`).
+**Load weights** (`/weights/`): fill the shell with Llama floats.
