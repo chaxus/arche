@@ -1,21 +1,33 @@
 ## Idea
 
-### 1. Why pretrain
+### 1. What it is for
 
-Learn next-token prediction on lots of text before following chats.
+**Pretraining** teaches next-token prediction on lots of text: logits → cross-entropy vs the next id → update weights (including the embedding table). This is where most trunk parameters are born.
 
-### 2. What we run
+### 2. Why the LLM pipeline needs it
 
-Toy AdamW loop: logits vs next id, cross-entropy, step. **On this page:** drag lr / steps and train a tiny model in-browser.
+Random weights can’t speak. Learn statistics/structure on huge text first; then chat and preferences. Without pretrain, SFT/DPO have no real starting point.
 
-### 3. Landscape
+### 3. Where it comes from · how you build it
 
 | Scale | Meaning |
 | --- | --- |
-| This lab | Feel the API |
-| Real pretrain | Huge data, many GPUs, weeks |
+| **This lab** | Toy AdamW: few steps, feel the API |
+| **Page playground** | Drag lr/steps; watch loss |
+| **Real pretrain** | Massive data, multi-GPU, long runs |
 
-### 4–6. What we do
+Intuition: batch → predict next token → loss → `optimizer.step()`.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Loss is next-id CE | Right objective |
+| **Hard** | Grads hit the right params | Including embeddings |
+| **Soft** | Loss trends down | Enough on the toy |
+| **Soft** | Real runs: data, stability, downstream | Not claimed here |
+
+### 5. What labs ship · what we do
 
 `arche/train/pretrain.py` + page playground. Not internet-scale training.
 

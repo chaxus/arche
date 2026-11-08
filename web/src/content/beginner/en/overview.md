@@ -1,27 +1,33 @@
 ## Idea
 
-### 1. Why this specimen
+### 1. What it is for
 
-We need one small, open, production-like model to hand-write end to end.
+This chapter picks the specimen: a **Llama 3.2-style** next-token stack—tokenize → embed → block stack → LM head—often called a **dense decoder**. Every later chapter hangs on this trunk.
 
-### 2. What “the model” is here
+### 2. Why the course needs it
 
-A **Llama 3.2–style** next-token stack: tokenizer → embed → blocks → LM head. People call this a **dense decoder**—learn the name as you go.
+You need one small, open, production-like model to hand-write end to end. Without a shared specimen, RMSNorm / RoPE / GQA won’t share one config.
 
-```mermaid
-flowchart LR
-  tok[Tokenizer] --> emb[Embedding]
-  emb --> stack[Blocks]
-  stack --> head[LM head]
-```
+### 3. Where it comes from · how we chose
 
-### 3–5. Why Llama 3.2
+| Factor | Llama 3.2 1B |
+| --- | --- |
+| Size | ~1B, laptop-reachable |
+| Open | Weights available with license |
+| Parts | RMSNorm, RoPE, SwiGLU, GQA—like many production dense stacks |
+| Path | Trunk → inference → tiny train → frontier primers |
 
-~1B, downloadable weights, same bricks as many production dense models (RMSNorm, RoPE, SwiGLU, GQA). Later parts add inference, tiny train, and frontier primers.
+### 4. Standards · what “good choice” means
 
-### 6. What we do
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Config prints and is consistent | Vocab, depth, dim match docs |
+| **Soft** | Carries the whole course | Later chapters plug in |
+| **Soft** | Honest scope | Dense trunk + primers, not full vLLM / full pretrain |
 
-Print config sizes in the lab—not chat yet.
+### 5. What we do
+
+Lab prints config sizes—not chat yet.
 
 ## Run
 

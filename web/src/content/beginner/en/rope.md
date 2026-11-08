@@ -1,37 +1,37 @@
 ## Idea
 
-### 1. Why position
+### 1. What it is for
 
-Without position, “A then B” and “B then A” look the same to attention.
+**RoPE** rotates Q and K by an angle from each **position**. Relative distance shows up in the attention dot product—no big PE table on embeddings.
 
-### 2. What RoPE does
+### 2. Why the LLM pipeline needs it
 
-**RoPE** rotates each Q/K by an angle from its **position**. Relative distance shows up in the dot product—no big PE table on embeddings.
+Self-attention alone is order-blind. Language is not. Embedding answers “which token”; RoPE answers “which place.” Modern dense decoders write position into Q/K.
 
-On this page: drag the interactive picture. In code: cos/sin cache, `rotate_half`, then `q' = q·cos + rotate(q)·sin`.
+### 3. Where it comes from · how you build it
 
-### 3. Alternatives
+| Stage | What happens |
+| --- | --- |
+| **Spec** | Choose `rope_theta`; cache cos/sin per position |
+| **Forward** | `rotate_half` on Q/K, combine with cos/sin |
+| **Train/infer** | Same rotation; longer context may need scaling (later chapter) |
 
-| Approach | Plain idea | Today |
+Drag the page viz to see angles change with position.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| Absolute learned PE | Add a vector per index | Older stacks |
-| Sinusoidal PE | Fixed sin/cos by position | Transformer original |
-| **RoPE** | Rotate Q/K | **Mainstream decoders** |
-| ALiBi / other biases | Distance bias in scores | Some long-context lines |
+| **Hard** | Q/K shape unchanged | Phase only |
+| **Hard** | Relative position enters scores | Swap positions → scores change |
+| **Hard** | Match checkpoint contract | `theta` / scaling must match weights |
+| **Soft** | Stable inside train length | Full-model quality is the judge |
+| **Soft** | Extra-long context | See RoPE scaling chapter |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Llama 3 / 3.2: large `rope_theta`; later chapters add **wavelength scaling** for longer context.
-
-### 5. What “good” means
-
-- Relative positions matter in attention  
-- Shapes of Q/K unchanged  
-- Long context may need scaling (next specialty chapter)  
-
-### 6. What we do
-
-`arche/rope.py`. Lab applies RoPE and checks shapes.
+Llama 3 / 3.2: RoPE + large `rope_theta`.  
+`arche/rope.py`; lab applies RoPE and checks shapes.
 
 ## Run
 

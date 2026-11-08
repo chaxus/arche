@@ -13,28 +13,34 @@ export const CHAPTERS_EN: Chapter[] = [
     estimatedMinutes: 12,
     markdown: `## Idea
 
-### 1. Why this specimen
+### 1. What it is for
 
-We need one small, open, production-like model to hand-write end to end.
+This chapter picks the specimen: a **Llama 3.2-style** next-token stack—tokenize → embed → block stack → LM head—often called a **dense decoder**. Every later chapter hangs on this trunk.
 
-### 2. What “the model” is here
+### 2. Why the course needs it
 
-A **Llama 3.2–style** next-token stack: tokenizer → embed → blocks → LM head. People call this a **dense decoder**—learn the name as you go.
+You need one small, open, production-like model to hand-write end to end. Without a shared specimen, RMSNorm / RoPE / GQA won’t share one config.
 
-\`\`\`mermaid
-flowchart LR
-  tok[Tokenizer] --> emb[Embedding]
-  emb --> stack[Blocks]
-  stack --> head[LM head]
-\`\`\`
+### 3. Where it comes from · how we chose
 
-### 3–5. Why Llama 3.2
+| Factor | Llama 3.2 1B |
+| --- | --- |
+| Size | ~1B, laptop-reachable |
+| Open | Weights available with license |
+| Parts | RMSNorm, RoPE, SwiGLU, GQA—like many production dense stacks |
+| Path | Trunk → inference → tiny train → frontier primers |
 
-~1B, downloadable weights, same bricks as many production dense models (RMSNorm, RoPE, SwiGLU, GQA). Later parts add inference, tiny train, and frontier primers.
+### 4. Standards · what “good choice” means
 
-### 6. What we do
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Config prints and is consistent | Vocab, depth, dim match docs |
+| **Soft** | Carries the whole course | Later chapters plug in |
+| **Soft** | Honest scope | Dense trunk + primers, not full vLLM / full pretrain |
 
-Print config sizes in the lab—not chat yet.
+### 5. What we do
+
+Lab prints config sizes—not chat yet.
 
 ## Run
 
@@ -314,44 +320,41 @@ Expect vocab size, dim, ids → output shape, and a note that position is not do
     estimatedMinutes: 12,
     markdown: `## Idea
 
-### 1. Why normalize
+### 1. What it is for
 
-Deep stacks blow up or die if every layer sees wild scales. Normalization keeps vectors usable.
+**RMSNorm** rescales each token’s float row: compute RMS, divide by it, multiply by a learnable \`γ\`. Unlike LayerNorm, it **does not subtract the mean**.
 
-### 2. What RMSNorm does
+In Llama-style stacks it runs before attention and before the MLP (**pre-norm**).
 
-For each token vector (last dim):
+### 2. Why the LLM pipeline needs it
 
-1. Compute RMS  
-2. Divide by RMS (+ tiny \`ε\`)  
-3. Multiply by learnable \`γ\`  
-4. **No mean subtract** (unlike LayerNorm)
+Deep stacks blow up or vanish without scale control. Norm is the “re-zero the ruler” step before the next heavy op. Without it, attention/MLP are hard to stack stably.
 
-We use **pre-norm**: before attention and before MLP.
+### 3. Where it comes from · how you build it
+
+| Stage | What happens |
+| --- | --- |
+| **Spec** | Normalize the last dim; \`γ\` length = model dim |
+| **Init** | \`γ\` often starts at 1 |
+| **Train** | Gradients update \`γ\` with the rest of the net |
+| **Infer** | Apply the formula; shape unchanged |
 
 $$\\mathrm{RMSNorm}(x)=x/\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}\\odot\\gamma$$
 
-### 3. Names you will hear
+### 4. Standards · what “good” means
 
-| Name | Plain idea | Today |
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| LayerNorm | Mean-center + scale | Older GPT-2-style stories |
-| **RMSNorm** | Scale by RMS only | **Llama / Qwen default** |
-| Pre-norm vs post-norm | Norm before vs after sublayer | Modern stacks: pre-norm |
+| **Hard** | Same shape in/out | Don’t change T or dim |
+| **Hard** | \`ε\` present | Avoid div-by-zero |
+| **Hard** | Agreed placement | This course: pre-norm |
+| **Soft** | With \`γ=1\`, per-token RMS ≈ 1 | Sanity that the formula is right |
+| **Soft** | Stabler training | Final judge is full-model loss |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Llama 3.2, Qwen dense, most new open decoders: RMSNorm + pre-norm.
-
-### 5. What “good” means
-
-- Same shape in/out  
-- With \`γ=1\`, post-norm RMS ≈ 1  
-- Stable training without being the whole story (optimizer/data still matter)  
-
-### 6. What we do
-
-\`RMSNorm\` in \`arche/norms.py\`. Lab prints shapes and per-token RMS.
+Llama 3.2 / Qwen dense: RMSNorm + pre-norm.  
+\`RMSNorm\` in \`arche/norms.py\`; lab prints shapes and per-token RMS.
 
 ## Run
 
@@ -361,7 +364,7 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## Next
 
-**RoPE** (\`?c=rope\`): bake position into Q/K.
+**RoPE** (\`?c=rope\`): write position into Q/K.
 
 `,
     latex:
@@ -378,38 +381,38 @@ python chapters/01-inference/ep04_rmsnorm.py
     demo: 'rope',
     markdown: `## Idea
 
-### 1. Why position
+### 1. What it is for
 
-Without position, “A then B” and “B then A” look the same to attention.
+**RoPE** rotates Q and K by an angle from each **position**. Relative distance shows up in the attention dot product—no big PE table on embeddings.
 
-### 2. What RoPE does
+### 2. Why the LLM pipeline needs it
 
-**RoPE** rotates each Q/K by an angle from its **position**. Relative distance shows up in the dot product—no big PE table on embeddings.
+Self-attention alone is order-blind. Language is not. Embedding answers “which token”; RoPE answers “which place.” Modern dense decoders write position into Q/K.
 
-On this page: drag the interactive picture. In code: cos/sin cache, \`rotate_half\`, then \`q' = q·cos + rotate(q)·sin\`.
+### 3. Where it comes from · how you build it
 
-### 3. Alternatives
+| Stage | What happens |
+| --- | --- |
+| **Spec** | Choose \`rope_theta\`; cache cos/sin per position |
+| **Forward** | \`rotate_half\` on Q/K, combine with cos/sin |
+| **Train/infer** | Same rotation; longer context may need scaling (later chapter) |
 
-| Approach | Plain idea | Today |
+Drag the page viz to see angles change with position.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| Absolute learned PE | Add a vector per index | Older stacks |
-| Sinusoidal PE | Fixed sin/cos by position | Transformer original |
-| **RoPE** | Rotate Q/K | **Mainstream decoders** |
-| ALiBi / other biases | Distance bias in scores | Some long-context lines |
+| **Hard** | Q/K shape unchanged | Phase only |
+| **Hard** | Relative position enters scores | Swap positions → scores change |
+| **Hard** | Match checkpoint contract | \`theta\` / scaling must match weights |
+| **Soft** | Stable inside train length | Full-model quality is the judge |
+| **Soft** | Extra-long context | See RoPE scaling chapter |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Llama 3 / 3.2: large \`rope_theta\`; later chapters add **wavelength scaling** for longer context.
-
-### 5. What “good” means
-
-- Relative positions matter in attention  
-- Shapes of Q/K unchanged  
-- Long context may need scaling (next specialty chapter)  
-
-### 6. What we do
-
-\`arche/rope.py\`. Lab applies RoPE and checks shapes.
+Llama 3 / 3.2: RoPE + large \`rope_theta\`.  
+\`arche/rope.py\`; lab applies RoPE and checks shapes.
 
 ## Run
 
@@ -436,38 +439,39 @@ python chapters/01-inference/ep05_rope.py
     demo: 'gqa',
     markdown: `## Idea
 
-### 1. Why GQA
+### 1. What it is for
 
-Full MHA: every query head has its own KV head → **KV cache** grows fast at decode.
+**GQA** lets groups of Q heads **share** fewer KV heads. Still causal (\`t\` sees only \`≤ t\`), but decode stores less K/V.
 
-### 2. What GQA does
+Flow: project → split heads → RoPE → expand KV → SDPA → out proj. See the page viz.
 
-**Grouped-Query Attention**: fewer KV heads than query heads; several Q heads **share** one KV. Still **causal** (position \`t\` sees \`≤ t\`).
+### 2. Why the LLM pipeline needs it
 
-Flow: project → reshape → RoPE → expand KV → SDPA → out proj. See the diagram on this page.
+Full MHA: every Q head owns KV → **KV cache** grows fast. GQA trades a bit of flexibility for much smaller cache vs MHA; usually gentler than extreme MQA.
 
-### 3. Family of attention layouts
+### 3. Where it comes from · how you build it
 
-| Layout | Plain idea | Today |
+| Stage | What happens |
+| --- | --- |
+| **Spec** | Choose \`n_q\`, \`n_kv\` (divides evenly); \`n_rep = n_q / n_kv\` |
+| **Impl** | Broadcast/repeat KV per group, then attend |
+| **Train** | Learn projections with the net |
+| **Infer** | Same layout + cache for prefill/decode |
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| MHA | Q heads = KV heads | Classic |
-| MQA | One KV for all Q | Extreme save |
-| **GQA** | KV groups shared by Q | **Llama 3.2 1B: 32Q / 8KV** |
-| MLA | Compress KV to a latent | DeepSeek-style (later chapter) |
+| **Hard** | \`n_q\` divisible by \`n_kv\` | Valid groups |
+| **Hard** | Causal mask correct | No future tokens |
+| **Hard** | Head counts match weights | Else shape/silent errors |
+| **Soft** | Cache clearly smaller than MHA | The point of GQA |
+| **Soft** | Quality doesn’t collapse vs MHA | Judge with evals/loss |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Llama 3.2 1B uses GQA. Many open 7B–70B models use GQA for decode memory.
-
-### 5. What “good” means
-
-- Correct \`n_rep = n_q / n_kv\`  
-- Causal mask / \`is_causal\` right for prefill vs decode  
-- Cache smaller than full MHA without collapsing quality entirely  
-
-### 6. What we do
-
-\`CausalSelfAttention\` in \`arche/attention.py\`. Lab prints head counts and shapes.
+Llama 3.2 1B: **32 Q / 8 KV**.  
+\`CausalSelfAttention\` in \`arche/attention.py\`; lab prints heads and shapes.
 
 ## Run
 
@@ -491,35 +495,36 @@ python chapters/01-inference/ep06_gqa.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-### 1. Why an MLP after attention
+### 1. What it is for
 
-Attention mixes tokens; each position still needs a **per-token** transform.
+Attention mixes **across positions**; each position still needs its own nonlinear map—the **FFN / MLP**.  
+Llama-style **SwiGLU**: three bias-free linears (gate / up / down), gated product, project back.
 
-### 2. What SwiGLU does
+$$\\\\mathrm{FFN}(x)=W_d\\\\big(\\\\mathrm{SiLU}(W_g x)\\\\odot W_u x\\\\big)$$
 
-$$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
+### 2. Why the LLM pipeline needs it
 
-Three bias-free linears: **gate**, **up**, **down**.
+Attention mostly “reads others.” The model also needs rich per-token transforms. SwiGLU is the common gated FFN in modern dense decoders (vs older GELU MLPs).
 
-### 3. Alternatives
+### 3. Where it comes from · how you build it
 
-| FFN | Plain idea | Today |
+| Stage | What happens |
+| --- | --- |
+| **Spec** | Wider hidden (\`ffn_dim\`); three bias-free mats |
+| **Init / train** | With the rest of the net |
+| **Variant** | MoE experts are often SwiGLUs (later) |
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| GELU MLP (GPT-2 style) | One hidden width + GELU | Older teaching fossils |
-| **SwiGLU** | Gated SiLU × up | **Llama / Qwen dense** |
-| MoE of SwiGLU experts | Router picks top-k | Mixtral-style (later) |
+| **Hard** | In/out \`embed_dim\` | Width only in the middle |
+| **Hard** | No bias (Llama contract) | Match weight layout |
+| **Soft** | Gains vs GELU MLP | Full-model metrics |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Modern dense decoders: SwiGLU (or close gated variants).
-
-### 5. What “good” means
-
-- In/out \`embed_dim\`; intermediate wider  
-- No bias on the three linears (Llama-style)  
-
-### 6. What we do
-
+Modern dense: SwiGLU or close gated cousins.  
 \`SwiGLU\` in \`arche/mlp.py\`.
 
 ## Run
@@ -530,7 +535,7 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## Next
 
-**Block** (\`?c=block\`): glue the sandwich.
+**Transformer block** (\`?c=block\`): the sandwich.
 
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
@@ -545,38 +550,34 @@ python chapters/01-inference/ep07_swiglu.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-### 1. Why a block
+### 1. What it is for
 
-One reusable unit you can stack \`N\` times.
+A **Transformer block** is one repeatable sandwich: RMSNorm → attention → residual → RMSNorm → SwiGLU → residual. Same shape in/out so you can stack \`N\` times.
 
-### 2. What it is
+### 2. Why the LLM pipeline needs it
 
-\`\`\`
-x → RMSNorm → Attn → + residual
-  → RMSNorm → SwiGLU → + residual
-\`\`\`
+Parts alone aren’t a deep LM. The block is the unit of depth: residuals keep a path for the original signal; pre-norm keeps scales sane at each entry.
 
-Same shape in/out. Optional KV cache through attention.
+### 3. Where it comes from · how you build it
 
-### 3. Layout choices
+| Stage | What happens |
+| --- | --- |
+| **Wire** | Sandwich above; attention may take a KV cache |
+| **Depth** | Llama 3.2 1B: **16** blocks |
+| **Train** | Each block has its own weights |
 
-| Choice | Plain idea | Today |
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| Post-norm | Norm after residual | Older |
-| **Pre-norm** | Norm before sublayer | **Modern default** |
-| Parallel attn∥MLP | Some non-Llama layouts | Not our trunk |
+| **Hard** | Residual shapes match | Can add |
+| **Hard** | Pre-norm placement | Llama contract |
+| **Hard** | Per-layer cache if used | No cross-talk / missing layers |
+| **Soft** | Still trainable when deep | Residuals + norms |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Llama 3.2 1B: **16** such blocks.
-
-### 5. What “good” means
-
-- Residual paths keep shapes  
-- Cache threading doesn’t drop layers  
-
-### 6. What we do
-
+Llama-style pre-norm blocks.  
 \`TransformerBlock\` in \`arche/block.py\`.
 
 ## Run
@@ -601,36 +602,41 @@ python chapters/01-inference/ep08_block.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-### 1. Why stack
+### 1. What it is for
 
-One block isn’t a language model—many blocks + a vocab head are.
+The **stack** wires embed → \`N\` blocks → final RMSNorm → LM head into a full next-token model:
 
-### 2. Full path
+\`ids → embed → Block×N → final RMSNorm → Linear(vocab) → logits\`
 
-\`ids → Embed → Block×N → final RMSNorm → Linear(vocab)\`
+Last-dim scores are next-token **logits**. Small Llamas often **tie** LM head ↔ embedding.
 
-Last scores = **logits** for the next token. Often **tie** LM head ↔ embedding.
+### 2. Why the LLM pipeline needs it
 
-### 3. Pieces
+One block isn’t a LM. Depth mixes context; the LM head maps hidden states back to **the same vocab** as the tokenizer so you can sample the next id.
 
-| Piece | Role |
+### 3. Where it comes from · how you build it
+
+| Part | Role |
 | --- | --- |
-| Embedding | ids → vectors |
-| Blocks | contextualize |
-| Final norm | stabilize before head |
-| LM head | vectors → vocab scores |
+| Embed | id → vector |
+| Blocks × N | mix + transform |
+| Final norm | steady before the head |
+| LM head | vector → vocab scores (maybe tied) |
 
-### 4. What labs ship
+Config sets depth/dim/heads; random weights mean a correct graph but nonsense outputs (next chapter loads).
 
-Llama-style dense decoder end-to-end (still random weights until the load chapter).
+### 4. Standards · what “good” means
 
-### 5. What “good” means
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | logits \`(B, T, vocab)\` | Align with vocab |
+| **Hard** | Tying matches claim | Shared params if tied |
+| **Hard** | Depth/dim match config | Else official weights won’t fit |
+| **Soft** | Coherent text after load | Full-model quality |
 
-- Logits shape \`(B, T, vocab)\`  
-- Tie setting matches the config you claim  
+### 5. What labs ship · what we do
 
-### 6. What we do
-
+Llama-style dense end-to-end.  
 \`Llama\` in \`arche/model.py\`.
 
 ## Run
@@ -655,34 +661,36 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-### 1. Why load weights
+### 1. What it is for
 
-Right graph + random weights = nonsense text.
+**Loading weights** copies trained tensors into the modules you built. A correct graph with random params is nonsense; official Llama 3.2 weights make the same forward a language model.
 
-### 2. What we do
+### 2. Why the LLM pipeline needs it
 
-\`from_pretrained\` builds our modules, then copies HF Llama 3.2 tensors via a **key map**.
+“Knowledge” lives in the checkpoint. Infer / align / fine-tune all start from a **correct load**. Wrong keys, tokenizer, or dtype → silent junk or crashes.
 
-### 3. Pitfalls
+### 3. Where it comes from · how you build it
 
-| Issue | Meaning |
+| Step | What happens |
 | --- | --- |
-| Wrong tokenizer | Ids won’t match rows (see tokenizer chapter) |
-| Missing gated access | Can’t download |
-| Key map bugs | Silent wrong layers |
+| **1** | Build empty modules from config |
+| **2** | Download HF Llama 3.2 (license + login) |
+| **3** | Copy tensors via a **key map** into arche names |
+| **4** | Use the matching official tokenizer |
 
-### 4. What labs ship
+### 4. Standards · what “good” means
 
-Official HF Llama 3.2 checkpoints (license + login).
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Param count / shapes match | Missing layers or wrong dims |
+| **Hard** | Key map covers every tensor | Unmapped = still random |
+| **Hard** | Tokenizer pairing | See tokenizer / embedding |
+| **Soft** | Logits close to HF on a short prompt | Alignment chapter |
 
-### 5. What “good” means
+### 5. What labs ship · what we do
 
-- Param counts look right  
-- Later HF align chapter: logits close on a short prompt  
-
-### 6. What we do
-
-\`arche/load_weights.py\` + chapter script.
+Official HF Llama 3.2 checkpoints.  
+\`arche/load_weights.py\` + this episode’s script.
 
 ## Run
 
@@ -693,11 +701,11 @@ python chapters/01-inference/ep10_load_weights.py
 
 ## Fix
 
-Same gated issues as tokenizer: license, login, mirror.
+Same as tokenizer: license, login, mirror.
 
 ## Next
 
-**Generate** (\`?c=generate\`).
+**Text generation** (\`?c=generate\`).
 
 `,
   },
@@ -711,39 +719,37 @@ Same gated issues as tokenizer: license, login, mirror.
     estimatedMinutes: 15,
     markdown: `## Idea
 
-### 1. Why a loop
+### 1. What it is for
 
-One forward gives scores for the next piece—not a full reply.
+**Generation** loops “one forward → next id”: last-position logits → optional temperature / top-k → greedy or sample → append → stop on EOS or length.
 
-### 2. What generation does
+### 2. Why the LLM pipeline needs it
 
-1. Logits at the **last** position  
-2. Optional temperature / top-k  
-3. Greedy or sample  
-4. Append; stop on EOS or length  
+One forward only yields the **next-token** distribution, not a full reply. Chat, completion, tools all sit on this loop; products differ in stopping, sampling, and templates.
 
-KV cache (next chapter) makes step 1 cheap after prefill.
+### 3. Where it comes from · how you build it
 
-### 3. Knobs
-
-| Knob | Effect |
+| Step | What happens |
 | --- | --- |
-| temperature → 0 | Greedy / sharp |
-| higher temperature | More random |
-| top-k | Keep only top candidates |
+| **1** | Prefill / forward → logits |
+| **2** | Last position; optional temperature, top-k |
+| **3** | argmax or sample a new id |
+| **4** | Append; stop on EOS or max length |
 
-### 4. What labs ship
+KV cache (next) makes step 1 cheap after prefill; the **loop** stays the same.
 
-Same loop idea in every chat stack; sampling details vary.
+### 4. Standards · what “good” means
 
-### 5. What “good” means
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Stops cleanly | EOS / max length work |
+| **Hard** | Only past prefix | No future tokens |
+| **Soft** | Temperature / top-k behave | 0 greedier; higher more random |
+| **Soft** | Coherent text with real weights | Full model + sampling |
 
-- Stops cleanly  
-- Respects EOS when provided  
-- With real weights, text is coherent (not this chapter’s only goal)  
+### 5. What labs ship · what we do
 
-### 6. What we do
-
+Every chat stack uses this loop shape.  
 \`generate\` in \`arche/generate.py\`.
 
 ## Run
@@ -769,33 +775,35 @@ python chapters/01-inference/ep11_generate.py
     demo: 'kv',
     markdown: `## Idea
 
-### 1. Why cache
+### 1. What it is for
 
-Naive decode recomputes K/V for the whole prompt every step.
+**KV cache** stores per-layer K/V after prefill. Each decode step only computes the new position’s K/V, appends, and attends over the cache—no full-prompt recompute every step.
 
-### 2. What KV cache does
+### 2. Why the LLM pipeline needs it
 
-**Prefill** once → store per-layer K/V. Each **decode** step appends one new K/V and attends over the cache. See the strip on this page.
+Naive decode recomputes K/V over the whole prefix every step. Generation is already a loop; cache makes that loop practical. Without it, long chats are painfully slow and expensive.
 
-### 3. Related ideas
+### 3. Where it comes from · how you build it
 
-| Idea | Role |
+| Stage | What happens |
 | --- | --- |
-| Contiguous cache | Simple \`cat\` along time (our teaching cache) |
-| Paged KV | Block table + gather (later primer) |
-| GQA/MLA | Shrink what you store |
+| **Prefill** | One forward; write K/V per layer |
+| **Decode** | Append one step; attend to cache |
+| **Layout** | This course: concat in time; production may page (later) |
+| **Shrink** | GQA / MLA reduce what you store |
 
-### 4. What labs ship
+### 4. Standards · what “good” means
 
-Every production decoder uses some KV cache; engines differ on paging/layout.
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Matches full recompute (up to float noise) | Cache must not change meaning |
+| **Hard** | Append per layer, no drops | One store per layer |
+| **Soft** | Cost grows with **new** tokens, not full prefix each step | The win |
+| **Soft** | Memory acceptable | Then GQA / paging |
 
-### 5. What “good” means
+### 5. What labs ship · what we do
 
-- Same answers as full recompute (up to numerics)  
-- Work grows with new tokens, not full prompt length each step  
-
-### 6. What we do
-
+Every production decoder caches KV.  
 \`KVCache\` in \`arche/cache.py\`.
 
 ## Run
@@ -820,34 +828,34 @@ python chapters/01-inference/ep12_kv_cache.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-### 1. Why scale RoPE
+### 1. What it is for
 
-Angles were tuned for a training length; much longer prompts can behave oddly.
+**RoPE scaling** adjusts rotations when context exceeds the training length—Llama 3 style: large \`rope_theta\` plus factor/low/high **wavelength smoothing**.
 
-### 2. What Llama-style scaling does
+### 2. Why the LLM pipeline needs it
 
-Keep large \`rope_theta\`; smoothly rescale **long wavelengths** (factor / low / high)—HF-compatible.
+RoPE angles were tuned for the train length. Naively huge positions distort relative distance. Products wanting 128K-class context often add a scaling schedule (and/or train longer) without inventing a new position system.
 
-### 3. Landscape
+### 3. Where it comes from · how you build it
 
-| Method | Plain idea |
+| Path | Plain meaning |
 | --- | --- |
-| NTK / YaRN / … | Other long-context RoPE recipes |
-| **Llama 3 wavelength smoothing** | What we mirror here |
-| Bigger context train | Data + length, not only formulas |
+| **Llama 3 wavelength smooth** | This lesson; HF-compatible |
+| NTK / YaRN / … | Other long-context recipes |
+| Train longer | Not formula-only |
 
-### 4. What labs ship
+### 4. Standards · what “good” means
 
-Llama 3.2 long-context schedule in the official configs.
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Matches checkpoint scaling config | Wrong recipe → long-context junk |
+| **Soft** | Near distances still familiar | Don’t break short deps |
+| **Soft** | Far distances usable | Long-context evals |
 
-### 5. What “good” means
+### 5. What labs ship · what we do
 
-- Short-range stays familiar  
-- Long-range stretches instead of wrapping badly  
-
-### 6. What we do
-
-Scaling helpers in \`arche/rope.py\` + chapter script.
+Llama 3.2 official long-context schedule.  
+Scaling helpers in \`arche/rope.py\` + this script.
 
 ## Run
 
@@ -871,34 +879,38 @@ python chapters/01-inference/ep13_rope_scaling.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-### 1. Why MoE
+### 1. What it is for
 
-One dense MLP per token is simple but capacity costs compute for everyone.
+**MoE** = many expert FFNs (here SwiGLU) + a **router**: each token runs only **top-k** experts—sparse compute for more capacity.
 
-### 2. What MoE does
+### 2. Why the LLM pipeline needs it
 
-Many expert MLPs (here SwiGLU) + a **router**: each token runs only **top-k** experts → sparse compute.
+Dense MLPs charge every token full width. MoE aims for huge total params while each token pays for only a few experts (at the cost of harder train/serve).
 
-### 3. Landscape
+### 3. Where it comes from · how you build it
 
-| Idea | Note |
+| Step | What happens |
 | --- | --- |
-| Dense FFN | Always-on |
-| **MoE (Mixtral-style)** | Top-k experts |
-| Shared experts / deep variants | Product-specific |
+| **1** | N experts + router |
+| **2** | Score tokens; pick top-k |
+| **3** | Run chosen experts; weighted merge |
+| **Train** | Often load-balancing aux losses |
 
-### 4. What labs ship
+This lesson is a teaching MoE API—not a full Mixtral stack.
 
-Teaching MoE block—not a full Mixtral production stack.
+### 4. Standards · what “good” means
 
-### 5. What “good” means
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Valid expert indices | No OOB routes |
+| **Hard** | top-k matches impl | Shapes/merge correct |
+| **Soft** | Load not extremely skewed | Critical in real training |
+| **Soft** | Quality vs compute trade | Product evals |
 
-- Router picks valid experts  
-- Load isn’t insanely skewed (real training cares; we only taste the API)  
+### 5. What labs ship · what we do
 
-### 6. What we do
-
-\`arche/moe.py\` primer.
+Mixtral-style top-k; shared-expert variants exist.  
+Primer in \`arche/moe.py\`.
 
 ## Run
 
@@ -922,34 +934,35 @@ python chapters/01-inference/ep14_moe.py
     estimatedMinutes: 18,
     markdown: `## Idea
 
-### 1. Why MLA
+### 1. What it is for
 
-GQA shrinks KV heads; decode memory can still dominate.
+**MLA-style** attention caches a **low-rank latent** (often plus a small RoPE stream) instead of full per-head K/V, expanding when needed—less decode memory.
 
-### 2. What MLA does
+### 2. Why the LLM pipeline needs it
 
-Cache a **low-rank latent** (+ small RoPE stream) instead of full per-head K/V; reconstruct what attention needs.
+GQA already cuts KV heads; long context can still dominate VRAM. DeepSeek-like paths compress what you cache, with more implementation detail.
 
-### 3. Landscape
+### 3. Where it comes from · how you build it
 
 | Idea | Role |
 | --- | --- |
 | GQA | Fewer KV heads |
-| **MLA** | Latent KV (DeepSeek-style idea) |
-| Paged KV | How storage is allocated |
+| **MLA** | Latent KV |
+| Paged KV | How memory is chunked |
 
-### 4. What labs ship
+Teaching shapes/API here—**not** a bit-exact DeepSeek port.
 
-Teaching shapes—not bit-identical DeepSeek weights.
+### 4. Standards · what “good” means
 
-### 5. What “good” means
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Latent cache smaller than full KV | Compression real |
+| **Hard** | Forward runs; shapes consistent | Primer bar |
+| **Soft** | Quality near full attention | Product claim; not this lesson |
 
-- Latent cache smaller than full KV  
-- Forward still runs  
+### 5. What labs ship · what we do
 
-### 6. What we do
-
-\`arche/mla.py\` primer.
+Primer in \`arche/mla.py\`.
 
 ## Run
 
@@ -974,27 +987,40 @@ python chapters/01-inference/ep15_mla.py
     demo: 'chat',
     markdown: `## Idea
 
-### 1. Why these three
+### 1. What it is for
 
-Math core isn’t enough to *run* a chat: device, size, and message format matter.
-
-### 2. What we cover
+Make the model **run and chat**: pick a device, shrink weights, format role messages with a chat template. Not new operators—required glue.
 
 1. **Device** — CUDA → MPS → CPU  
-2. **INT8 (teaching)** — smaller weights; simple dequant path  
-3. **Chat template** — roles → string the model expects (HF or plain fallback; try the demo)
+2. **INT8 (teaching)** — smaller weights; dequant then compute  
+3. **Chat template** — roles → model string (HF template or text fallback)
 
-### 3. Landscape
+Try the page demo.
 
-| Topic | Production note |
-| --- | --- |
-| Quant | INT8/INT4/FP8… many recipes |
-| Templates | Model-specific; don’t invent casually |
-| Devices | Same graph, different backends |
+### 2. Why the LLM pipeline needs it
 
-### 4–6. What we do
+A correct trunk still fails users without a device, enough RAM, or the right message format. Device = can run; quant = can fit; template = “chat” vs raw completion.
 
-Teaching helpers + chapter script—not a full quant product.
+### 3. Where it comes from · how you build it
+
+| Topic | Approach | Production note |
+| --- | --- | --- |
+| Device | Probe backends; \`.to(device)\` | Same graph, different backends |
+| Quant | Teaching INT8; products use INT4/FP8/… | Accuracy vs speed |
+| Template | Model’s own chat template | **Don’t invent** formats |
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Fallback chain works | No CUDA shouldn’t hard-crash |
+| **Hard** | Template matches model | Wrong template → junk |
+| **Soft** | Quality after quant OK | Evals; teaching INT8 ≠ product |
+| **Soft** | Clear multi-turn roles | System/user/assistant boundaries |
+
+### 5. What labs ship · what we do
+
+Teaching helpers + script—not a full quant product.
 
 ## Run
 
@@ -1019,24 +1045,34 @@ python chapters/01-inference/ep16_device_quant_chat.py
     demo: 'batch',
     markdown: `## Idea
 
-### 1. Why
+### 1. What it is for
 
-One generate loop per user wastes GPU when people finish at different times.
+**Continuous batching (teaching)**: many short decode jobs share one step loop; finished jobs retire so new ones can enter—less “one loop per user, fast waits for slow.”
 
-### 2. What continuous batching is here
+Try the page demo. **Not** full paged / vLLM.
 
-Several short decode jobs share one stepping loop; finished jobs retire. **Not** full paged attention / vLLM. Try the demo.
+### 2. Why the LLM pipeline needs it
 
-### 3. Landscape
+Servers serve many users. One loop each → GPU idle when finish times differ. Continuous batching turns “who’s still active this step” into scheduling; real systems also need paged KV and fused kernels.
+
+### 3. Where it comes from · how you build it
 
 | Layer | Role |
 | --- | --- |
-| Scheduling | Who is active this step |
-| Paging / kernels | How memory & compute run (later primer) |
+| **Scheduler** | Who’s active each step (this lesson) |
+| **Paging / kernels** | How memory/compute run (later primer) |
 
-### 4–6. What we do
+### 4. Standards · what “good” means
 
-Teaching scheduler shape in the chapter script.
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Finished seqs retire | Don’t keep stepping them |
+| **Hard** | No cross-talk | Batched ≠ mixed semantics |
+| **Soft** | Fuller GPU, steadier latency | Serving metrics; shape only here |
+
+### 5. What labs ship · what we do
+
+Teaching schedule shape + this script.
 
 ## Run
 
@@ -1061,22 +1097,34 @@ python chapters/01-inference/ep17_continuous_batching.py
     demo: 'pretrain',
     markdown: `## Idea
 
-### 1. Why pretrain
+### 1. What it is for
 
-Learn next-token prediction on lots of text before following chats.
+**Pretraining** teaches next-token prediction on lots of text: logits → cross-entropy vs the next id → update weights (including the embedding table). This is where most trunk parameters are born.
 
-### 2. What we run
+### 2. Why the LLM pipeline needs it
 
-Toy AdamW loop: logits vs next id, cross-entropy, step. **On this page:** drag lr / steps and train a tiny model in-browser.
+Random weights can’t speak. Learn statistics/structure on huge text first; then chat and preferences. Without pretrain, SFT/DPO have no real starting point.
 
-### 3. Landscape
+### 3. Where it comes from · how you build it
 
 | Scale | Meaning |
 | --- | --- |
-| This lab | Feel the API |
-| Real pretrain | Huge data, many GPUs, weeks |
+| **This lab** | Toy AdamW: few steps, feel the API |
+| **Page playground** | Drag lr/steps; watch loss |
+| **Real pretrain** | Massive data, multi-GPU, long runs |
 
-### 4–6. What we do
+Intuition: batch → predict next token → loss → \`optimizer.step()\`.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Loss is next-id CE | Right objective |
+| **Hard** | Grads hit the right params | Including embeddings |
+| **Soft** | Loss trends down | Enough on the toy |
+| **Soft** | Real runs: data, stability, downstream | Not claimed here |
+
+### 5. What labs ship · what we do
 
 \`arche/train/pretrain.py\` + page playground. Not internet-scale training.
 
@@ -1103,22 +1151,37 @@ python chapters/02-training/ep18_pretrain.py
     demo: 'train',
     markdown: `## Idea
 
-### 1. Why
+### 1. What it is for
 
-After pretrain, models still need to follow chats and prefer better answers.
+Post-pretrain alignment APIs in this lesson:
 
-### 2. What
+- **SFT**: prompt→answer demos; **mask the prompt**; loss only on reply tokens  
+- **DPO**: vs a frozen reference, prefer chosen over rejected (one teaching step)
 
-- **SFT:** prompt→response; **mask the prompt**; loss on reply only  
-- **DPO:** prefer chosen over rejected vs a frozen reference (one teaching step)
+### 2. Why the LLM pipeline needs it
 
-### 3. Landscape
+Pretrain completes web text; it doesn’t automatically “be an assistant.” SFT teaches format/following; DPO/RLHF-style methods push toward preferences. Chat products need some of this.
 
-RLHF / RLAIF / DPO / … many alignment recipes; we taste two APIs.
+### 3. Where it comes from · how you build it
 
-### 4–6. What we do
+| Method | Data | Goal |
+| --- | --- | --- |
+| SFT | instruction–reply pairs | Imitate replies |
+| DPO | chosen/rejected for a prompt | Preference (no explicit RM in this recipe) |
+| Broader map | RLHF / RLAIF / … | Many recipes; two APIs here |
 
-\`arche/train/sft.py\` (+ DPO helper) and the chapter script.
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | SFT mask correct | No loss on the prompt |
+| **Hard** | DPO has reference + pairs | API shape |
+| **Soft** | Better instruction-following | Human/auto evals |
+| **Soft** | Don’t erase pretrain skill | Data/lr tradeoffs |
+
+### 5. What labs ship · what we do
+
+\`arche/train/sft.py\` (and DPO) + this script.
 
 ## Run
 
@@ -1142,17 +1205,29 @@ python chapters/02-training/ep19_sft_dpo.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-### 1. Why
+### 1. What it is for
 
-MoE/MLA modules still need save/load without silent shape bugs.
+**Frontier checkpoint primer**: save/load MoE/MLA-style modules—round-trip a teaching checkpoint and map Mixtral-like \`w1/w2/w3\` names into our modules so shapes don’t silently break.
 
-### 2. What
+### 2. Why the LLM pipeline needs it
 
-Round-trip teaching checkpoints; map Mixtral-style \`w1/w2/w3\` expert keys into our names.
+Running MoE/MLA forward isn’t enough; open weights arrive as foreign key names and shards. Can’t load ⇒ frontier structure stays on paper.
 
-### 3–6. What we do
+### 3. Where it comes from · how you build it
 
-Primer for reading open MoE checkpoints—not a full trainer.
+Mapping + round-trip for open MoE-style checkpoints—not a full trainer.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Round-trip \`allclose\` / shapes | No silent mis-load |
+| **Hard** | Name map covers experts | Missed map = random expert |
+| **Soft** | Hooks real open weights | Product engineering; shapes here |
+
+### 5. What we do
+
+This episode’s primer script.
 
 ## Run
 
@@ -1176,17 +1251,29 @@ python chapters/02-training/ep20_frontier_ckpt.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-### 1. Why
+### 1. What it is for
 
-Trust but verify the dense trunk wiring.
+**HF align**: same short prompt through arche and official HF Llama 3.2; compare argmax and max abs logit diff—evidence the dense trunk and weight map are trustworthy.
 
-### 2. What
+### 2. Why the LLM pipeline needs it
 
-Same short prompt through arche vs HF Llama 3.2; compare argmax and max-abs logit diff. No weights → clean exit.
+Hand-written stacks can “run” with wrong layers. Matching a reference on short logits is hard proof. No weights → clean skip ≠ broken logic.
 
-### 3–6. What we do
+### 3. Where it comes from · how you build it
 
-Chapter script + CI synthetic mapper test.
+This script + CI synthetic map tests; license/login for real weights.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Logits close enough with weights | Map/formulas OK |
+| **Hard** | Skip clearly without weights | Don’t fake pass |
+| **Soft** | Longer seqs / more ops | Later; short prompt here |
+
+### 5. What we do
+
+See Run; Fix if gated.
 
 ## Run
 
@@ -1197,7 +1284,7 @@ python chapters/01-inference/ep21_hf_align.py
 
 ## Fix
 
-Missing weights/login → skip/hints, not necessarily a logic bug.
+No weights / not logged in → skip or tip; not a logic failure.
 
 ## Next
 
@@ -1215,17 +1302,29 @@ Missing weights/login → skip/hints, not necessarily a logic bug.
     estimatedMinutes: 15,
     markdown: `## Idea
 
-### 1. Why
+### 1. What it is for
 
-Huge models ship as \`index.json\` + many shard files.
+Huge checkpoints often ship as \`index.json\` + many shards. This lesson uses **synthetic** index+shards (Mixtral-like MoE / DeepSeek-like MLA) to practice pack/unpack and \`allclose\` after load—no multi-tens-of-GB download.
 
-### 2. What
+### 2. Why the LLM pipeline needs it
 
-Synthetic index + shards for Mixtral-shaped MoE / DeepSeek-shaped MLA; reload and \`allclose\`.
+Single files don’t scale. Can’t read shards ⇒ can’t use frontier open weights. Synthetic data trains **index + concat**, not download stamina.
 
-### 3–6. What we do
+### 3. Where it comes from · how you build it
 
-Packing/unpacking pattern without downloading tens of GB.
+Build synthetic shards → load via index → numeric check.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Index matches shards | Missing/wrong keys fail clearly |
+| **Hard** | Reload \`allclose\` | Concat correct |
+| **Soft** | Real hub formats | Product engineering |
+
+### 5. What we do
+
+This episode’s script.
 
 ## Run
 
@@ -1235,7 +1334,7 @@ python chapters/02-training/ep22_sharded_frontier.py
 
 ## Next
 
-**Paged KV · CUDA graphs** (\`?c=paged-cuda-graph\`).
+**Paged KV · CUDA Graph** (\`?c=paged-cuda-graph\`).
 
 `,
   },
@@ -1249,20 +1348,34 @@ python chapters/02-training/ep22_sharded_frontier.py
     estimatedMinutes: 18,
     markdown: `## Idea
 
-### 1. Why
+### 1. What it is for
 
-Serving needs smarter memory and lower launch overhead than a toy loop.
-
-### 2. What
+Two serving primers:
 
 1. **Paged KV** — fixed-size blocks + block table + gather  
-2. **CUDA Graph** — capture fixed-shape compute when CUDA exists  
+2. **CUDA Graph** — capture fixed-shape work when CUDA is present  
 
-Teaching mechanisms—not a drop-in vLLM.
+Teaching mechanisms—**not** a drop-in vLLM.
 
-### 3–6. What we do
+### 2. Why the LLM pipeline needs it
 
-\`arche/paged_kv.py\` (+ graph helper) and the chapter script.
+Toy loops are fine solo; production concurrency fragments VRAM and pays launch tax. Paging manages memory; graphs cut repeated fixed-shape launch overhead.
+
+### 3. Where it comes from · how you build it
+
+\`arche/paged_kv.py\` (and graph) shows block-table gather and optional CUDA Graph capture.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Gather matches logical cache | Paging must not change meaning |
+| **Hard** | Block table in bounds | Alloc/free correct |
+| **Soft** | Less fragmentation / fewer launches | Serving metrics; shape here |
+
+### 5. What we do
+
+This primer script. Path complete—revisit weak chapters or run HF align with weights.
 
 ## Run
 
@@ -1272,7 +1385,7 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## Next
 
-Path complete—revisit weak chapters or run HF align with real weights.
+Path complete—revisit weak chapters, or run HF align when you have weights.
 
 `,
   },

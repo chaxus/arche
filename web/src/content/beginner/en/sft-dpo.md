@@ -1,21 +1,36 @@
 ## Idea
 
-### 1. Why
+### 1. What it is for
 
-After pretrain, models still need to follow chats and prefer better answers.
+Post-pretrain alignment APIs in this lesson:
 
-### 2. What
+- **SFT**: prompt→answer demos; **mask the prompt**; loss only on reply tokens  
+- **DPO**: vs a frozen reference, prefer chosen over rejected (one teaching step)
 
-- **SFT:** prompt→response; **mask the prompt**; loss on reply only  
-- **DPO:** prefer chosen over rejected vs a frozen reference (one teaching step)
+### 2. Why the LLM pipeline needs it
 
-### 3. Landscape
+Pretrain completes web text; it doesn’t automatically “be an assistant.” SFT teaches format/following; DPO/RLHF-style methods push toward preferences. Chat products need some of this.
 
-RLHF / RLAIF / DPO / … many alignment recipes; we taste two APIs.
+### 3. Where it comes from · how you build it
 
-### 4–6. What we do
+| Method | Data | Goal |
+| --- | --- | --- |
+| SFT | instruction–reply pairs | Imitate replies |
+| DPO | chosen/rejected for a prompt | Preference (no explicit RM in this recipe) |
+| Broader map | RLHF / RLAIF / … | Many recipes; two APIs here |
 
-`arche/train/sft.py` (+ DPO helper) and the chapter script.
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | SFT mask correct | No loss on the prompt |
+| **Hard** | DPO has reference + pairs | API shape |
+| **Soft** | Better instruction-following | Human/auto evals |
+| **Soft** | Don’t erase pretrain skill | Data/lr tradeoffs |
+
+### 5. What labs ship · what we do
+
+`arche/train/sft.py` (and DPO) + this script.
 
 ## Run
 

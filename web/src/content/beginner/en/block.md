@@ -1,37 +1,33 @@
 ## Idea
 
-### 1. Why a block
+### 1. What it is for
 
-One reusable unit you can stack `N` times.
+A **Transformer block** is one repeatable sandwich: RMSNorm → attention → residual → RMSNorm → SwiGLU → residual. Same shape in/out so you can stack `N` times.
 
-### 2. What it is
+### 2. Why the LLM pipeline needs it
 
-```
-x → RMSNorm → Attn → + residual
-  → RMSNorm → SwiGLU → + residual
-```
+Parts alone aren’t a deep LM. The block is the unit of depth: residuals keep a path for the original signal; pre-norm keeps scales sane at each entry.
 
-Same shape in/out. Optional KV cache through attention.
+### 3. Where it comes from · how you build it
 
-### 3. Layout choices
+| Stage | What happens |
+| --- | --- |
+| **Wire** | Sandwich above; attention may take a KV cache |
+| **Depth** | Llama 3.2 1B: **16** blocks |
+| **Train** | Each block has its own weights |
 
-| Choice | Plain idea | Today |
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| Post-norm | Norm after residual | Older |
-| **Pre-norm** | Norm before sublayer | **Modern default** |
-| Parallel attn∥MLP | Some non-Llama layouts | Not our trunk |
+| **Hard** | Residual shapes match | Can add |
+| **Hard** | Pre-norm placement | Llama contract |
+| **Hard** | Per-layer cache if used | No cross-talk / missing layers |
+| **Soft** | Still trainable when deep | Residuals + norms |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Llama 3.2 1B: **16** such blocks.
-
-### 5. What “good” means
-
-- Residual paths keep shapes  
-- Cache threading doesn’t drop layers  
-
-### 6. What we do
-
+Llama-style pre-norm blocks.  
 `TransformerBlock` in `arche/block.py`.
 
 ## Run

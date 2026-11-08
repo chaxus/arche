@@ -1,33 +1,33 @@
 ## Idea
 
-### 1. Why scale RoPE
+### 1. What it is for
 
-Angles were tuned for a training length; much longer prompts can behave oddly.
+**RoPE scaling** adjusts rotations when context exceeds the training length—Llama 3 style: large `rope_theta` plus factor/low/high **wavelength smoothing**.
 
-### 2. What Llama-style scaling does
+### 2. Why the LLM pipeline needs it
 
-Keep large `rope_theta`; smoothly rescale **long wavelengths** (factor / low / high)—HF-compatible.
+RoPE angles were tuned for the train length. Naively huge positions distort relative distance. Products wanting 128K-class context often add a scaling schedule (and/or train longer) without inventing a new position system.
 
-### 3. Landscape
+### 3. Where it comes from · how you build it
 
-| Method | Plain idea |
+| Path | Plain meaning |
 | --- | --- |
-| NTK / YaRN / … | Other long-context RoPE recipes |
-| **Llama 3 wavelength smoothing** | What we mirror here |
-| Bigger context train | Data + length, not only formulas |
+| **Llama 3 wavelength smooth** | This lesson; HF-compatible |
+| NTK / YaRN / … | Other long-context recipes |
+| Train longer | Not formula-only |
 
-### 4. What labs ship
+### 4. Standards · what “good” means
 
-Llama 3.2 long-context schedule in the official configs.
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Matches checkpoint scaling config | Wrong recipe → long-context junk |
+| **Soft** | Near distances still familiar | Don’t break short deps |
+| **Soft** | Far distances usable | Long-context evals |
 
-### 5. What “good” means
+### 5. What labs ship · what we do
 
-- Short-range stays familiar  
-- Long-range stretches instead of wrapping badly  
-
-### 6. What we do
-
-Scaling helpers in `arche/rope.py` + chapter script.
+Llama 3.2 official long-context schedule.  
+Scaling helpers in `arche/rope.py` + this script.
 
 ## Run
 

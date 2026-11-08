@@ -1,43 +1,40 @@
 ## Idea
 
-### 1. Why normalize
+### 1. What it is for
 
-Deep stacks blow up or die if every layer sees wild scales. Normalization keeps vectors usable.
+**RMSNorm** rescales each token’s float row: compute RMS, divide by it, multiply by a learnable `γ`. Unlike LayerNorm, it **does not subtract the mean**.
 
-### 2. What RMSNorm does
+In Llama-style stacks it runs before attention and before the MLP (**pre-norm**).
 
-For each token vector (last dim):
+### 2. Why the LLM pipeline needs it
 
-1. Compute RMS  
-2. Divide by RMS (+ tiny `ε`)  
-3. Multiply by learnable `γ`  
-4. **No mean subtract** (unlike LayerNorm)
+Deep stacks blow up or vanish without scale control. Norm is the “re-zero the ruler” step before the next heavy op. Without it, attention/MLP are hard to stack stably.
 
-We use **pre-norm**: before attention and before MLP.
+### 3. Where it comes from · how you build it
+
+| Stage | What happens |
+| --- | --- |
+| **Spec** | Normalize the last dim; `γ` length = model dim |
+| **Init** | `γ` often starts at 1 |
+| **Train** | Gradients update `γ` with the rest of the net |
+| **Infer** | Apply the formula; shape unchanged |
 
 $$\mathrm{RMSNorm}(x)=x/\sqrt{\mathrm{mean}(x^2)+\varepsilon}\odot\gamma$$
 
-### 3. Names you will hear
+### 4. Standards · what “good” means
 
-| Name | Plain idea | Today |
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| LayerNorm | Mean-center + scale | Older GPT-2-style stories |
-| **RMSNorm** | Scale by RMS only | **Llama / Qwen default** |
-| Pre-norm vs post-norm | Norm before vs after sublayer | Modern stacks: pre-norm |
+| **Hard** | Same shape in/out | Don’t change T or dim |
+| **Hard** | `ε` present | Avoid div-by-zero |
+| **Hard** | Agreed placement | This course: pre-norm |
+| **Soft** | With `γ=1`, per-token RMS ≈ 1 | Sanity that the formula is right |
+| **Soft** | Stabler training | Final judge is full-model loss |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Llama 3.2, Qwen dense, most new open decoders: RMSNorm + pre-norm.
-
-### 5. What “good” means
-
-- Same shape in/out  
-- With `γ=1`, post-norm RMS ≈ 1  
-- Stable training without being the whole story (optimizer/data still matter)  
-
-### 6. What we do
-
-`RMSNorm` in `arche/norms.py`. Lab prints shapes and per-token RMS.
+Llama 3.2 / Qwen dense: RMSNorm + pre-norm.  
+`RMSNorm` in `arche/norms.py`; lab prints shapes and per-token RMS.
 
 ## Run
 
@@ -47,4 +44,4 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## Next
 
-**RoPE** (`?c=rope`): bake position into Q/K.
+**RoPE** (`?c=rope`): write position into Q/K.

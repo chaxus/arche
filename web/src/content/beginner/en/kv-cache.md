@@ -1,32 +1,34 @@
 ## Idea
 
-### 1. Why cache
+### 1. What it is for
 
-Naive decode recomputes K/V for the whole prompt every step.
+**KV cache** stores per-layer K/V after prefill. Each decode step only computes the new position’s K/V, appends, and attends over the cache—no full-prompt recompute every step.
 
-### 2. What KV cache does
+### 2. Why the LLM pipeline needs it
 
-**Prefill** once → store per-layer K/V. Each **decode** step appends one new K/V and attends over the cache. See the strip on this page.
+Naive decode recomputes K/V over the whole prefix every step. Generation is already a loop; cache makes that loop practical. Without it, long chats are painfully slow and expensive.
 
-### 3. Related ideas
+### 3. Where it comes from · how you build it
 
-| Idea | Role |
+| Stage | What happens |
 | --- | --- |
-| Contiguous cache | Simple `cat` along time (our teaching cache) |
-| Paged KV | Block table + gather (later primer) |
-| GQA/MLA | Shrink what you store |
+| **Prefill** | One forward; write K/V per layer |
+| **Decode** | Append one step; attend to cache |
+| **Layout** | This course: concat in time; production may page (later) |
+| **Shrink** | GQA / MLA reduce what you store |
 
-### 4. What labs ship
+### 4. Standards · what “good” means
 
-Every production decoder uses some KV cache; engines differ on paging/layout.
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Matches full recompute (up to float noise) | Cache must not change meaning |
+| **Hard** | Append per layer, no drops | One store per layer |
+| **Soft** | Cost grows with **new** tokens, not full prefix each step | The win |
+| **Soft** | Memory acceptable | Then GQA / paging |
 
-### 5. What “good” means
+### 5. What labs ship · what we do
 
-- Same answers as full recompute (up to numerics)  
-- Work grows with new tokens, not full prompt length each step  
-
-### 6. What we do
-
+Every production decoder caches KV.  
 `KVCache` in `arche/cache.py`.
 
 ## Run

@@ -1,16 +1,28 @@
 ## Idea
 
-### 1. Why
+### 1. What it is for
 
-Huge models ship as `index.json` + many shard files.
+Huge checkpoints often ship as `index.json` + many shards. This lesson uses **synthetic** index+shards (Mixtral-like MoE / DeepSeek-like MLA) to practice pack/unpack and `allclose` after load—no multi-tens-of-GB download.
 
-### 2. What
+### 2. Why the LLM pipeline needs it
 
-Synthetic index + shards for Mixtral-shaped MoE / DeepSeek-shaped MLA; reload and `allclose`.
+Single files don’t scale. Can’t read shards ⇒ can’t use frontier open weights. Synthetic data trains **index + concat**, not download stamina.
 
-### 3–6. What we do
+### 3. Where it comes from · how you build it
 
-Packing/unpacking pattern without downloading tens of GB.
+Build synthetic shards → load via index → numeric check.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Index matches shards | Missing/wrong keys fail clearly |
+| **Hard** | Reload `allclose` | Concat correct |
+| **Soft** | Real hub formats | Product engineering |
+
+### 5. What we do
+
+This episode’s script.
 
 ## Run
 
@@ -20,4 +32,4 @@ python chapters/02-training/ep22_sharded_frontier.py
 
 ## Next
 
-**Paged KV · CUDA graphs** (`?c=paged-cuda-graph`).
+**Paged KV · CUDA Graph** (`?c=paged-cuda-graph`).

@@ -1,33 +1,37 @@
 ## Idea
 
-### 1. Why MoE
+### 1. What it is for
 
-One dense MLP per token is simple but capacity costs compute for everyone.
+**MoE** = many expert FFNs (here SwiGLU) + a **router**: each token runs only **top-k** experts—sparse compute for more capacity.
 
-### 2. What MoE does
+### 2. Why the LLM pipeline needs it
 
-Many expert MLPs (here SwiGLU) + a **router**: each token runs only **top-k** experts → sparse compute.
+Dense MLPs charge every token full width. MoE aims for huge total params while each token pays for only a few experts (at the cost of harder train/serve).
 
-### 3. Landscape
+### 3. Where it comes from · how you build it
 
-| Idea | Note |
+| Step | What happens |
 | --- | --- |
-| Dense FFN | Always-on |
-| **MoE (Mixtral-style)** | Top-k experts |
-| Shared experts / deep variants | Product-specific |
+| **1** | N experts + router |
+| **2** | Score tokens; pick top-k |
+| **3** | Run chosen experts; weighted merge |
+| **Train** | Often load-balancing aux losses |
 
-### 4. What labs ship
+This lesson is a teaching MoE API—not a full Mixtral stack.
 
-Teaching MoE block—not a full Mixtral production stack.
+### 4. Standards · what “good” means
 
-### 5. What “good” means
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Valid expert indices | No OOB routes |
+| **Hard** | top-k matches impl | Shapes/merge correct |
+| **Soft** | Load not extremely skewed | Critical in real training |
+| **Soft** | Quality vs compute trade | Product evals |
 
-- Router picks valid experts  
-- Load isn’t insanely skewed (real training cares; we only taste the API)  
+### 5. What labs ship · what we do
 
-### 6. What we do
-
-`arche/moe.py` primer.
+Mixtral-style top-k; shared-expert variants exist.  
+Primer in `arche/moe.py`.
 
 ## Run
 

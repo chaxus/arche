@@ -1,16 +1,28 @@
 ## Idea
 
-### 1. Why
+### 1. What it is for
 
-Trust but verify the dense trunk wiring.
+**HF align**: same short prompt through arche and official HF Llama 3.2; compare argmax and max abs logit diff—evidence the dense trunk and weight map are trustworthy.
 
-### 2. What
+### 2. Why the LLM pipeline needs it
 
-Same short prompt through arche vs HF Llama 3.2; compare argmax and max-abs logit diff. No weights → clean exit.
+Hand-written stacks can “run” with wrong layers. Matching a reference on short logits is hard proof. No weights → clean skip ≠ broken logic.
 
-### 3–6. What we do
+### 3. Where it comes from · how you build it
 
-Chapter script + CI synthetic mapper test.
+This script + CI synthetic map tests; license/login for real weights.
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | Logits close enough with weights | Map/formulas OK |
+| **Hard** | Skip clearly without weights | Don’t fake pass |
+| **Soft** | Longer seqs / more ops | Later; short prompt here |
+
+### 5. What we do
+
+See Run; Fix if gated.
 
 ## Run
 
@@ -21,7 +33,7 @@ python chapters/01-inference/ep21_hf_align.py
 
 ## Fix
 
-Missing weights/login → skip/hints, not necessarily a logic bug.
+No weights / not logged in → skip or tip; not a logic failure.
 
 ## Next
 

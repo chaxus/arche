@@ -1,35 +1,40 @@
 ## Idea
 
-### 1. Why stack
+### 1. What it is for
 
-One block isn’t a language model—many blocks + a vocab head are.
+The **stack** wires embed → `N` blocks → final RMSNorm → LM head into a full next-token model:
 
-### 2. Full path
+`ids → embed → Block×N → final RMSNorm → Linear(vocab) → logits`
 
-`ids → Embed → Block×N → final RMSNorm → Linear(vocab)`
+Last-dim scores are next-token **logits**. Small Llamas often **tie** LM head ↔ embedding.
 
-Last scores = **logits** for the next token. Often **tie** LM head ↔ embedding.
+### 2. Why the LLM pipeline needs it
 
-### 3. Pieces
+One block isn’t a LM. Depth mixes context; the LM head maps hidden states back to **the same vocab** as the tokenizer so you can sample the next id.
 
-| Piece | Role |
+### 3. Where it comes from · how you build it
+
+| Part | Role |
 | --- | --- |
-| Embedding | ids → vectors |
-| Blocks | contextualize |
-| Final norm | stabilize before head |
-| LM head | vectors → vocab scores |
+| Embed | id → vector |
+| Blocks × N | mix + transform |
+| Final norm | steady before the head |
+| LM head | vector → vocab scores (maybe tied) |
 
-### 4. What labs ship
+Config sets depth/dim/heads; random weights mean a correct graph but nonsense outputs (next chapter loads).
 
-Llama-style dense decoder end-to-end (still random weights until the load chapter).
+### 4. Standards · what “good” means
 
-### 5. What “good” means
+| Kind | Check | Plain meaning |
+| --- | --- | --- |
+| **Hard** | logits `(B, T, vocab)` | Align with vocab |
+| **Hard** | Tying matches claim | Shared params if tied |
+| **Hard** | Depth/dim match config | Else official weights won’t fit |
+| **Soft** | Coherent text after load | Full-model quality |
 
-- Logits shape `(B, T, vocab)`  
-- Tie setting matches the config you claim  
+### 5. What labs ship · what we do
 
-### 6. What we do
-
+Llama-style dense end-to-end.  
 `Llama` in `arche/model.py`.
 
 ## Run

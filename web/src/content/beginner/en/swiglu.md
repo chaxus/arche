@@ -1,34 +1,35 @@
 ## Idea
 
-### 1. Why an MLP after attention
+### 1. What it is for
 
-Attention mixes tokens; each position still needs a **per-token** transform.
+Attention mixes **across positions**; each position still needs its own nonlinear map—the **FFN / MLP**.  
+Llama-style **SwiGLU**: three bias-free linears (gate / up / down), gated product, project back.
 
-### 2. What SwiGLU does
+$$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
 
-$$\mathrm{FFN}(x)=W_d\big(\mathrm{SiLU}(W_g x)\odot W_u x\big)$$
+### 2. Why the LLM pipeline needs it
 
-Three bias-free linears: **gate**, **up**, **down**.
+Attention mostly “reads others.” The model also needs rich per-token transforms. SwiGLU is the common gated FFN in modern dense decoders (vs older GELU MLPs).
 
-### 3. Alternatives
+### 3. Where it comes from · how you build it
 
-| FFN | Plain idea | Today |
+| Stage | What happens |
+| --- | --- |
+| **Spec** | Wider hidden (`ffn_dim`); three bias-free mats |
+| **Init / train** | With the rest of the net |
+| **Variant** | MoE experts are often SwiGLUs (later) |
+
+### 4. Standards · what “good” means
+
+| Kind | Check | Plain meaning |
 | --- | --- | --- |
-| GELU MLP (GPT-2 style) | One hidden width + GELU | Older teaching fossils |
-| **SwiGLU** | Gated SiLU × up | **Llama / Qwen dense** |
-| MoE of SwiGLU experts | Router picks top-k | Mixtral-style (later) |
+| **Hard** | In/out `embed_dim` | Width only in the middle |
+| **Hard** | No bias (Llama contract) | Match weight layout |
+| **Soft** | Gains vs GELU MLP | Full-model metrics |
 
-### 4. What labs ship
+### 5. What labs ship · what we do
 
-Modern dense decoders: SwiGLU (or close gated variants).
-
-### 5. What “good” means
-
-- In/out `embed_dim`; intermediate wider  
-- No bias on the three linears (Llama-style)  
-
-### 6. What we do
-
+Modern dense: SwiGLU or close gated cousins.  
 `SwiGLU` in `arche/mlp.py`.
 
 ## Run
@@ -39,4 +40,4 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## Next
 
-**Block** (`?c=block`): glue the sandwich.
+**Transformer block** (`?c=block`): the sandwich.
