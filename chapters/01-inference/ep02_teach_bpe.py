@@ -28,7 +28,8 @@ def main() -> None:
         "a cat and a dog",
         "on the mat",
     ]
-    bpe = train_bpe(corpus, num_merges=40)
+    # Keep merges modest so the demo sentence stays multi-token (tiny corpora over-merge easily).
+    bpe = train_bpe(corpus, num_merges=12)
     text = "the cat sat on the mat"
     text_b = "the dog ran"
     ids = encode(bpe, text)
