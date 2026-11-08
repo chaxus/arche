@@ -24,6 +24,9 @@
   --arche-cache: #0e7490;
   --ran-color-bg: var(--arche-paper);
   --ran-color-bg-muted: var(--arche-paper-deep);
+  --ran-color-bg-elevated: var(--arche-paper);
+  --ran-color-bg-hover: color-mix(in srgb, var(--arche-teal) 12%, var(--arche-paper));
+  --ran-color-bg-subtle: var(--arche-paper-deep);
   --ran-color-text: var(--arche-ink);
   --ran-color-text-secondary: color-mix(in srgb, var(--arche-ink) 62%, transparent);
   --ran-color-border: color-mix(in srgb, var(--arche-ink) 14%, transparent);
@@ -126,10 +129,28 @@ a:hover {
   min-width: 7.5rem;
   --ran-select-min-height: 32px;
   --ran-select-font-size: var(--ran-text-label-1, 13px);
+  --ran-select-background-color: var(--arche-paper);
+  --ran-select-hover-background-color: color-mix(in srgb, var(--arche-paper-deep) 88%, transparent);
+  --ran-select-border: 1px solid var(--ran-color-border, #e5e5e5);
+  --ran-select-border-radius: 8px;
+  --ran-dropdown-background: var(--arche-paper);
+  --ran-dropdown-border: 1px solid var(--ran-color-border, #e5e5e5);
+  --ran-dropdown-box-shadow: 0 10px 28px color-mix(in srgb, var(--arche-ink) 12%, transparent);
+  --ran-dropdown-option-item-hover-background-color: var(--ran-color-bg-hover);
+  --ran-dropdown-option-selected-background-color: color-mix(in srgb, var(--arche-teal) 12%, transparent);
+  --ran-dropdown-option-active-background-color: color-mix(in srgb, var(--arche-teal) 12%, transparent);
 }
 
 r-theme-switch {
   --ran-theme-switch-width: 8.75rem;
+  --ran-theme-switch-background: var(--arche-paper);
+  --ran-theme-switch-border-color: var(--ran-color-border, #e5e5e5);
+  --ran-dropdown-background: var(--arche-paper);
+  --ran-dropdown-border: 1px solid var(--ran-color-border, #e5e5e5);
+  --ran-dropdown-box-shadow: 0 10px 28px color-mix(in srgb, var(--arche-ink) 12%, transparent);
+  --ran-dropdown-option-item-hover-background-color: var(--ran-color-bg-hover);
+  --ran-dropdown-option-selected-background-color: color-mix(in srgb, var(--arche-teal) 12%, transparent);
+  --ran-dropdown-option-active-background-color: color-mix(in srgb, var(--arche-teal) 12%, transparent);
 }
 
 .layout {
