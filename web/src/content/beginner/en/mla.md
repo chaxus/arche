@@ -1,8 +1,33 @@
 ## Idea
 
-GQA already shrinks KV heads. **MLA** (Multi-head Latent Attention, DeepSeek-style idea) goes further for decode memory: cache a **low-rank latent** (plus a small RoPE stream) instead of full per-head K and V, then reconstruct what attention needs on the fly.
+### 1. Why MLA
 
-Teaching goal: feel *why* latent KV helps memory—not ship a bit-identical DeepSeek checkpoint.
+GQA shrinks KV heads; decode memory can still dominate.
+
+### 2. What MLA does
+
+Cache a **low-rank latent** (+ small RoPE stream) instead of full per-head K/V; reconstruct what attention needs.
+
+### 3. Landscape
+
+| Idea | Role |
+| --- | --- |
+| GQA | Fewer KV heads |
+| **MLA** | Latent KV (DeepSeek-style idea) |
+| Paged KV | How storage is allocated |
+
+### 4. What labs ship
+
+Teaching shapes—not bit-identical DeepSeek weights.
+
+### 5. What “good” means
+
+- Latent cache smaller than full KV  
+- Forward still runs  
+
+### 6. What we do
+
+`arche/mla.py` primer.
 
 ## Run
 
@@ -10,8 +35,6 @@ Teaching goal: feel *why* latent KV helps memory—not ship a bit-identical Deep
 python chapters/01-inference/ep15_mla.py
 ```
 
-Expect a compact forward that shows latent cache shapes.
-
 ## Next
 
-**Device · INT8 · chat** (`?c=device-quant-chat`): where it runs, how weights shrink, how chats are formatted.
+**Device · INT8 · chat** (`?c=device-quant-chat`).

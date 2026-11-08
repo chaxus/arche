@@ -1,8 +1,16 @@
 ## Idea
 
-Frontier modules (MoE, MLA) need the same discipline as dense: **save and load** without silent shape bugs.
+### 1. Why
 
-This chapter round-trips teaching MoE/MLA checkpoints and shows how **Mixtral-style** expert keys (`w1/w2/w3`) map into our module names—so reading real open checkpoints is less mysterious.
+MoE/MLA modules still need save/load without silent shape bugs.
+
+### 2. What
+
+Round-trip teaching checkpoints; map Mixtral-style `w1/w2/w3` expert keys into our names.
+
+### 3–6. What we do
+
+Primer for reading open MoE checkpoints—not a full trainer.
 
 ## Run
 
@@ -10,8 +18,6 @@ This chapter round-trips teaching MoE/MLA checkpoints and shows how **Mixtral-st
 python chapters/02-training/ep20_frontier_ckpt.py
 ```
 
-Expect successful save→load and a key-map demonstration.
-
 ## Next
 
-**HF align** (`?c=hf-align`): prove dense logits match Hugging Face when weights exist.
+**HF align** (`?c=hf-align`).

@@ -1,8 +1,16 @@
 ## 要点
 
-前沿模块（MoE、MLA）和 dense 一样要会**存取**，不能静默形状错乱。
+### 1. 为什么
 
-本章往返教学用 MoE/MLA 检查点，并演示 **Mixtral 风格**专家 key（`w1/w2/w3`）如何映射到我们的模块名——读真实开放权重时少猜一点。
+MoE/MLA 也要能存取，不能静默形状错乱。
+
+### 2. 做什么
+
+往返教学检查点；把 Mixtral 风 `w1/w2/w3` 映射到我们的模块名。
+
+### 3–6. 本课怎么做
+
+读开放 MoE 检查点的引物——不是完整训练器。
 
 ## 动手
 
@@ -10,8 +18,6 @@
 python chapters/02-training/ep20_frontier_ckpt.py
 ```
 
-预期：存→载成功，并看到 key 映射演示。
-
 ## 下一章
 
-**HF 对齐**（`?c=hf-align`）：有权重时证明 dense logits 能对上 Hugging Face。
+**HF 对齐**（`?c=hf-align`）。

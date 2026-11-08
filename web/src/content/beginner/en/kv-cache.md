@@ -1,10 +1,33 @@
 ## Idea
 
-Naive generate re-runs attention over **all** past tokens every step. That repeats the same K/V work for the prompt.
+### 1. Why cache
 
-**KV cache:** on the first pass (**prefill**), store every layer’s keys and values. Each new token (**decode**) only computes K/V for itself and **appends** to the cache, then attends over the full cached sequence.
+Naive decode recomputes K/V for the whole prompt every step.
 
-Same answers (in exact arithmetic), far less work as the reply grows. See the interactive strip on this page.
+### 2. What KV cache does
+
+**Prefill** once → store per-layer K/V. Each **decode** step appends one new K/V and attends over the cache. See the strip on this page.
+
+### 3. Related ideas
+
+| Idea | Role |
+| --- | --- |
+| Contiguous cache | Simple `cat` along time (our teaching cache) |
+| Paged KV | Block table + gather (later primer) |
+| GQA/MLA | Shrink what you store |
+
+### 4. What labs ship
+
+Every production decoder uses some KV cache; engines differ on paging/layout.
+
+### 5. What “good” means
+
+- Same answers as full recompute (up to numerics)  
+- Work grows with new tokens, not full prompt length each step  
+
+### 6. What we do
+
+`KVCache` in `arche/cache.py`.
 
 ## Run
 
@@ -12,8 +35,6 @@ Same answers (in exact arithmetic), far less work as the reply grows. See the in
 python chapters/01-inference/ep12_kv_cache.py
 ```
 
-Expect a comparison or demo showing cached decode stepping.
-
 ## Next
 
-**RoPE scaling** (`?c=rope-scaling`): keep RoPE sane for long prompts.
+**RoPE scaling** (`?c=rope-scaling`).

@@ -1,10 +1,33 @@
 ## Idea
 
-RoPE angles were tuned for a training context length. Push much longer and relative positions can “wrap” oddly.
+### 1. Why scale RoPE
 
-**Llama 3.2-style RoPE scaling** keeps a large `rope_theta` and smoothly rescales **long wavelengths** using factor / low / high frequency bands (Hugging Face–compatible formula). Short-range behavior stays familiar; long-range gets stretched so longer prompts remain usable.
+Angles were tuned for a training length; much longer prompts can behave oddly.
 
-This chapter is about the **schedule**, not inventing a new attention.
+### 2. What Llama-style scaling does
+
+Keep large `rope_theta`; smoothly rescale **long wavelengths** (factor / low / high)—HF-compatible.
+
+### 3. Landscape
+
+| Method | Plain idea |
+| --- | --- |
+| NTK / YaRN / … | Other long-context RoPE recipes |
+| **Llama 3 wavelength smoothing** | What we mirror here |
+| Bigger context train | Data + length, not only formulas |
+
+### 4. What labs ship
+
+Llama 3.2 long-context schedule in the official configs.
+
+### 5. What “good” means
+
+- Short-range stays familiar  
+- Long-range stretches instead of wrapping badly  
+
+### 6. What we do
+
+Scaling helpers in `arche/rope.py` + chapter script.
 
 ## Run
 
@@ -12,8 +35,6 @@ This chapter is about the **schedule**, not inventing a new attention.
 python chapters/01-inference/ep13_rope_scaling.py
 ```
 
-Expect prints that contrast unscaled vs scaled inverse frequencies / shapes.
-
 ## Next
 
-**MoE** (`?c=moe`): sparse experts instead of one big MLP.
+**MoE** (`?c=moe`).

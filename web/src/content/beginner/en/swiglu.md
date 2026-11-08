@@ -1,12 +1,35 @@
 ## Idea
 
-After attention mixes tokens, each position still needs a **per-token MLP** to transform features.
+### 1. Why an MLP after attention
 
-Modern stacks use **SwiGLU** instead of a plain GELU MLP:
+Attention mixes tokens; each position still needs a **per-token** transform.
+
+### 2. What SwiGLU does
 
 $$\mathrm{FFN}(x)=W_d\big(\mathrm{SiLU}(W_g x)\odot W_u x\big)$$
 
-Three bias-free linears: **gate**, **up**, **down**. SiLU on the gate, multiply by up, then down-project. Same width ideas as Llama / Qwen dense models.
+Three bias-free linears: **gate**, **up**, **down**.
+
+### 3. Alternatives
+
+| FFN | Plain idea | Today |
+| --- | --- | --- |
+| GELU MLP (GPT-2 style) | One hidden width + GELU | Older teaching fossils |
+| **SwiGLU** | Gated SiLU × up | **Llama / Qwen dense** |
+| MoE of SwiGLU experts | Router picks top-k | Mixtral-style (later) |
+
+### 4. What labs ship
+
+Modern dense decoders: SwiGLU (or close gated variants).
+
+### 5. What “good” means
+
+- In/out `embed_dim`; intermediate wider  
+- No bias on the three linears (Llama-style)  
+
+### 6. What we do
+
+`SwiGLU` in `arche/mlp.py`.
 
 ## Run
 
@@ -14,8 +37,6 @@ Three bias-free linears: **gate**, **up**, **down**. SiLU on the gate, multiply 
 python chapters/01-inference/ep07_swiglu.py
 ```
 
-Expect input/output same `embed_dim`, intermediate wider.
-
 ## Next
 
-**Block** (`?c=block`): glue norm + attention + SwiGLU with residuals.
+**Block** (`?c=block`): glue the sandwich.

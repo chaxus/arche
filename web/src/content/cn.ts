@@ -13,7 +13,13 @@ export const CHAPTERS_CN: Chapter[] = [
     estimatedMinutes: 12,
     markdown: `## 要点
 
-我们要亲手写出一个小 **Llama 3.2**（约 10 亿参数）：够小能装进脑子，权重能下载，零件和生产里常见的一样。业界常把这种「层层都算、猜下一个词」的结构叫做 **dense 解码器**——名字后面混熟即可。目标：前向每一块都自己写过。
+### 1. 为什么选这个标本
+
+需要一个够小、开放、像生产的模型，端到端手写。
+
+### 2. 「模型」在这里指什么
+
+**Llama 3.2 风格**的 next-token 栈：分词 → 嵌入 → 块堆叠 → LM head。人们常叫它 **dense 解码器**——名字后面混熟即可。
 
 \`\`\`mermaid
 flowchart LR
@@ -22,13 +28,19 @@ flowchart LR
   stack --> head[LM head]
 \`\`\`
 
+### 3–5. 为什么是 Llama 3.2
+
+约 1B、权重可下、积木与很多生产 dense 一致（RMSNorm、RoPE、SwiGLU、GQA）。后面还有推理、小训练、前沿引物。
+
+### 6. 本课怎么做
+
+实验打印配置尺寸——还不是聊天。
+
 ## 动手
 
 \`\`\`bash
 python chapters/01-inference/ep01_overview.py
 \`\`\`
-
-打印层数/头数/维度等配置，不是聊天。
 
 ## 下一章
 
@@ -185,16 +197,41 @@ python chapters/01-inference/ep02_tokenizer.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-token id 还只是整数。模型要能做乘法，需要每个 id 对应一串数字——**向量**。
+### 1. 为什么要嵌入
 
-**嵌入（embedding）**就是一张查找表，形状 \`(词表大小，维度)\`：第 \`i\` 行是 id \`i\` 的向量。前向一次 = 按 id 把行取出来。这里还不「理解」语义，只是符号到几何的第一层可学习映射。
+token id 只是整数。网络要能做乘加，需要每个 id 对应一串数字——**向量**。
 
-Llama 3.2 风格里两点要记住：
+### 2. 做什么
 
-- **不加**单独的绝对位置向量表；**位置后面用 RoPE** 加在 Q/K 上。
-- 这张表常常和最后的 LM head **绑权**（同一套权重：id→向量，向量→词表分数）。
+**嵌入**是一张查找表，形状 \`(词表大小, 维度)\`：第 \`i\` 行是 id \`i\` 的向量。前向 = 按 id 取行。这里还不「理解」语义，只是符号 → 几何的第一层可学习映射。
 
-实验用很小的假词表，免下载权重；形状和真模型一样：\`(batch, seq) → (batch, seq, dim)\`。
+\`\`\`mermaid
+flowchart LR
+  ids[token id] --> table[嵌入表]
+  table --> vecs["向量 (B, T, dim)"]
+\`\`\`
+
+### 3. 你会听到的设计
+
+| 选择 | 人话 | 今天 |
+| --- | --- | --- |
+| 嵌入上再加绝对位置表 | 每个位置学一个向量 | Llama 风格里不作主线 |
+| **这里不加位置；RoPE 稍后** | 位置写在 Q/K 上 | **主流 dense** |
+| 与 LM head 绑权 | 同一矩阵：id→向量、向量→词表分 | 小 Llama 常见 |
+
+### 4. 业界实际
+
+Llama 3.2 / Qwen 一类：只做查表；**RoPE** 管位置；常 **绑** 嵌入 ↔ LM head。
+
+### 5. 怎样算对
+
+- 形状 \`(B, T) → (B, T, dim)\`  
+- 与分词器同一词表（第 \`i\` 行 ↔ id \`i\`）  
+- 若后面假定 RoPE，就别在这里偷偷加回绝对 PE  
+
+### 6. 本课怎么做
+
+\`arche/\` 里的 \`TokenEmbedding\`。实验用很小假词表，免下载；形状与真模型一致。
 
 ## 动手
 
@@ -202,11 +239,11 @@ Llama 3.2 风格里两点要记住：
 python chapters/01-inference/ep03_embedding.py
 \`\`\`
 
-预期：打印 ids / 输出形状，并提醒位置交给 RoPE。
+预期：ids / 输出形状，并提醒位置交给 RoPE。
 
 ## 下一章
 
-**RMSNorm**（\`?c=rmsnorm\`）：进重层前先稳住向量尺度。
+**RMSNorm**（\`?c=rmsnorm\`）：进重层前先稳住尺度。
 
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',
@@ -221,18 +258,44 @@ python chapters/01-inference/ep03_embedding.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-层一深，数值容易炸或塌。**归一化**把向量尺度拉回可控范围。
+### 1. 为什么要归一化
 
-**RMSNorm**（均方根归一化）是这里的现代默认：
+层一深，数值容易炸或塌。归一化把尺度拉回可控。
 
-- 对每个 token 向量，在最后一维算 RMS  
-- 除以 RMS（再加一点 \`ε\`）  
-- 再乘可学习缩放 \`γ\`  
-- **不减均值**（和经典 LayerNorm 不同）——更省，实践里也够稳  
+### 2. RMSNorm 做什么
 
-我们用 **pre-norm**：注意力前一次、MLP 前一次。Llama / Qwen 一类 dense 栈就是这样。
+对每个 token 向量（最后一维）：
+
+1. 算 RMS  
+2. 除以 RMS（+ 很小的 \`ε\`）  
+3. 乘可学习 \`γ\`  
+4. **不减均值**（和 LayerNorm 不同）
+
+我们用 **pre-norm**：注意力前一次、MLP 前一次。
 
 $$\\mathrm{RMSNorm}(x)=x/\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}\\odot\\gamma$$
+
+### 3. 你会听到的名字
+
+| 名字 | 人话 | 今天 |
+| --- | --- | --- |
+| LayerNorm | 减均值再缩放 | 偏 GPT-2 老故事 |
+| **RMSNorm** | 只按 RMS 缩放 | **Llama / Qwen 默认** |
+| Pre-norm / post-norm | 子层前还是后归一化 | 现代栈：pre-norm |
+
+### 4. 业界实际
+
+Llama 3.2、Qwen dense、多数新开放解码器：RMSNorm + pre-norm。
+
+### 5. 怎样算对
+
+- 进出同形状  
+- \`γ=1\` 时，归一化后 RMS ≈ 1  
+- 稳住训练，但不等于整模型的全部故事  
+
+### 6. 本课怎么做
+
+\`arche/norms.py\` 的 \`RMSNorm\`。实验打印形状与每 token RMS。
 
 ## 动手
 
@@ -240,11 +303,9 @@ $$\\mathrm{RMSNorm}(x)=x/\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}\\odot\\gamma$$
 python chapters/01-inference/ep04_rmsnorm.py
 \`\`\`
 
-预期：进出同形状；\`γ\` 初始为 1 时，归一化后每 token 的 RMS 约等于 1。
-
 ## 下一章
 
-**RoPE**（\`?c=rope\`）：用旋转把位置写进 Q/K。
+**RoPE**（\`?c=rope\`）：把位置写进 Q/K。
 
 `,
     latex:
@@ -261,13 +322,38 @@ python chapters/01-inference/ep04_rmsnorm.py
     demo: 'rope',
     markdown: `## 要点
 
-注意力靠 Q 和 K 做点积。若完全没有位置，「先 A 后 B」和「先 B 后 A」看起来一样。
+### 1. 为什么要位置
 
-**RoPE**（旋转位置编码）按**位置**给每个 Q/K 转一个角。相对距离会自然进点积——不必在嵌入上再贴一张大正弦位置表。
+没有位置，「先 A 后 B」和「先 B 后 A」对注意力长一样。
 
-Llama 3.2 用很大的基频（\`rope_theta\`）照顾长文；后面还有**波长缩放**专讲更长上下文。
+### 2. RoPE 做什么
 
-本页可拖互动图。代码里：预计算 cos/sin，\`rotate_half\`，再 \`q' = q·cos + rotate(q)·sin\`（K 同理）。
+**RoPE** 按**位置**旋转每个 Q/K。相对距离进点积——不必在嵌入上贴大位置表。
+
+本页可拖互动图。代码：cos/sin 缓存、\`rotate_half\`，再 \`q' = q·cos + rotate(q)·sin\`。
+
+### 3. 其他做法
+
+| 做法 | 人话 | 今天 |
+| --- | --- | --- |
+| 绝对可学习 PE | 每个下标一个向量 | 偏老栈 |
+| 正弦 PE | 固定 sin/cos | 原版 Transformer |
+| **RoPE** | 旋转 Q/K | **主流解码器** |
+| ALiBi 等 | 在分数上加距离偏置 | 部分长上下文路线 |
+
+### 4. 业界实际
+
+Llama 3 / 3.2：很大的 \`rope_theta\`；后面专章讲**波长缩放**。
+
+### 5. 怎样算对
+
+- 相对位置能进注意力  
+- Q/K 形状不变  
+- 更长上下文可能要缩放（后面专章）  
+
+### 6. 本课怎么做
+
+\`arche/rope.py\`。实验应用 RoPE 并核对形状。
 
 ## 动手
 
@@ -275,11 +361,9 @@ Llama 3.2 用很大的基频（\`rope_theta\`）照顾长文；后面还有**波
 python chapters/01-inference/ep05_rope.py
 \`\`\`
 
-预期：演示一次 RoPE 应用并核对形状。
-
 ## 下一章
 
-**GQA**（\`?c=gqa\`）：KV 头更少的注意力。
+**GQA**（\`?c=gqa\`）：更少的 KV 头。
 
 `,
     latex:
@@ -296,13 +380,38 @@ python chapters/01-inference/ep05_rope.py
     demo: 'gqa',
     markdown: `## 要点
 
-经典多头：每个 query 头配自己的 K/V 头。解码时 **KV 缓存**（后面章节）会很大。
+### 1. 为什么要 GQA
 
-**GQA**（分组查询注意力）：KV 头少于 query 头，多个 query **共用**一组 K/V。Llama 3.2 1B 是 **32 个 Q / 8 个 KV**——质量差不多，缓存更小。
+完整 MHA：每个 Q 头自带 KV → 解码时 **KV 缓存**涨得快。
 
-仍然是**因果**：位置 \`t\` 只能看见 \`≤ t\`。
+### 2. GQA 做什么
 
-代码流程：投影 Q/K/V → 拆头 → RoPE → \`repeat_interleave\` 扩 KV → 缩放点积注意力 → 输出投影。
+**分组查询注意力**：KV 头少于 Q 头，多组 Q **共用**一组 KV。仍是**因果**（\`t\` 只看 \`≤ t\`）。
+
+流程：投影 → 拆头 → RoPE → 扩 KV → SDPA → 输出投影。见本页图。
+
+### 3. 注意力布局家族
+
+| 布局 | 人话 | 今天 |
+| --- | --- | --- |
+| MHA | Q 头数 = KV 头数 | 经典 |
+| MQA | 全体 Q 共用一套 KV | 极致省 |
+| **GQA** | 分组共用 | **Llama 3.2 1B：32Q / 8KV** |
+| MLA | 把 KV 压成 latent | DeepSeek 风（后面章） |
+
+### 4. 业界实际
+
+Llama 3.2 1B 用 GQA；很多开放 7B–70B 为了解码显存也用 GQA。
+
+### 5. 怎样算对
+
+- \`n_rep = n_q / n_kv\` 正确  
+- prefill / decode 的因果设置正确  
+- 缓存比满 MHA 小，质量别塌光  
+
+### 6. 本课怎么做
+
+\`arche/attention.py\` 的 \`CausalSelfAttention\`。实验打印头数与形状。
 
 ## 动手
 
@@ -310,11 +419,9 @@ python chapters/01-inference/ep05_rope.py
 python chapters/01-inference/ep06_gqa.py
 \`\`\`
 
-预期：一次小前向，打印头数与输出形状。可看本页互动图。
-
 ## 下一章
 
-**SwiGLU**（\`?c=swiglu\`）：每一块里的前馈半边。
+**SwiGLU**（\`?c=swiglu\`）：前馈那半边。
 
 `,
   },
@@ -328,13 +435,36 @@ python chapters/01-inference/ep06_gqa.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-注意力混合过各个位置之后，每个位置还要过一个**按位置的 MLP** 变换特征。
+### 1. 为什么注意力后还要 MLP
 
-现代栈用 **SwiGLU**，而不是简单的 GELU MLP：
+注意力混合各位置；每个位置还要**各自**变换特征。
+
+### 2. SwiGLU 做什么
 
 $$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
 
-三条**无偏置**线性层：**gate**、**up**、**down**。gate 走 SiLU，再与 up 相乘，最后 down 投回。宽度思路与 Llama / Qwen dense 一致。
+三条无偏置线性：**gate**、**up**、**down**。
+
+### 3. 其他做法
+
+| FFN | 人话 | 今天 |
+| --- | --- | --- |
+| GELU MLP（GPT-2 风） | 一层隐层 + GELU | 偏考古教学 |
+| **SwiGLU** | 门控 SiLU × up | **Llama / Qwen dense** |
+| SwiGLU 专家 MoE | 路由 top-k | Mixtral 风（后面） |
+
+### 4. 业界实际
+
+现代 dense 解码器：SwiGLU（或近亲门控）。
+
+### 5. 怎样算对
+
+- 进出 \`embed_dim\`；中间更宽  
+- 三层无 bias（Llama 风格）  
+
+### 6. 本课怎么做
+
+\`arche/mlp.py\` 的 \`SwiGLU\`。
 
 ## 动手
 
@@ -342,11 +472,9 @@ $$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
 python chapters/01-inference/ep07_swiglu.py
 \`\`\`
 
-预期：进出同为 \`embed_dim\`，中间层更宽。
-
 ## 下一章
 
-**Transformer 块**（\`?c=block\`）：Norm + 注意力 + SwiGLU + 残差拼起来。
+**Transformer 块**（\`?c=block\`）：拼成三明治。
 
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
@@ -361,16 +489,39 @@ python chapters/01-inference/ep07_swiglu.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-一个 **Transformer 块**就是可重复的三明治：
+### 1. 为什么要「块」
+
+一个可重复单元，叠 \`N\` 次。
+
+### 2. 长什么样
 
 \`\`\`
 x → RMSNorm → 注意力 → + 残差
   → RMSNorm → SwiGLU → + 残差
 \`\`\`
 
-进出同形状，所以叠 \`N\` 次（Llama 3.2 1B：**16** 层）。现代 dense 用 **pre-norm**（子层**前**归一化）；残差让梯度还能流。
+进出同形状。注意力可带 KV cache。
 
-注意力可带 KV cache，解码时用（马上会用到）。
+### 3. 布局选择
+
+| 选择 | 人话 | 今天 |
+| --- | --- | --- |
+| Post-norm | 残差后再归一化 | 偏老 |
+| **Pre-norm** | 子层前归一化 | **现代默认** |
+| 注意力∥MLP 并行 | 非 Llama 布局 | 不是本课主干 |
+
+### 4. 业界实际
+
+Llama 3.2 1B：**16** 个这样的块。
+
+### 5. 怎样算对
+
+- 残差路径形状不变  
+- cache 别漏层  
+
+### 6. 本课怎么做
+
+\`arche/block.py\` 的 \`TransformerBlock\`。
 
 ## 动手
 
@@ -378,11 +529,9 @@ x → RMSNorm → 注意力 → + 残差
 python chapters/01-inference/ep08_block.py
 \`\`\`
 
-预期：一块前向；残差路径上形状不变。
-
 ## 下一章
 
-**堆叠 + LM head**（\`?c=stack\`）：嵌入 → 多层块 → 词表分数。
+**堆叠 + LM head**（\`?c=stack\`）。
 
 `,
   },
@@ -396,13 +545,37 @@ python chapters/01-inference/ep08_block.py
     estimatedMinutes: 12,
     markdown: `## 要点
 
-整模路径：
+### 1. 为什么要堆叠
 
-\`token id → 嵌入 → Block×N → 最终 RMSNorm → Linear(词表)\`
+一块还不是语言模型——多层 + 词表头才是。
 
-最后的线性层是 **LM head**：每个位置给词表里每个词一个分数（**logits**）。取最大（或采样）就是下一个 token。
+### 2. 整条路
 
-Llama 3.2 常把 LM head 与嵌入表 **绑权**——一张矩阵两个用途。
+\`ids → 嵌入 → Block×N → 最终 RMSNorm → Linear(词表)\`
+
+最后分数 = 下一 token 的 **logits**。常 **绑** LM head ↔ 嵌入。
+
+### 3. 零件
+
+| 零件 | 作用 |
+| --- | --- |
+| 嵌入 | id → 向量 |
+| 块 | 上下文混合 |
+| 最终 norm | 进 head 前稳住 |
+| LM head | 向量 → 词表分 |
+
+### 4. 业界实际
+
+Llama 风格 dense 端到端（下一章前仍是随机权重）。
+
+### 5. 怎样算对
+
+- logits \`(B, T, vocab)\`  
+- 绑权与声称的配置一致  
+
+### 6. 本课怎么做
+
+\`arche/model.py\` 的 \`Llama\`。
 
 ## 动手
 
@@ -410,11 +583,9 @@ Llama 3.2 常把 LM head 与嵌入表 **绑权**——一张矩阵两个用途�
 python chapters/01-inference/ep09_stack.py
 \`\`\`
 
-预期：随机小模型前向，logits 形状 \`(batch, seq, vocab)\`。
-
 ## 下一章
 
-**加载权重**（\`?c=weights\`）：用真 Llama 张量替换随机初始化。
+**加载权重**（\`?c=weights\`）。
 
 `,
   },
@@ -428,11 +599,34 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## 要点
 
-到目前图是对的，但权重是随机的——输出没有意义。
+### 1. 为什么要加载权重
 
-**\`from_pretrained\`** 先搭好我们的 \`Llama\` 模块，再按 **key 映射**（HF 名 → arche 名）把官方 Hugging Face Llama 3.2 检查点拷进来。之后前向应与发布模型一致（差在数值误差）。
+图对了但权重随机 → 输出无意义。
 
-需要接受模型许可并 \`huggingface-cli login\`（和分词器同一道门）。
+### 2. 做什么
+
+\`from_pretrained\` 搭好模块，再按 **key 映射**拷入 HF Llama 3.2 张量。
+
+### 3. 常见坑
+
+| 问题 | 含义 |
+| --- | --- |
+| 分词器不对 | id 对不上嵌入行（见分词器章） |
+| 没过门禁 | 下不了 |
+| key 映射错 | 静默装错层 |
+
+### 4. 业界实际
+
+官方 HF Llama 3.2 检查点（许可 + 登录）。
+
+### 5. 怎样算对
+
+- 参数量看起来对  
+- 后面 HF 对齐章：短 prompt 上 logits 接近  
+
+### 6. 本课怎么做
+
+\`arche/load_weights.py\` + 本章脚本。
 
 ## 动手
 
@@ -441,15 +635,13 @@ huggingface-cli login
 python chapters/01-inference/ep10_load_weights.py
 \`\`\`
 
-预期：确认权重已装入（参数量 / 简短自检）。镜像：\`export HF_ENDPOINT=https://hf-mirror.com\`。
-
 ## 翻车
 
-与分词器相同：许可、登录、网络。
+与分词器相同：许可、登录、镜像。
 
 ## 下一章
 
-**文本生成**（\`?c=generate\`）：把 logits 一个个变成字。
+**文本生成**（\`?c=generate\`）。
 
 `,
   },
@@ -463,14 +655,40 @@ python chapters/01-inference/ep10_load_weights.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-生成是一个**循环**，不是算一次就完：
+### 1. 为什么要循环
 
-1. 用当前 id 跑模型 → 取**最后位置**的 logits  
-2. 可选：**temperature** 软化，**top-k** 截断  
-3. **贪心**（\`argmax\`）或按分布**采样**  
-4. 把新 id 拼上；遇到 EOS 或达到长度就停  
+一次前向只给出「下一个」的分数，不是整段回复。
 
-有了 KV 缓存（下一章），第 1 步在首次 prefill 之后会便宜很多。本章先把采样循环本身搞清。
+### 2. 生成做什么
+
+1. 取**最后位置** logits  
+2. 可选 temperature / top-k  
+3. 贪心或采样  
+4. 拼上；EOS 或长度则停  
+
+KV 缓存（下一章）让第 1 步在 prefill 后变便宜。
+
+### 3. 旋钮
+
+| 旋钮 | 效果 |
+| --- | --- |
+| temperature → 0 | 更贪心/更尖 |
+| temperature 升高 | 更随机 |
+| top-k | 只保留前 k 个 |
+
+### 4. 业界实际
+
+所有聊天栈同一类循环；采样细节各家不同。
+
+### 5. 怎样算对
+
+- 能干净停下  
+- 有 EOS 时尊重它  
+- 有真权重时文字连贯（不是本章唯一目标）  
+
+### 6. 本课怎么做
+
+\`arche/generate.py\` 的 \`generate\`。
 
 ## 动手
 
@@ -478,11 +696,9 @@ python chapters/01-inference/ep10_load_weights.py
 python chapters/01-inference/ep11_generate.py
 \`\`\`
 
-预期：一段短解码文本（真文案需要上一章的权重；否则看脚本说明）。
-
 ## 下一章
 
-**KV 缓存**（\`?c=kv-cache\`）：别每步都把整段 prompt 重算一遍。
+**KV 缓存**（\`?c=kv-cache\`）。
 
 `,
   },
@@ -497,11 +713,34 @@ python chapters/01-inference/ep11_generate.py
     demo: 'kv',
     markdown: `## 要点
 
-朴素生成每一步都对**全部**历史做注意力——prompt 的 K/V 被反复重算。
+### 1. 为什么要缓存
 
-**KV 缓存：** 第一次（**prefill**）存下每层的 K/V；之后每个新 token（**decode**）只算自己的 K/V 并**追加**，再对整段缓存做注意力。
+朴素解码每步都对整段 prompt 重算 K/V。
 
-结果（精确算术下）一样，回复越长越省。看本页互动条。
+### 2. KV 缓存做什么
+
+**Prefill** 一次 → 存每层 K/V。每次 **decode** 只追加一步再对缓存做注意力。见本页条带图。
+
+### 3. 相关想法
+
+| 想法 | 作用 |
+| --- | --- |
+| 连续缓存 | 沿时间 \`cat\`（本课教学缓存） |
+| Paged KV | 块表 + gather（后面引物） |
+| GQA/MLA | 缩小要存的东西 |
+
+### 4. 业界实际
+
+生产解码器都有 KV 缓存；分页/布局各引擎不同。
+
+### 5. 怎样算对
+
+- 与全量重算结果一致（差在数值）  
+- 算量随新 token 涨，而不是每步整段 prompt  
+
+### 6. 本课怎么做
+
+\`arche/cache.py\` 的 \`KVCache\`。
 
 ## 动手
 
@@ -509,11 +748,9 @@ python chapters/01-inference/ep11_generate.py
 python chapters/01-inference/ep12_kv_cache.py
 \`\`\`
 
-预期：演示带缓存的逐步解码。
-
 ## 下一章
 
-**RoPE 缩放**（\`?c=rope-scaling\`）：长 prompt 下 RoPE 仍好用。
+**RoPE 缩放**（\`?c=rope-scaling\`）。
 
 `,
   },
@@ -527,11 +764,34 @@ python chapters/01-inference/ep12_kv_cache.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-RoPE 的角度是按训练长度调的。上下文拉太长，相对位置可能「绕坏」。
+### 1. 为什么要缩放 RoPE
 
-**Llama 3.2 风格 RoPE 缩放**：保持很大的 \`rope_theta\`，用 factor / low / high 频段平滑拉长**长波长**（与 HF 公式兼容）。近距离行为仍熟悉，远距离被拉伸，长 prompt 才好用。
+角度按训练长度调的；上下文拉太长可能「绕坏」。
 
-本章讲的是**调度表**，不是另造一种注意力。
+### 2. Llama 风格缩放做什么
+
+保持大 \`rope_theta\`；按 factor/low/high **平滑拉长波长**（与 HF 兼容）。
+
+### 3. 版图
+
+| 方法 | 人话 |
+| --- | --- |
+| NTK / YaRN / … | 其他长上下文 RoPE 配方 |
+| **Llama 3 波长平滑** | 本课对照的 |
+| 更长数据直接训 | 不只靠公式 |
+
+### 4. 业界实际
+
+Llama 3.2 官方配置里的长上下文调度。
+
+### 5. 怎样算对
+
+- 近距离仍熟悉  
+- 远距离被拉伸而不是乱绕  
+
+### 6. 本课怎么做
+
+\`arche/rope.py\` 的缩放辅助 + 本章脚本。
 
 ## 动手
 
@@ -539,11 +799,9 @@ RoPE 的角度是按训练长度调的。上下文拉太长，相对位置可能
 python chapters/01-inference/ep13_rope_scaling.py
 \`\`\`
 
-预期：对比未缩放 / 已缩放的频率或形状打印。
-
 ## 下一章
 
-**MoE**（\`?c=moe\`）：稀疏专家，而不是一个巨大 MLP。
+**MoE**（\`?c=moe\`）。
 
 `,
   },
@@ -557,9 +815,34 @@ python chapters/01-inference/ep13_rope_scaling.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-Dense MLP 对每个 token 跑**同一套**前馈。**混合专家（MoE）**准备很多专家 MLP（这里是 SwiGLU 专家），再用**路由器**给每个 token 只选 **top-k** 个专家来算。
+### 1. 为什么要 MoE
 
-总参数可以很大，但每个 token 只付少数专家的算力——**稀疏计算**（Mixtral 思路）。本章是教学用 MoE 块，不是完整生产 Mixtral。
+每个 token 都跑同一套 dense MLP 简单，但容量要人人付算力。
+
+### 2. MoE 做什么
+
+很多专家 MLP（这里是 SwiGLU）+ **路由器**：每 token 只跑 **top-k** → 稀疏计算。
+
+### 3. 版图
+
+| 想法 | 备注 |
+| --- | --- |
+| Dense FFN | 始终全开 |
+| **MoE（Mixtral 风）** | top-k 专家 |
+| 共享专家等变体 | 产品各异 |
+
+### 4. 业界实际
+
+本课是教学 MoE 块——不是完整 Mixtral 生产栈。
+
+### 5. 怎样算对
+
+- 路由到合法专家  
+- 负载别极端倾斜（真训练很在意；这里只尝 API）  
+
+### 6. 本课怎么做
+
+\`arche/moe.py\` 引物。
 
 ## 动手
 
@@ -567,11 +850,9 @@ Dense MLP 对每个 token 跑**同一套**前馈。**混合专家（MoE）**准�
 python chapters/01-inference/ep14_moe.py
 \`\`\`
 
-预期：一次小 MoE 前向的路由 / 形状。
-
 ## 下一章
 
-**MLA**（\`?c=mla\`）：压缩解码时要缓存的东西。
+**MLA**（\`?c=mla\`）。
 
 `,
   },
@@ -585,9 +866,34 @@ python chapters/01-inference/ep14_moe.py
     estimatedMinutes: 18,
     markdown: `## 要点
 
-GQA 已经减少了 KV 头。**MLA**（Multi-head Latent Attention，DeepSeek 思路）为了解码显存走得更远：缓存**低秩 latent**（外加一小段 RoPE 流），而不是每头完整 K/V，注意力需要时再展开。
+### 1. 为什么要 MLA
 
-教学目标：体会 latent KV **为什么**省内存——不是比特级复刻 DeepSeek 权重。
+GQA 已减 KV 头；解码显存仍可能占大头。
+
+### 2. MLA 做什么
+
+缓存**低秩 latent**（+ 小段 RoPE 流），而不是每头完整 K/V；需要时再展开。
+
+### 3. 版图
+
+| 想法 | 作用 |
+| --- | --- |
+| GQA | 更少 KV 头 |
+| **MLA** | latent KV（DeepSeek 思路） |
+| Paged KV | 显存怎么切块 |
+
+### 4. 业界实际
+
+教学形状——不是比特级 DeepSeek 权重。
+
+### 5. 怎样算对
+
+- latent 缓存比满 KV 小  
+- 前向能跑通  
+
+### 6. 本课怎么做
+
+\`arche/mla.py\` 引物。
 
 ## 动手
 
@@ -595,11 +901,9 @@ GQA 已经减少了 KV 头。**MLA**（Multi-head Latent Attention，DeepSeek �
 python chapters/01-inference/ep15_mla.py
 \`\`\`
 
-预期：紧凑前向，展示 latent 缓存形状。
-
 ## 下一章
 
-**设备 · INT8 · 对话**（\`?c=device-quant-chat\`）：跑在哪、权重怎么变小、对话怎么排版。
+**设备 · INT8 · 对话**（\`?c=device-quant-chat\`）。
 
 `,
   },
@@ -614,11 +918,27 @@ python chapters/01-inference/ep15_mla.py
     demo: 'chat',
     markdown: `## 要点
 
-围着算子核心的三块实用东西：
+### 1. 为什么要这三块
 
-1. **设备** — 有 CUDA 用 CUDA，否则 Apple MPS，再否则 CPU（\`pick_device\`）  
-2. **INT8（教学）** — 权重存成 int8 省内存；计算走简单反量化路径，方便学  
-3. **对话模板** — 把 system/user/assistant 消息排成模型认识的字符串；没有 HF 模板时回退成可读纯文本（可试本页 demo）
+只有算子不够跑聊天：设备、体积、消息格式都要。
+
+### 2. 覆盖什么
+
+1. **设备** — CUDA → MPS → CPU  
+2. **INT8（教学）** — 权重更小；简单反量化  
+3. **对话模板** — 角色 → 模型要的字符串（HF 或纯文本回退；可试 demo）
+
+### 3. 版图
+
+| 主题 | 生产备注 |
+| --- | --- |
+| 量化 | INT8/INT4/FP8… 配方很多 |
+| 模板 | 模型相关；别随便发明 |
+| 设备 | 同一图，不同后端 |
+
+### 4–6. 本课怎么做
+
+教学辅助 + 脚本——不是完整量化产品。
 
 ## 动手
 
@@ -626,11 +946,9 @@ python chapters/01-inference/ep15_mla.py
 python chapters/01-inference/ep16_device_quant_chat.py
 \`\`\`
 
-预期：选中的设备、量化说明、渲染后的对话串。
-
 ## 下一章
 
-**连续批处理**（\`?c=continuous-batching\`）：多段短生成共享步进。
+**连续批处理**（\`?c=continuous-batching\`）。
 
 `,
   },
@@ -645,11 +963,24 @@ python chapters/01-inference/ep16_device_quant_chat.py
     demo: 'batch',
     markdown: `## 要点
 
-朴素服务：每人一个生成循环——人一多 GPU 经常空转。
+### 1. 为什么
 
-**连续批处理**（这里是教学调度器）：多个短解码任务放进**同一个**步进循环；谁先打满长度（或 EOS）就退役，必要时再进新任务。大家共享同一拍「时间步」。
+每人一个生成循环 → 结束节奏不同时 GPU 常空转。
 
-这**不是**完整 paged attention / vLLM——只是调度形状。可试本页 demo。
+### 2. 这里的连续批是什么
+
+多个短解码任务共享一个步进循环；结束就退役。**不是**完整 paged / vLLM。可试 demo。
+
+### 3. 版图
+
+| 层 | 作用 |
+| --- | --- |
+| 调度 | 这一步谁还在跑 |
+| 分页 / 内核 | 显存与算力怎么跑（后面引物） |
+
+### 4–6. 本课怎么做
+
+教学调度形状 + 本章脚本。
 
 ## 动手
 
@@ -657,11 +988,9 @@ python chapters/01-inference/ep16_device_quant_chat.py
 python chapters/01-inference/ep17_continuous_batching.py
 \`\`\`
 
-预期：几个任务一起推进直到各自结束。
-
 ## 下一章
 
-**预训练**（\`?c=pretrain\`）：一个极小的 next-token 训练循环。
+**预训练**（\`?c=pretrain\`）。
 
 `,
   },
@@ -676,9 +1005,24 @@ python chapters/01-inference/ep17_continuous_batching.py
     demo: 'pretrain',
     markdown: `## 要点
 
-**预训练** = 在大量文本上学习猜下一个 token。损失通常是 logits 与真实下一 id 的交叉熵；优化器（这里是 **AdamW**）更新权重。
+### 1. 为什么要预训练
 
-循环故意**极小**（玩具 batch、很少步）：感受 API、看 loss 动——不是真去训 1B 全网数据。本页可调学习率/步数，在浏览器里真跑一小段。
+先在大量文本上学会猜下一个 token，再谈跟对话。
+
+### 2. 我们跑什么
+
+玩具 AdamW：logits 对下一 id、交叉熵、一步更新。**本页**可拖学习率/步数，在浏览器里真跑一小段。
+
+### 3. 版图
+
+| 规模 | 含义 |
+| --- | --- |
+| 本实验 | 感受 API |
+| 真预训练 | 海量数据、多卡、很久 |
+
+### 4–6. 本课怎么做
+
+\`arche/train/pretrain.py\` + 页内试跑。不是全网训练。
 
 ## 动手
 
@@ -686,11 +1030,9 @@ python chapters/01-inference/ep17_continuous_batching.py
 python chapters/02-training/ep18_pretrain.py
 \`\`\`
 
-预期：几步玩具 loss。本页 demo 用示意数字演同一思路。
-
 ## 下一章
 
-**SFT · DPO**（\`?c=sft-dpo\`）：跟指令、跟偏好。
+**SFT · DPO**（\`?c=sft-dpo\`）。
 
 `,
   },
@@ -705,10 +1047,22 @@ python chapters/02-training/ep18_pretrain.py
     demo: 'train',
     markdown: `## 要点
 
-预训练之后，还要会**跟对话**、**更偏好好回答**。
+### 1. 为什么
 
-- **SFT**（监督微调）：用「提示→回答」样本训练，但**掩掉提示**，损失只打在回复 token 上。  
-- **DPO**（直接偏好优化）：给定更好 / 更差回答，相对**冻结的 reference** 把模型推向更好那一侧——基础形式不需要单独奖励模型。我们只跑**教学用的一步**。
+预训练后仍要会跟对话、更偏好好回答。
+
+### 2. 做什么
+
+- **SFT：** 提示→回答；**掩掉提示**；损失只打在回复  
+- **DPO：** 相对冻结 reference，偏好 chosen（教学一步）
+
+### 3. 版图
+
+RLHF / RLAIF / DPO / … 配方很多；这里尝两个 API。
+
+### 4–6. 本课怎么做
+
+\`arche/train/sft.py\`（及 DPO）+ 本章脚本。
 
 ## 动手
 
@@ -716,11 +1070,9 @@ python chapters/02-training/ep18_pretrain.py
 python chapters/02-training/ep19_sft_dpo.py
 \`\`\`
 
-预期：看到 SFT 掩码行为，以及一次 DPO 更新打印。
-
 ## 下一章
 
-**前沿检查点**（\`?c=frontier-ckpt\`）：存取 MoE / MLA 形状的权重。
+**前沿检查点**（\`?c=frontier-ckpt\`）。
 
 `,
   },
@@ -734,9 +1086,17 @@ python chapters/02-training/ep19_sft_dpo.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-前沿模块（MoE、MLA）和 dense 一样要会**存取**，不能静默形状错乱。
+### 1. 为什么
 
-本章往返教学用 MoE/MLA 检查点，并演示 **Mixtral 风格**专家 key（\`w1/w2/w3\`）如何映射到我们的模块名——读真实开放权重时少猜一点。
+MoE/MLA 也要能存取，不能静默形状错乱。
+
+### 2. 做什么
+
+往返教学检查点；把 Mixtral 风 \`w1/w2/w3\` 映射到我们的模块名。
+
+### 3–6. 本课怎么做
+
+读开放 MoE 检查点的引物——不是完整训练器。
 
 ## 动手
 
@@ -744,11 +1104,9 @@ python chapters/02-training/ep19_sft_dpo.py
 python chapters/02-training/ep20_frontier_ckpt.py
 \`\`\`
 
-预期：存→载成功，并看到 key 映射演示。
-
 ## 下一章
 
-**HF 对齐**（\`?c=hf-align\`）：有权重时证明 dense logits 能对上 Hugging Face。
+**HF 对齐**（\`?c=hf-align\`）。
 
 `,
   },
@@ -762,9 +1120,17 @@ python chapters/02-training/ep20_frontier_ckpt.py
     estimatedMinutes: 20,
     markdown: `## 要点
 
-信任但要验证：\`from_pretrained\` 之后，用**同一句短 prompt**分别跑 arche 与 Hugging Face Llama 3.2，比 **argmax** 和 **logits 最大绝对差**。
+### 1. 为什么
 
-若没有门禁权重，本章干净退出（CI 仍有合成映射测试）。这是「dense 主干接线对不对」的关卡。
+信任 dense 主干接线，但要验证。
+
+### 2. 做什么
+
+同一短 prompt 跑 arche 与 HF Llama 3.2；比 argmax 与 logits 最大绝对差。无权重 → 干净退出。
+
+### 3–6. 本课怎么做
+
+本章脚本 + CI 合成映射测试。
 
 ## 动手
 
@@ -773,15 +1139,13 @@ huggingface-cli login
 python chapters/01-inference/ep21_hf_align.py
 \`\`\`
 
-有权重时预期：一份很小的差异报告。
-
 ## 翻车
 
-无权重 / 未登录 → 脚本干净跳过或给出 Fix；不等于 arche 逻辑坏了。
+无权重/未登录 → 跳过或提示，不等于逻辑坏了。
 
 ## 下一章
 
-**分片 MoE/MLA**（\`?c=sharded-frontier\`）：大检查点在磁盘上怎么拆。
+**分片 MoE/MLA**（\`?c=sharded-frontier\`）。
 
 `,
   },
@@ -795,9 +1159,17 @@ python chapters/01-inference/ep21_hf_align.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-超大模型很少一个文件搞定。Hugging Face 风格常用 **\`index.json\`** + 许多 **\`.safetensors\` / \`.pt\` 分片**。
+### 1. 为什么
 
-我们造一份 **合成** index + 分片（Mixtral 形 MoE、DeepSeek 形 MLA），再装回来做 \`allclose\`——看清打包/拆包，不必真下几十 GB。
+超大模型用 \`index.json\` + 许多分片文件。
+
+### 2. 做什么
+
+合成 index + 分片（Mixtral 形 MoE / DeepSeek 形 MLA）；装回并 \`allclose\`。
+
+### 3–6. 本课怎么做
+
+打包/拆包形状，不必真下几十 GB。
 
 ## 动手
 
@@ -805,11 +1177,9 @@ python chapters/01-inference/ep21_hf_align.py
 python chapters/02-training/ep22_sharded_frontier.py
 \`\`\`
 
-预期：分片写入/读回，张量对齐。
-
 ## 下一章
 
-**Paged KV · CUDA Graph**（\`?c=paged-cuda-graph\`）：服务端显存与捕获的思路。
+**Paged KV · CUDA Graph**（\`?c=paged-cuda-graph\`）。
 
 `,
   },
@@ -823,12 +1193,20 @@ python chapters/02-training/ep22_sharded_frontier.py
     estimatedMinutes: 18,
     markdown: `## 要点
 
-两个服务端思路（教学体量）：
+### 1. 为什么
 
-1. **Paged KV** — K/V 放进固定大小的**块** + **块表**，注意力时再 gather（vLLM 启发的形状）。避免「一条超长序列必须整段连续缓存」的故事。  
-2. **CUDA Graph** — 有 CUDA 时**捕获**固定 shape 计算，减少启动开销；在 KV 写入安全变为原地之前，解码仍可 eager。
+服务端需要比玩具循环更聪明的显存与更低的启动开销。
 
-实验展示机制，不是可替换生产引擎。
+### 2. 做什么
+
+1. **Paged KV** — 定长块 + 块表 + gather  
+2. **CUDA Graph** — 有 CUDA 时捕获固定 shape 计算  
+
+教学机制——不是可替换的 vLLM。
+
+### 3–6. 本课怎么做
+
+\`arche/paged_kv.py\`（及 graph）+ 本章脚本。
 
 ## 动手
 
@@ -836,11 +1214,9 @@ python chapters/02-training/ep22_sharded_frontier.py
 python chapters/01-inference/ep23_paged_cuda_graph.py
 \`\`\`
 
-预期：分页 gather；仅在有 CUDA 时做 graph 捕获。
-
 ## 下一章
 
-路径走完。可回看薄弱章，或有权重时跑 HF 对齐。
+路径走完——可回看薄弱章，或有权重时跑 HF 对齐。
 
 `,
   },

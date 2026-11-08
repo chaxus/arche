@@ -1,10 +1,23 @@
 ## Idea
 
-Serving many users naively = one generate loop each (GPUs idle between people).
+### 1. Why
 
-**Continuous batching** (teaching scheduler here): keep several short decode jobs in one stepping loop; when a job hits max new tokens (or EOS), retire it and optionally admit another. Everyone shares the same “time step” rhythm.
+One generate loop per user wastes GPU when people finish at different times.
 
-This is **not** full paged attention / vLLM—just the scheduling shape. Try the demo on this page.
+### 2. What continuous batching is here
+
+Several short decode jobs share one stepping loop; finished jobs retire. **Not** full paged attention / vLLM. Try the demo.
+
+### 3. Landscape
+
+| Layer | Role |
+| --- | --- |
+| Scheduling | Who is active this step |
+| Paging / kernels | How memory & compute run (later primer) |
+
+### 4–6. What we do
+
+Teaching scheduler shape in the chapter script.
 
 ## Run
 
@@ -12,8 +25,6 @@ This is **not** full paged attention / vLLM—just the scheduling shape. Try the
 python chapters/01-inference/ep17_continuous_batching.py
 ```
 
-Expect several jobs advancing together until each finishes.
-
 ## Next
 
-**Pretrain** (`?c=pretrain`): a tiny next-token training loop.
+**Pretrain** (`?c=pretrain`).

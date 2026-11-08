@@ -1,10 +1,26 @@
 ## Idea
 
-Three practical pieces that sit around the math core:
+### 1. Why these three
 
-1. **Device** — pick CUDA if present, else Apple MPS, else CPU (`pick_device`)  
-2. **INT8 (teaching)** — store weights in int8 to shrink memory; compute still follows a simple dequant path for learning  
-3. **Chat template** — turn role messages (system/user/assistant) into the token string the model expects; if HF’s template is missing, we fall back to a plain readable format (try the demo on this page)
+Math core isn’t enough to *run* a chat: device, size, and message format matter.
+
+### 2. What we cover
+
+1. **Device** — CUDA → MPS → CPU  
+2. **INT8 (teaching)** — smaller weights; simple dequant path  
+3. **Chat template** — roles → string the model expects (HF or plain fallback; try the demo)
+
+### 3. Landscape
+
+| Topic | Production note |
+| --- | --- |
+| Quant | INT8/INT4/FP8… many recipes |
+| Templates | Model-specific; don’t invent casually |
+| Devices | Same graph, different backends |
+
+### 4–6. What we do
+
+Teaching helpers + chapter script—not a full quant product.
 
 ## Run
 
@@ -12,8 +28,6 @@ Three practical pieces that sit around the math core:
 python chapters/01-inference/ep16_device_quant_chat.py
 ```
 
-Expect device choice, a quant note, and a rendered chat string.
-
 ## Next
 
-**Continuous batching** (`?c=continuous-batching`): many short generations sharing steps.
+**Continuous batching** (`?c=continuous-batching`).

@@ -1,8 +1,16 @@
 ## Idea
 
-Huge models rarely ship as one file. Hugging Face-style layouts use an **`index.json`** plus many **`.safetensors` / `.pt` shards**.
+### 1. Why
 
-We build a **synthetic** index + shards for Mixtral-shaped MoE and DeepSeek-shaped MLA, reload them, and `allclose`—so you see the packing/unpacking pattern without downloading tens of GB.
+Huge models ship as `index.json` + many shard files.
+
+### 2. What
+
+Synthetic index + shards for Mixtral-shaped MoE / DeepSeek-shaped MLA; reload and `allclose`.
+
+### 3–6. What we do
+
+Packing/unpacking pattern without downloading tens of GB.
 
 ## Run
 
@@ -10,8 +18,6 @@ We build a **synthetic** index + shards for Mixtral-shaped MoE and DeepSeek-shap
 python chapters/02-training/ep22_sharded_frontier.py
 ```
 
-Expect shard write/read and matching tensors.
-
 ## Next
 
-**Paged KV · CUDA graphs** (`?c=paged-cuda-graph`): serving-memory and capture ideas.
+**Paged KV · CUDA graphs** (`?c=paged-cuda-graph`).

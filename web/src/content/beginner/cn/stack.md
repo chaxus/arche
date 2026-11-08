@@ -1,12 +1,36 @@
 ## 要点
 
-整模路径：
+### 1. 为什么要堆叠
 
-`token id → 嵌入 → Block×N → 最终 RMSNorm → Linear(词表)`
+一块还不是语言模型——多层 + 词表头才是。
 
-最后的线性层是 **LM head**：每个位置给词表里每个词一个分数（**logits**）。取最大（或采样）就是下一个 token。
+### 2. 整条路
 
-Llama 3.2 常把 LM head 与嵌入表 **绑权**——一张矩阵两个用途。
+`ids → 嵌入 → Block×N → 最终 RMSNorm → Linear(词表)`
+
+最后分数 = 下一 token 的 **logits**。常 **绑** LM head ↔ 嵌入。
+
+### 3. 零件
+
+| 零件 | 作用 |
+| --- | --- |
+| 嵌入 | id → 向量 |
+| 块 | 上下文混合 |
+| 最终 norm | 进 head 前稳住 |
+| LM head | 向量 → 词表分 |
+
+### 4. 业界实际
+
+Llama 风格 dense 端到端（下一章前仍是随机权重）。
+
+### 5. 怎样算对
+
+- logits `(B, T, vocab)`  
+- 绑权与声称的配置一致  
+
+### 6. 本课怎么做
+
+`arche/model.py` 的 `Llama`。
 
 ## 动手
 
@@ -14,8 +38,6 @@ Llama 3.2 常把 LM head 与嵌入表 **绑权**——一张矩阵两个用途�
 python chapters/01-inference/ep09_stack.py
 ```
 
-预期：随机小模型前向，logits 形状 `(batch, seq, vocab)`。
-
 ## 下一章
 
-**加载权重**（`?c=weights`）：用真 Llama 张量替换随机初始化。
+**加载权重**（`?c=weights`）。

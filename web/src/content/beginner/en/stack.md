@@ -1,12 +1,36 @@
 ## Idea
 
-Full model path:
+### 1. Why stack
 
-`token ids → Embedding → Block×N → final RMSNorm → Linear(vocab)`
+One block isn’t a language model—many blocks + a vocab head are.
 
-The last linear is the **LM head**: each position gets a score per vocab entry (**logits**). Highest (or sampled) id = next token.
+### 2. Full path
 
-Llama 3.2 often **ties** LM head weights with the embedding table—one matrix, two roles.
+`ids → Embed → Block×N → final RMSNorm → Linear(vocab)`
+
+Last scores = **logits** for the next token. Often **tie** LM head ↔ embedding.
+
+### 3. Pieces
+
+| Piece | Role |
+| --- | --- |
+| Embedding | ids → vectors |
+| Blocks | contextualize |
+| Final norm | stabilize before head |
+| LM head | vectors → vocab scores |
+
+### 4. What labs ship
+
+Llama-style dense decoder end-to-end (still random weights until the load chapter).
+
+### 5. What “good” means
+
+- Logits shape `(B, T, vocab)`  
+- Tie setting matches the config you claim  
+
+### 6. What we do
+
+`Llama` in `arche/model.py`.
 
 ## Run
 
@@ -14,8 +38,6 @@ Llama 3.2 often **ties** LM head weights with the embedding table—one matrix, 
 python chapters/01-inference/ep09_stack.py
 ```
 
-Expect a tiny random model forward and logits shape `(batch, seq, vocab)`.
-
 ## Next
 
-**Load weights** (`?c=weights`): swap random init for real Llama tensors.
+**Load weights** (`?c=weights`).

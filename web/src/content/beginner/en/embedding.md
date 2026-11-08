@@ -1,15 +1,40 @@
 ## Idea
 
-Token ids are still just integers. The model needs **numbers it can multiply**—a vector per id.
+### 1. Why embedding
 
-**Embedding** is a lookup table of shape `(vocab_size, dim)`: row `i` is the vector for token id `i`. One forward = gather those rows. No “understanding” happens here yet; it is the first learnable map from symbols to geometry.
+Token ids are just integers. The network needs **vectors** it can multiply and add.
 
-Important for Llama 3.2–style models:
+### 2. What it does
 
-- We do **not** add a separate absolute position table on top of the embedding. **Position comes later via RoPE** on Q/K.
-- Often the same table is **tied** with the final LM head (same weights for “id → vector” and “vector → vocab scores”).
+**Embedding** is a lookup table of shape `(vocab_size, dim)`: row `i` is the vector for id `i`. One forward = gather those rows. No “understanding” yet—only the first learnable map from symbols to geometry.
 
-The lab uses a tiny fake vocab so it runs without downloading weights; shapes match the real idea: `(batch, seq) → (batch, seq, dim)`.
+```mermaid
+flowchart LR
+  ids[token ids] --> table[Embedding table]
+  table --> vecs["vectors (B, T, dim)"]
+```
+
+### 3. Design choices you will hear
+
+| Choice | Plain idea | Today |
+| --- | --- | --- |
+| Absolute PE table added on embeds | Learn a vector per position | Rare as the main story in Llama-style stacks |
+| **No PE here; RoPE later** | Position enters on Q/K | **Mainstream dense decoders** |
+| Tied LM head | Same matrix for id→vec and vec→vocab scores | Common on small Llamas |
+
+### 4. What labs ship
+
+Llama 3.2 / Qwen-style dense: embedding lookup only; **RoPE** carries position; often **tie** embed ↔ LM head.
+
+### 5. What “good” means here
+
+- Shape `(B, T) → (B, T, dim)`  
+- Same vocab as the tokenizer (row `i` ↔ id `i`)  
+- Don’t sneak absolute PE back in if the rest of the stack assumes RoPE  
+
+### 6. What we do
+
+`TokenEmbedding` in `arche/`. Lab uses a tiny fake vocab so you need no download; shapes match the real idea.
 
 ## Run
 
@@ -17,8 +42,8 @@ The lab uses a tiny fake vocab so it runs without downloading weights; shapes ma
 python chapters/01-inference/ep03_embedding.py
 ```
 
-Expect shapes for ids and output, plus a note that position is RoPE’s job.
+Expect id/output shapes and a note that position is RoPE’s job.
 
 ## Next
 
-**RMSNorm** (`?c=rmsnorm`): stabilize vectors before the heavy layers.
+**RMSNorm** (`?c=rmsnorm`): stabilize scales before heavy layers.

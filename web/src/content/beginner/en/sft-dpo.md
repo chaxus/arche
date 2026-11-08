@@ -1,9 +1,21 @@
 ## Idea
 
-After pretrain, models still need to **follow chats** and **prefer better answers**.
+### 1. Why
 
-- **SFT** (supervised fine-tune): train on prompt→response examples, but **mask the prompt** so loss only hits the reply tokens.  
-- **DPO** (Direct Preference Optimization): given chosen vs rejected replies, push the model toward chosen **relative to a frozen reference**—no separate reward model in the basic form. We run **one teaching step**.
+After pretrain, models still need to follow chats and prefer better answers.
+
+### 2. What
+
+- **SFT:** prompt→response; **mask the prompt**; loss on reply only  
+- **DPO:** prefer chosen over rejected vs a frozen reference (one teaching step)
+
+### 3. Landscape
+
+RLHF / RLAIF / DPO / … many alignment recipes; we taste two APIs.
+
+### 4–6. What we do
+
+`arche/train/sft.py` (+ DPO helper) and the chapter script.
 
 ## Run
 
@@ -11,8 +23,6 @@ After pretrain, models still need to **follow chats** and **prefer better answer
 python chapters/02-training/ep19_sft_dpo.py
 ```
 
-Expect SFT masking behavior and a single DPO update printout.
-
 ## Next
 
-**Frontier checkpoints** (`?c=frontier-ckpt`): save/load MoE & MLA shaped weights.
+**Frontier checkpoints** (`?c=frontier-ckpt`).

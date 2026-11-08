@@ -1,8 +1,33 @@
 ## Idea
 
-A dense MLP runs the **same** feed-forward for every token. **Mixture of Experts (MoE)** keeps many expert MLPs (here: SwiGLU experts) and a **router** that, per token, picks only the **top-k** experts to run.
+### 1. Why MoE
 
-You can grow total parameters a lot while each token pays for only a few experts—**sparse compute** (Mixtral-style idea). This chapter is a teaching MoE block, not a full production Mixtral stack.
+One dense MLP per token is simple but capacity costs compute for everyone.
+
+### 2. What MoE does
+
+Many expert MLPs (here SwiGLU) + a **router**: each token runs only **top-k** experts → sparse compute.
+
+### 3. Landscape
+
+| Idea | Note |
+| --- | --- |
+| Dense FFN | Always-on |
+| **MoE (Mixtral-style)** | Top-k experts |
+| Shared experts / deep variants | Product-specific |
+
+### 4. What labs ship
+
+Teaching MoE block—not a full Mixtral production stack.
+
+### 5. What “good” means
+
+- Router picks valid experts  
+- Load isn’t insanely skewed (real training cares; we only taste the API)  
+
+### 6. What we do
+
+`arche/moe.py` primer.
 
 ## Run
 
@@ -10,8 +35,6 @@ You can grow total parameters a lot while each token pays for only a few experts
 python chapters/01-inference/ep14_moe.py
 ```
 
-Expect router choices / shapes for a tiny MoE forward.
-
 ## Next
 
-**MLA** (`?c=mla`): compress what you cache for decode.
+**MLA** (`?c=mla`).

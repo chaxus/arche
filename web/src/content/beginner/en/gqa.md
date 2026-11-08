@@ -1,12 +1,37 @@
 ## Idea
 
-Full multi-head attention: every query head has its own key/value head. That makes the **KV cache** (next chapters) large at decode time.
+### 1. Why GQA
 
-**GQA** (Grouped-Query Attention): fewer KV heads than query heads. Several query heads **share** one KV head. Llama 3.2 1B uses **32 query / 8 KV** heads—same quality ballpark, smaller cache.
+Full MHA: every query head has its own KV head → **KV cache** grows fast at decode.
 
-Causal mask still applies: position `t` only sees positions `≤ t`.
+### 2. What GQA does
 
-Flow in our code: project Q/K/V → reshape heads → RoPE on Q/K → expand KV with `repeat_interleave` → scaled dot-product attention → output projection.
+**Grouped-Query Attention**: fewer KV heads than query heads; several Q heads **share** one KV. Still **causal** (position `t` sees `≤ t`).
+
+Flow: project → reshape → RoPE → expand KV → SDPA → out proj. See the diagram on this page.
+
+### 3. Family of attention layouts
+
+| Layout | Plain idea | Today |
+| --- | --- | --- |
+| MHA | Q heads = KV heads | Classic |
+| MQA | One KV for all Q | Extreme save |
+| **GQA** | KV groups shared by Q | **Llama 3.2 1B: 32Q / 8KV** |
+| MLA | Compress KV to a latent | DeepSeek-style (later chapter) |
+
+### 4. What labs ship
+
+Llama 3.2 1B uses GQA. Many open 7B–70B models use GQA for decode memory.
+
+### 5. What “good” means
+
+- Correct `n_rep = n_q / n_kv`  
+- Causal mask / `is_causal` right for prefill vs decode  
+- Cache smaller than full MHA without collapsing quality entirely  
+
+### 6. What we do
+
+`CausalSelfAttention` in `arche/attention.py`. Lab prints head counts and shapes.
 
 ## Run
 
@@ -14,8 +39,6 @@ Flow in our code: project Q/K/V → reshape heads → RoPE on Q/K → expand KV 
 python chapters/01-inference/ep06_gqa.py
 ```
 
-Expect a tiny forward that prints head counts and output shape. Use the interactive diagram on this page.
-
 ## Next
 
-**SwiGLU** (`?c=swiglu`): the feed-forward half of each block.
+**SwiGLU** (`?c=swiglu`): the feed-forward half.
