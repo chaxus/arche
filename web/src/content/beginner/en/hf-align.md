@@ -1,6 +1,6 @@
 ## Idea
 
-From-zero handwritten stack acceptance: **match authoritative HF logits** on a short prompt.
+End of Part 1: **match authoritative HF logits** on a short prompt—proof the map and formulas are sound. Then Part 2 shows how weights get written from zero.
 
 ### 1. What it is for
 

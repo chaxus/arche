@@ -1,6 +1,7 @@
 ## Idea
 
-From zero, two paths meet: **(A) write your own checkpoint via pretrain**; **(B) load an open checkpoint**. Bad loads waste the handwritten stack.
+This chapter takes **path A (specimen)**: load an open checkpoint so the handwritten stack can speak now.  
+**Path B (write weights from zero)** is Part 2 pretrain / SFT·DPO—most floats are trained, not hand-filled. Bad loads waste the handwritten stack.
 
 ### 1. What it is for
 
@@ -8,7 +9,11 @@ Copy tensors via a key map. Random weights are a correct graph with nonsense out
 
 ### 2. From zero: how you do it
 
-Self-train: save state_dict + tokenizer version. Open load: license→download→key map→official tokenizer→validate.
+| Path | Steps |
+| --- | --- |
+| **A Load open (this chapter)** | license→download→key map→official tokenizer |
+| **B Self-train (Part 2)** | toy/real pretrain writes `state_dict`; record tokenizer version |
+| **Validate** | shapes/missing keys; **HF align** after generate compares short-prompt logits |
 
 ### 3. What “good” means
 

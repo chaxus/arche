@@ -1,6 +1,6 @@
 ## Idea
 
-From-zero serving last mile: **paged KV** fights fragmentation; **CUDA Graph** cuts fixed-shape launch tax—a map toward vLLM-class engines.
+End of Part 3: **paged KV** fights fragmentation; **CUDA Graph** cuts fixed-shape launch tax—toward vLLM-class engines. Next part enters MoE/MLA frontier structures.
 
 ### 1. What it is for
 

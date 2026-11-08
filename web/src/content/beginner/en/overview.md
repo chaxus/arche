@@ -1,6 +1,6 @@
 ## Idea
 
-This course trains **from zero toward frontier-ready**: pick a production-isomorphic specimen, hand-write blocks, then speed and train. Wrong specimen ⇒ later “how industry does it” won’t match.
+This course trains **from zero toward frontier-ready**. Reading order: build the dense trunk → **train weights from zero** → serve faster → frontier structures (MoE/MLA). Wrong specimen ⇒ later “how industry does it” won’t match.
 
 ### 1. What it is for
 
@@ -13,8 +13,8 @@ Specimen: **Llama 3.2-style** next-token stack—tokenize → embed → blocks×
 | **1. Pick open, downloadable, small, production-like** | Here: Llama 3.2 ~1B |
 | **2. Freeze tokenizer; record V, D, depth, heads** | Config is the contract |
 | **3. Hand-write the same bricks** | RMSNorm, RoPE, GQA, SwiGLU… |
-| **4. Random shapes first, then load/train weights** | Graph → numbers |
-| **5. Add serving & alignment** | KV, batching, SFT… |
+| **4. Random shapes first, then load the specimen or Part 2 self-train** | Graph → numbers |
+| **5. Generate + HF check → train → serve → frontier** | See the four sidebar parts |
 
 ### 3. What “good choice” means
 

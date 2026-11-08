@@ -13,7 +13,7 @@ export const CHAPTERS_CN: Chapter[] = [
     estimatedMinutes: 12,
     markdown: `## 要点
 
-本课是**从零训到能对接业界前沿**：先选一个与生产同构的标本，再逐块手写、再谈加速与训练。标本错了，后面所有「业界怎么做」都会对不上。
+本课是**从零训到能对接业界前沿**。阅读顺序：写出 dense 本体 → **从零训练写出权重** → 服务加速 → 前沿结构（MoE/MLA）。标本错了，后面「业界怎么做」会对不上。
 
 ### 1. 有什么作用
 
@@ -33,8 +33,8 @@ flowchart LR
 | **1. 选开放、可下、够小的生产同构模型** | 本课：Llama 3.2 ~1B |
 | **2. 冻结其分词 / 记下 V、D、层数、头数** | 配置即契约 |
 | **3. 按同积木手写模块** | RMSNorm、RoPE、GQA、SwiGLU… |
-| **4. 先随机权重跑通形状，再加载/自训权重** | 图对 → 数对 |
-| **5. 再叠推理与对齐** | KV、批处理、SFT… |
+| **4. 先随机权重跑通形状，再加载标本或进入 Part 2 自训** | 图对 → 数对 |
+| **5. 生成 + HF 验收 → 训练 → 服务 → 前沿** | 见站点四段侧栏 |
 
 ### 3. 怎么样算选对了
 
@@ -801,7 +801,8 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## 要点
 
-从零两条路交汇：**(A) 自己预训练写出检查点**；**(B) 加载开源检查点**对齐业界。加载错 = 前面手写全白费。
+本章先走**路径 A（标本）**：加载开源检查点，让手写栈立刻能说话。  
+**路径 B（从零写出权重）**在下一 Part 的预训练 / SFT·DPO——真正的小数多半不是手填的，是训练写的。加载错 = 前面手写全白费。
 
 ### 1. 有什么作用
 
@@ -811,9 +812,9 @@ python chapters/01-inference/ep09_stack.py
 
 | 路径 | 步骤 |
 | --- | --- |
-| **自训** | 训完 \`state_dict\` / safetensors 存盘；记下分词版本 |
-| **加载开源** | 许可+登录 → 下 HF 检查点 → **key 映射**进 arche → 配官方分词 |
-| **校验** | 参数量、缺 key、短 prompt 与 HF 比 logits（后章） |
+| **A 加载开源（本章）** | 许可 + 登录 → 下 HF 检查点 → **key 映射**进 arche → 配官方分词 |
+| **B 自训（Part 2）** | 玩具/真预训练写出 \`state_dict\`；记下分词版本 |
+| **校验** | 参数量、缺 key；生成后一章 **HF 对齐**比短 prompt logits |
 
 ### 3. 怎么样算好
 
@@ -1372,7 +1373,7 @@ python chapters/02-training/ep18_pretrain.py
     demo: 'train',
     markdown: `## 要点
 
-从零预训练后仍要**对齐**：SFT 教会跟随；DPO/RLHF 一类推向偏好——聊天产品的必经。
+Part 2 收尾：预训练后仍要**对齐**——SFT 教会跟随；DPO/RLHF 一类推向偏好。之后进入 Part 3，把生成做成可服务的解码。
 
 ### 1. 有什么作用
 
@@ -1486,7 +1487,7 @@ python chapters/02-training/ep20_frontier_ckpt.py
     estimatedMinutes: 20,
     markdown: `## 要点
 
-从零手写栈的验收：**与权威 HF 实现对短 prompt logits**——证明映射与公式没大错。
+Part 1 收尾验收：**与权威 HF 实现对短 prompt logits**——证明映射与公式没大错。过关后再进入 Part 2，体会权重如何从零训练出来。
 
 ### 1. 有什么作用
 
@@ -1600,7 +1601,7 @@ python chapters/02-training/ep22_sharded_frontier.py
     estimatedMinutes: 18,
     markdown: `## 要点
 
-从零服务化的最后一公里引物：**分页 KV** 管显存碎片，**CUDA Graph** 砍固定形状启动税——对接 vLLM 一类引擎的地图。
+Part 3 收尾引物：**分页 KV** 管显存碎片，**CUDA Graph** 砍固定形状启动税——对接 vLLM 一类引擎。下一 Part 进入 MoE/MLA 等前沿结构。
 
 ### 1. 有什么作用
 

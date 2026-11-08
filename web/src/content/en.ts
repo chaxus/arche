@@ -13,7 +13,7 @@ export const CHAPTERS_EN: Chapter[] = [
     estimatedMinutes: 12,
     markdown: `## Idea
 
-This course trains **from zero toward frontier-ready**: pick a production-isomorphic specimen, hand-write blocks, then speed and train. Wrong specimen ⇒ later “how industry does it” won’t match.
+This course trains **from zero toward frontier-ready**. Reading order: build the dense trunk → **train weights from zero** → serve faster → frontier structures (MoE/MLA). Wrong specimen ⇒ later “how industry does it” won’t match.
 
 ### 1. What it is for
 
@@ -26,8 +26,8 @@ Specimen: **Llama 3.2-style** next-token stack—tokenize → embed → blocks×
 | **1. Pick open, downloadable, small, production-like** | Here: Llama 3.2 ~1B |
 | **2. Freeze tokenizer; record V, D, depth, heads** | Config is the contract |
 | **3. Hand-write the same bricks** | RMSNorm, RoPE, GQA, SwiGLU… |
-| **4. Random shapes first, then load/train weights** | Graph → numbers |
-| **5. Add serving & alignment** | KV, batching, SFT… |
+| **4. Random shapes first, then load the specimen or Part 2 self-train** | Graph → numbers |
+| **5. Generate + HF check → train → serve → frontier** | See the four sidebar parts |
 
 ### 3. What “good choice” means
 
@@ -660,7 +660,8 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-From zero, two paths meet: **(A) write your own checkpoint via pretrain**; **(B) load an open checkpoint**. Bad loads waste the handwritten stack.
+This chapter takes **path A (specimen)**: load an open checkpoint so the handwritten stack can speak now.  
+**Path B (write weights from zero)** is Part 2 pretrain / SFT·DPO—most floats are trained, not hand-filled. Bad loads waste the handwritten stack.
 
 ### 1. What it is for
 
@@ -668,7 +669,11 @@ Copy tensors via a key map. Random weights are a correct graph with nonsense out
 
 ### 2. From zero: how you do it
 
-Self-train: save state_dict + tokenizer version. Open load: license→download→key map→official tokenizer→validate.
+| Path | Steps |
+| --- | --- |
+| **A Load open (this chapter)** | license→download→key map→official tokenizer |
+| **B Self-train (Part 2)** | toy/real pretrain writes \`state_dict\`; record tokenizer version |
+| **Validate** | shapes/missing keys; **HF align** after generate compares short-prompt logits |
 
 ### 3. What “good” means
 
@@ -1125,7 +1130,7 @@ python chapters/02-training/ep18_pretrain.py
     demo: 'train',
     markdown: `## Idea
 
-After from-zero pretrain you still **align**: SFT teaches following; DPO/RLHF-style methods push preferences.
+End of Part 2: after pretrain you still **align**—SFT teaches following; DPO/RLHF-style methods push preferences. Part 3 then makes decode servable.
 
 ### 1. What it is for
 
@@ -1227,7 +1232,7 @@ python chapters/02-training/ep20_frontier_ckpt.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-From-zero handwritten stack acceptance: **match authoritative HF logits** on a short prompt.
+End of Part 1: **match authoritative HF logits** on a short prompt—proof the map and formulas are sound. Then Part 2 shows how weights get written from zero.
 
 ### 1. What it is for
 
@@ -1335,7 +1340,7 @@ Path complete—revisit weak chapters, or re-run HF align with weights.
     estimatedMinutes: 18,
     markdown: `## Idea
 
-From-zero serving last mile: **paged KV** fights fragmentation; **CUDA Graph** cuts fixed-shape launch tax—a map toward vLLM-class engines.
+End of Part 3: **paged KV** fights fragmentation; **CUDA Graph** cuts fixed-shape launch tax—toward vLLM-class engines. Next part enters MoE/MLA frontier structures.
 
 ### 1. What it is for
 

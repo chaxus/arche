@@ -1,6 +1,6 @@
 ## Idea
 
-After from-zero pretrain you still **align**: SFT teaches following; DPO/RLHF-style methods push preferences.
+End of Part 2: after pretrain you still **align**—SFT teaches following; DPO/RLHF-style methods push preferences. Part 3 then makes decode servable.
 
 ### 1. What it is for
 
