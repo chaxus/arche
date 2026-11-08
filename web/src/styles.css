@@ -82,30 +82,15 @@ a:hover {
   flex-shrink: 0;
 }
 
-.langs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.locale-select {
+  width: 8.75rem;
+  min-width: 7.5rem;
+  --ran-select-min-height: 32px;
+  --ran-select-font-size: var(--ran-text-label-1, 13px);
 }
 
-.langs__link {
-  color: var(--ran-color-text-secondary, #666);
-  font-size: 13px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  text-decoration: none;
-}
-
-.langs__link:hover {
-  background: var(--ran-color-bg-muted, #f5f5f5);
-  color: var(--ran-color-text, #111);
-  text-decoration: none;
-}
-
-.langs__link[aria-current='true'] {
-  color: var(--ran-color-text, #111);
-  font-weight: 600;
-  background: var(--ran-color-bg-muted, #f5f5f5);
+r-theme-switch {
+  --ran-theme-switch-width: 8.75rem;
 }
 
 .layout {
