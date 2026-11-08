@@ -17,6 +17,8 @@ export const CHAPTERS_EN: Chapter[] = [
 
 This chapter picks the specimen: a **Llama 3.2-style** next-token stack—tokenize → embed → block stack → LM head—often called a **dense decoder**. Every later chapter hangs on this trunk.
 
+From zero to frontier-ready: freeze the tokenizer, then size the embedding and pretrain—this specimen shows a shipped industry pair; the tokenizer/embedding chapters also cover **generating your own**.
+
 ### 2. Why the course needs it
 
 You need one small, open, production-like model to hand-write end to end. Without a shared specimen, RMSNorm / RoPE / GQA won’t share one config.
@@ -65,79 +67,113 @@ python chapters/01-inference/ep01_overview.py
     demo: 'tokenizer',
     markdown: `## Idea
 
+This course aims to **build from zero toward frontier-ready**. The tokenizer table is not a disposable download—it is the first table you **choose or train** when you train a model; embeddings, pretraining, and inference cost all bind to it.
+
 ### 1. What the tokenizer table is for
 
-The tokenizer table (vocab + merge/cut rules) does two jobs:
+Tokenizer table = **cut rules + vocab (piece ↔ id)**.
 
-1. **Cut** — text → pieces (**tokens**)  
-2. **Number** — pieces → fixed integer **token ids**
+1. **Cut** — text → tokens  
+2. **Number** — tokens → fixed integer ids  
 
-Encode before the model; decode with the **same** table after. Specials (BOS/EOS/…) are fixed ids in that table.
+Encode before the model; decode with the **same** table. Specials (BOS/EOS/tools) are ids too.
 
 \`\`\`mermaid
 flowchart LR
-  text[text] --> cut[cut tokens]
+  text[text] --> cut[cut]
   cut --> ids[token ids]
-  ids --> model[model]
-  model --> ids2[new ids]
-  ids2 --> back[decode text]
+  ids --> emb[embedding row i]
+  emb --> stack[rest of net]
+  stack --> ids2[new ids]
+  ids2 --> back[decode]
 \`\`\`
 
-One line: **one rule set for text ↔ ids.**
+No table ⇒ embedding has no row indices; next-token pretraining has no vocab.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you generate the table
 
-Models compute on numbers. Whole-sentence symbols explode the vocab; raw bytes make sequences too long. Tokenization is the stable, reversible middle. Without a tokenizer table, the **embedding table** has no row indices to pair with.
+Open decoders mostly use **byte-level BPE** (GPT/Llama family). From-scratch order:
 
-### 3. How the tokenizer table is generated
+| Step | What you do | What it fixes |
+| --- | --- | --- |
+| **1. Corpus mix** | code / EN / CJK / math / web… | which pieces enter the vocab; which languages compress |
+| **2. Pretokenizer regex** | spaces, digits, punct, CJK | structure; Chinese UX |
+| **3. Base symbols** | UTF-8 **256 bytes** | universal coverage, reversible |
+| **4. BPE merges** | merge most frequent adjacent pairs to target size | compression |
+| **5. Specials** | BOS/EOS/pad/tool marks | chat/agent protocols |
+| **6. Freeze + version** | write \`tokenizer.json\` / merges | embedding rows & checkpoints lock to this id space |
+| **7. Then embed + pretrain** | set \`vocab_size\`, build embedding, train | **changing the table ≈ rebuild embeds + heavy retrain** |
 
-Open decoders mostly use **byte-level BPE** (Llama / much of the GPT line). **Not** hand-numbered words.
+This course:
 
-| Step | What happens |
+- **Teaching:** \`arche/teach_bpe.py\` trains a tiny table so you see generation  
+- **Specimen:** official Llama 3.2 table for a production pairing
+
+### 3. What counts as a good table
+
+**Hard constraints**
+
+| Check | Plain meaning |
 | --- | --- |
-| **1. Corpus** | Lots of text (what becomes frequent) |
-| **2. Base vocab** | UTF-8 **256 bytes** (or equivalent) |
-| **3. Merge loop** | Count adjacent pairs; merge the most frequent; append to merges |
-| **4. Stop** | Hit target size (e.g. ~128K); add specials |
-| **5. Save** | \`tokenizer.json\` / merges + specials; ship with the model |
-| **6. You use it** | **Load the official table**; retrain only if you train a model from scratch |
+| **Reversible** | encode→decode recovers normal text |
+| **Coverage** | any byte string representable |
+| **Stable** | same text → same ids |
+| **Train-time identity** | same table for pretrain/finetune/infer |
 
-Vs embeddings: the tokenizer comes from a **BPE-style algorithm on text**; the embedding table comes from **neural training** (next chapter).
+**Optimization targets**
 
-The page playground uses **fixed teaching merges**. The script below **trains** a tiny table on a toy corpus.
+| Check | Plain meaning | Impact on the whole model |
+| --- | --- | --- |
+| **Compression / fertility** | fewer tokens better; fertility = pieces/word | longer effective context; cheaper train/infer |
+| **Parity** | similar meaning shouldn’t explode across languages | unfair ⇒ short effective context, expensive, undertrained |
+| **Domain fit** | code/math/CJK not shredded | vertical ceiling |
+| **Structure** | indent, JSON, URLs, numbers | tools & code |
+| **Vocab size** | often 32K–200K+ | shorter seqs vs **embed params ∝ V×D** and fatter softmax |
+| **Special design** | clear chat/tool boundaries | alignment & agents |
+| **Downstream** | loss/evals under same trunk | one final referee |
 
-### 4. Code: generate · use · measure
+“Good” is a tradeoff among compression, parity, size, and downstream—not one score.
 
-Teaching code: \`arche/teach_bpe.py\` (minimal byte BPE). Core loop:
+### 4. How to improve · impact on the whole LLM
 
-\`\`\`python
-# Same idea as arche.teach_bpe.train_bpe
-vocab = [bytes([i]) for i in range(256)]
-merges = []
-for _ in range(num_merges):
-    a, b = most_frequent_adjacent_pair(corpus)
-    merges.append((a, b))
-    vocab.append(a + b)
-    corpus = apply_merge(corpus, a, b)
-\`\`\`
+| Lever | How | Whole-model impact |
+| --- | --- | --- |
+| **Corpus mix** | more code/CJK/math | those domains compress & learn better; others may regress |
+| **Pretokenizer** | digit/CJK-friendly regex | often beats blindly growing V |
+| **Larger V** | more merges | shorter sequences; fatter embed/LM head; more VRAM |
+| **Append specials** | grow table tail; keep old ids | **expand embedding rows** and keep training |
+| **Change algorithm family** | BPE ↔ Unigram… | **new table**; rebuild embeds; retrain |
+| **Extend inherited table** | append domain pieces | cheaper than full reset |
 
-Encode: bytes → apply merges in order → ids. Decode: ids → bytes → UTF-8.
+Frontier-from-zero practice: freeze tokenizer after data goals are clear → set \`vocab_size\` → embed → pretrain. Mid-flight table swaps are extremely expensive.
 
-Train a toy table (**no** Hugging Face):
+### 5. Industry · well-known open models
+
+Most sit in **byte BPE / tiktoken-like** land; differences are corpus and regex, not “words vs characters” as the main split.
+
+| Model / line | Engine & size | Notes |
+| --- | --- | --- |
+| **GPT-4 / 3.5** | tiktoken \`cl100k\` ~100K | open cut library; table bound to model |
+| **GPT-4o** | \`o200k\` ~200K | generation bump; **new table ≠ old embeds** |
+| **Llama 3 / 3.2** | byte BPE 128K+ | **course specimen**; factory-paired with weights |
+| **Qwen** | BPE ~150K-class | self-trained; multilingual + tool specials |
+| **DeepSeek-V3** | byte BPE ~128K | pretok/corpus for multilingual compression |
+| **Kimi K2** | tiktoken-like ~163K | Han-friendlier regex |
+| **Legacy BERT** | WordPiece | encoder era; **not interchangeable** with decoder BPE |
+| **Some multilingual** | Unigram + SentencePiece | still used; different rules |
+
+Consensus: trainers ship one table with the recipe; users only load that checkpoint’s tokenizer; next gens often grow V and improve multilingual/code regex.
+
+### 6. Code (this course)
 
 \`\`\`bash
 python chapters/01-inference/ep02_teach_bpe.py
 \`\`\`
 
-Expect \`vocab_size\`, ids, round-trip decode, rough \`fertility≈\`.
-
-Then the **official Llama 3.2 table** (paired with weights; needs license):
-
 \`\`\`python
 from arche.tokenizer import load_tokenizer
 tok = load_tokenizer()
 ids = tok.encode("The cat sat on the mat.")
-text = tok.decode(ids)
 \`\`\`
 
 \`\`\`bash
@@ -145,43 +181,10 @@ huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 \`\`\`
 
-### 5. What “good” means
-
-| Check | Plain meaning | How to see it |
-| --- | --- | --- |
-| **Reversible** | encode→decode recovers text (modulo normalizations) | Compare decode in scripts |
-| **Compression / fertility** | Fewer tokens is cheaper; fertility = pieces per word (**higher = more fragmented**) | Toy script prints it; compare parallel corpora on official tables |
-| **Parity** | Similar meaning across languages shouldn’t explode length | Parallel token counts |
-| **Structure** | Don’t wreck code, URLs, numbers | Spot checks |
-| **Checkpoint pairing** | id \`i\` must match embedding row \`i\` | **Hard**; foreign tables break models |
-| **Vocab size** | Bigger often shorter sequences but fatter embeddings | Product tradeoff |
-| **Downstream** | Final judge includes trained model quality | One main referee |
-
-Pairing: train saw \`the\`→\`65\`→row 65; another table maps \`the\`→\`902\` → wrong row.
-
-| When tables differ | Example |
-| --- | --- |
-| Model family | Llama ≠ Qwen ≠ \`cl100k\` |
-| Generation bump | GPT-3.5 ~100K → GPT-4o ~200K |
-| Train from scratch | New BPE; old embeds don’t fit |
-| New specials | Append ids |
-| Ops mistake | Llama weights + foreign \`tokenizer.json\` |
-
-### 6. What labs ship · what we do
-
-| Line | ~vocab | Note |
-| --- | --- | --- |
-| GPT tiktoken | 100K–200K | BPE |
-| Llama 3.2 | 128K+ | **Course official table** |
-| DeepSeek / Qwen / Kimi | ~128K–163K | Same family of ideas |
-
-Toy training shows **generation**; official table shows **pairing**. Never mix them.
-
 ## Run
 
 \`\`\`bash
 python chapters/01-inference/ep02_teach_bpe.py
-
 huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 \`\`\`
@@ -190,11 +193,11 @@ Optional: \`export HF_ENDPOINT=https://hf-mirror.com\`
 
 ## Fix
 
-Official table: license / login / \`401\` / slow download. Teaching BPE needs no network.
+Official table: license / login / mirror. Teaching BPE needs no network.
 
 ## Next
 
-**Embedding** (\`?c=embedding\`): after ids, how the embedding table is built, looked up, and judged.
+**Embedding** (\`?c=embedding\`): after the vocab is frozen, how to build the embedding table from zero, judge it, improve it, and what open models do.
 
 `,
   },
@@ -209,113 +212,106 @@ Official table: license / login / \`401\` / slow download. Teaching BPE needs no
     demo: 'embedding',
     markdown: `## Idea
 
+After the tokenizer is frozen, the next from-scratch step is the **embedding table**: each id becomes a trainable float row. A bad table makes every later layer learn on noise; a mismatched tokenizer breaks the whole frontier pipeline.
+
 ### 1. What the embedding table is for
 
-A matrix \`(vocab_size, dim)\`: **row \`i\` = the float row for token id \`i\`.**
+Matrix \`(V, D)\`: **row \`i\` = floats for id \`i\`** (\`V\` = vocab size, \`D\` = model dim).
 
 | Role | Plain meaning |
 | --- | --- |
-| **① Interface** | ids → floats later layers can multiply/add |
-| **② Learnable identity** | one row per id; training rewrites those floats |
-| **③ Often tied LM head** | small Llamas: gather in, score vocab out with the same matrix |
+| **① Interface** | discrete ids → tensors you can multiply/add |
+| **② Learnable identity** | each token’s starting face; pretrain is the main author |
+| **③ Often tied LM head** | small models share gather-in / score-out |
 
-At inference it’s mostly **gather by id** (try the table above). Not a dictionary gloss.
+Inference ≈ **gather** by id (try the page table). Not a dictionary gloss.
 
 \`\`\`mermaid
 flowchart LR
-  text[text] --> tok[tokenizer → ids]
-  tok --> emb[embedding gather]
-  emb --> rest[later layers]
+  tok[tokenizer frozen] --> shape["set V = vocab_size"]
+  shape --> init["random init V×D"]
+  init --> pretrain[pretrain updates rows]
+  pretrain --> ckpt[checkpoint]
 \`\`\`
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you generate the table
 
-Tokenization only yields integers; \`3+7=10\` has no linguistic meaning. The stack needs a learnable map from ids into tensor-land. Modern decoders use a lookup table: simple, trainable, one row per id.
+**Not** hand-filled, **not** another BPE. BPE assigns ids; embedding stores learnable floats.
 
-### 3. How the embedding table is generated
-
-**Not** hand-written floats, and **not** another BPE pass. The tokenizer names ids; the embedding stores learnable floats for those ids.
-
-| Stage | What happens |
-| --- | --- |
-| **1. Shape** | rows = vocab size; cols = model dim |
-| **2. Init** | \`nn.Embedding\`: random floats (nearly meaningless) |
-| **3. Pretrain** | next-token loss; backprop **updates rows that appear** (and other layers) |
-| **4. Save** | checkpoint beside attention, MLP, … |
-| **5. You use it** | load trained weights; inference gathers only |
-| **6. Fine-tune (optional)** | keep updating, or append rows for new specials |
-
-| | Tokenizer table | Embedding table |
+| Step | What you do | Note |
 | --- | --- | --- |
-| How built | BPE-style merges on text | random init + **gradients** |
-| Artifact | \`tokenizer.json\`, etc. | \`embed_tokens.weight\` in the checkpoint |
-| At inference | encode/decode | gather by id |
+| **1. Lock V** | \`V = tokenizer size\` (incl. specials) | same factory as previous chapter |
+| **2. Choose D** | e.g. **2048** for Llama 3.2 1B | architecture hyperparameter |
+| **3. Build module** | \`nn.Embedding(V, D)\` | random init |
+| **4. Tie or not** | small models often tie embed ↔ lm_head | larger sometimes untie |
+| **5. Pretrain** | next-token CE; grads update **seen rows** | grows with the whole net |
+| **6. Save** | \`embed_tokens.weight\` in checkpoint | infer = load + gather |
+| **7. Changes** | new specials → **grow rows + train**; new tokenizer → **rebuild** | costs differ by orders of magnitude |
 
-### 4. Code: build · gather · train one row
+Init is an empty locker wall; **training writes the numbers**. This lesson’s toy table shows gather + one update; real tables come from official weights or your pretrain.
 
-Library (\`arche/embedding.py\`):
-
-\`\`\`python
-class TokenEmbedding(nn.Module):
-    def __init__(self, vocab_size: int, embed_dim: int) -> None:
-        super().__init__()
-        self.weight = nn.Embedding(vocab_size, embed_dim)  # (V, D)
-
-    def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
-        return self.weight(token_ids)  # gather rows
-\`\`\`
-
-“Generation” happens in training—one toy step (same idea as the chapter script):
-
-\`\`\`python
-emb = TokenEmbedding(vocab_size=32, embed_dim=8)  # random init = create table
-ctx = torch.tensor([[3, 7, 11]])
-target = torch.tensor([5])
-h = emb(ctx)[:, -1, :]
-loss = F.cross_entropy(head(h), target)
-loss.backward()
-opt.step()  # row 11 (last context id) moves
-\`\`\`
-
-Full demo (toy table, no download):
-
-\`\`\`bash
-python chapters/01-inference/ep03_embedding.py
-\`\`\`
-
-Expect table shape, gathered rows, mean |Δ| on a touched row after one SGD step, finite checks.
-
-Real Llama embedding lives in the official checkpoint (~\`128256\` × \`2048\` for 1B); must pair with the official tokenizer.
-
-### 5. What “good” means
+### 3. What counts as a good table
 
 **Hard constraints**
 
 | Check | Plain meaning |
 | --- | --- |
-| **Shape** | \`(V, D)\`; \`T\` ids → \`T\` rows |
+| **Shape** | \`(V, D)\` matches config/tokenizer; \`T\` ids → \`T\` rows |
 | **Pairing** | row \`i\` ↔ tokenizer id \`i\` |
-| **Numbers** | no NaN/Inf; scales sane |
-| **Stack contract** | RoPE later; no sneaky absolute PE here |
+| **Healthy values** | no NaN/Inf; RMSNorm can steady scales |
+| **Contract** | this stack: RoPE later; no absolute PE on embeds |
 
-**Quality (unlike tokenizers)**
+**Optimization targets** (rarely a solo “embedding score”)
 
-Fertility-style solo scores are rare. Embedding floats are trained with the whole net:
+| Check | Plain meaning | Whole-model impact |
+| --- | --- | --- |
+| **Fits pretrain objective** | frequent rows get updates | base LM skill |
+| **Dim budget** | too small → weak; too big → hungry | capacity vs stability |
+| **Rare tokens** | long-tail ids barely move | weak rare words |
+| **Tying** | tie often helps small models | params & output calibration |
+| **Downstream / loss** | same-architecture compare | **main judge** |
 
-| Signal | Plain meaning |
-| --- | --- |
-| **Pretrain / downstream** | loss and evals under the same architecture — main judge |
-| **Dim budget** | too small → weak; too big → data-hungry |
-| **Rare tokens** | idle rows barely update |
-| **Neighbor sanity** | optional checkup |
-| **Tying** | small models often tie the LM head |
+Unlike fertility, embedding quality is judged mainly via the **full model** under a fixed setup.
 
-Valid = shape + pairing + stable train/infer. Good = the model scores well. Shipping: official embed + official tokenizer only.
+### 4. How to improve · impact on the whole LLM
 
-### 6. What labs ship · what we do
+| Lever | How | Whole-model impact |
+| --- | --- | --- |
+| **Better pretrain** | data, steps, stability | main path: embeds improve with the net |
+| **Change D** | width | global capacity; requires retrain |
+| **Tie / untie LM head** | share or split | small models often tie |
+| **Grow vocab** | append rows (random/mean/subword init) + continue train | new specials/domains; keep old rows |
+| **Change tokenizer** | new V | **rebuild embeds + re-pretrain** (or costly migration) |
+| **Warm-start rows** | copy from a related model | can speed convergence; wrong pairing destroys the model |
+| **Freeze embeds in FT** | small data | less overfit; may cap expressivity |
 
-Llama 3.2 / Qwen: lookup; RoPE for position; small models often tie the LM head.  
-This lesson: \`TokenEmbedding\` toy gather + one update; real table in the checkpoint.
+From-zero order: freeze tokenizer → set \`V,D\` & tying → random embed + pretrain → append rows only when protocols need new specials. **Never** mix Llama embeds with a Qwen tokenizer.
+
+### 5. Industry · well-known open models
+
+| Model / line | How embeddings are done | Notes |
+| --- | --- | --- |
+| **Llama 3 / 3.2** | lookup; small sizes often **tie** LM head; **no** absolute PE on embeds | **course specimen**; RoPE for position |
+| **Qwen** | lookup + RoPE; V from their tokenizer | strict pairing |
+| **DeepSeek** | lookup; frontier focus on MLA/MoE etc. | multilingual tokenizer makes rows “worth more” |
+| **GPT line (public)** | larger V → larger embed; generation bumps rebuild embeds | \`o200k\` isn’t a light patch on \`cl100k\` embeds |
+| **BERT era** | token + segment + **absolute position** embeds | unlike modern decoder “pure lookup + RoPE” |
+| **MoE LLMs** | usually still a shared lookup; sparsity in FFN experts | embed isn’t the MoE headline, but V still costs |
+
+Consensus: embeddings are a **learnable lookup** factory-paired with the tokenizer; improving them ≈ better pretrain/tokenizer; open checkpoints store the matrix in safetensors—you write the same when training from zero.
+
+### 6. Code (this course)
+
+\`\`\`python
+self.weight = nn.Embedding(vocab_size, embed_dim)
+return self.weight(token_ids)
+\`\`\`
+
+\`\`\`bash
+python chapters/01-inference/ep03_embedding.py
+\`\`\`
+
+Expect shape, gather, mean |Δ| after one step, finiteness. Real Llama 1B: \`V≈128256\`, \`D=2048\` in the official checkpoint.
 
 ## Run
 
@@ -325,7 +321,7 @@ python chapters/01-inference/ep03_embedding.py
 
 ## Next
 
-**RMSNorm** (\`?c=rmsnorm\`): steady scales before heavy layers.
+**RMSNorm** (\`?c=rmsnorm\`): how to steady scales after embedding—critical when training deep nets from zero.
 
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',

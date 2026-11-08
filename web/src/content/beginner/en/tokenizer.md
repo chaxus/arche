@@ -1,78 +1,112 @@
 ## Idea
 
+This course aims to **build from zero toward frontier-ready**. The tokenizer table is not a disposable download—it is the first table you **choose or train** when you train a model; embeddings, pretraining, and inference cost all bind to it.
+
 ### 1. What the tokenizer table is for
 
-The tokenizer table (vocab + merge/cut rules) does two jobs:
+Tokenizer table = **cut rules + vocab (piece ↔ id)**.
 
-1. **Cut** — text → pieces (**tokens**)  
-2. **Number** — pieces → fixed integer **token ids**
+1. **Cut** — text → tokens  
+2. **Number** — tokens → fixed integer ids  
 
-Encode before the model; decode with the **same** table after. Specials (BOS/EOS/…) are fixed ids in that table.
+Encode before the model; decode with the **same** table. Specials (BOS/EOS/tools) are ids too.
 
 ```mermaid
 flowchart LR
-  text[text] --> cut[cut tokens]
+  text[text] --> cut[cut]
   cut --> ids[token ids]
-  ids --> model[model]
-  model --> ids2[new ids]
-  ids2 --> back[decode text]
+  ids --> emb[embedding row i]
+  emb --> stack[rest of net]
+  stack --> ids2[new ids]
+  ids2 --> back[decode]
 ```
 
-One line: **one rule set for text ↔ ids.**
+No table ⇒ embedding has no row indices; next-token pretraining has no vocab.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you generate the table
 
-Models compute on numbers. Whole-sentence symbols explode the vocab; raw bytes make sequences too long. Tokenization is the stable, reversible middle. Without a tokenizer table, the **embedding table** has no row indices to pair with.
+Open decoders mostly use **byte-level BPE** (GPT/Llama family). From-scratch order:
 
-### 3. How the tokenizer table is generated
+| Step | What you do | What it fixes |
+| --- | --- | --- |
+| **1. Corpus mix** | code / EN / CJK / math / web… | which pieces enter the vocab; which languages compress |
+| **2. Pretokenizer regex** | spaces, digits, punct, CJK | structure; Chinese UX |
+| **3. Base symbols** | UTF-8 **256 bytes** | universal coverage, reversible |
+| **4. BPE merges** | merge most frequent adjacent pairs to target size | compression |
+| **5. Specials** | BOS/EOS/pad/tool marks | chat/agent protocols |
+| **6. Freeze + version** | write `tokenizer.json` / merges | embedding rows & checkpoints lock to this id space |
+| **7. Then embed + pretrain** | set `vocab_size`, build embedding, train | **changing the table ≈ rebuild embeds + heavy retrain** |
 
-Open decoders mostly use **byte-level BPE** (Llama / much of the GPT line). **Not** hand-numbered words.
+This course:
 
-| Step | What happens |
+- **Teaching:** `arche/teach_bpe.py` trains a tiny table so you see generation  
+- **Specimen:** official Llama 3.2 table for a production pairing
+
+### 3. What counts as a good table
+
+**Hard constraints**
+
+| Check | Plain meaning |
 | --- | --- |
-| **1. Corpus** | Lots of text (what becomes frequent) |
-| **2. Base vocab** | UTF-8 **256 bytes** (or equivalent) |
-| **3. Merge loop** | Count adjacent pairs; merge the most frequent; append to merges |
-| **4. Stop** | Hit target size (e.g. ~128K); add specials |
-| **5. Save** | `tokenizer.json` / merges + specials; ship with the model |
-| **6. You use it** | **Load the official table**; retrain only if you train a model from scratch |
+| **Reversible** | encode→decode recovers normal text |
+| **Coverage** | any byte string representable |
+| **Stable** | same text → same ids |
+| **Train-time identity** | same table for pretrain/finetune/infer |
 
-Vs embeddings: the tokenizer comes from a **BPE-style algorithm on text**; the embedding table comes from **neural training** (next chapter).
+**Optimization targets**
 
-The page playground uses **fixed teaching merges**. The script below **trains** a tiny table on a toy corpus.
+| Check | Plain meaning | Impact on the whole model |
+| --- | --- | --- |
+| **Compression / fertility** | fewer tokens better; fertility = pieces/word | longer effective context; cheaper train/infer |
+| **Parity** | similar meaning shouldn’t explode across languages | unfair ⇒ short effective context, expensive, undertrained |
+| **Domain fit** | code/math/CJK not shredded | vertical ceiling |
+| **Structure** | indent, JSON, URLs, numbers | tools & code |
+| **Vocab size** | often 32K–200K+ | shorter seqs vs **embed params ∝ V×D** and fatter softmax |
+| **Special design** | clear chat/tool boundaries | alignment & agents |
+| **Downstream** | loss/evals under same trunk | one final referee |
 
-### 4. Code: generate · use · measure
+“Good” is a tradeoff among compression, parity, size, and downstream—not one score.
 
-Teaching code: `arche/teach_bpe.py` (minimal byte BPE). Core loop:
+### 4. How to improve · impact on the whole LLM
 
-```python
-# Same idea as arche.teach_bpe.train_bpe
-vocab = [bytes([i]) for i in range(256)]
-merges = []
-for _ in range(num_merges):
-    a, b = most_frequent_adjacent_pair(corpus)
-    merges.append((a, b))
-    vocab.append(a + b)
-    corpus = apply_merge(corpus, a, b)
-```
+| Lever | How | Whole-model impact |
+| --- | --- | --- |
+| **Corpus mix** | more code/CJK/math | those domains compress & learn better; others may regress |
+| **Pretokenizer** | digit/CJK-friendly regex | often beats blindly growing V |
+| **Larger V** | more merges | shorter sequences; fatter embed/LM head; more VRAM |
+| **Append specials** | grow table tail; keep old ids | **expand embedding rows** and keep training |
+| **Change algorithm family** | BPE ↔ Unigram… | **new table**; rebuild embeds; retrain |
+| **Extend inherited table** | append domain pieces | cheaper than full reset |
 
-Encode: bytes → apply merges in order → ids. Decode: ids → bytes → UTF-8.
+Frontier-from-zero practice: freeze tokenizer after data goals are clear → set `vocab_size` → embed → pretrain. Mid-flight table swaps are extremely expensive.
 
-Train a toy table (**no** Hugging Face):
+### 5. Industry · well-known open models
+
+Most sit in **byte BPE / tiktoken-like** land; differences are corpus and regex, not “words vs characters” as the main split.
+
+| Model / line | Engine & size | Notes |
+| --- | --- | --- |
+| **GPT-4 / 3.5** | tiktoken `cl100k` ~100K | open cut library; table bound to model |
+| **GPT-4o** | `o200k` ~200K | generation bump; **new table ≠ old embeds** |
+| **Llama 3 / 3.2** | byte BPE 128K+ | **course specimen**; factory-paired with weights |
+| **Qwen** | BPE ~150K-class | self-trained; multilingual + tool specials |
+| **DeepSeek-V3** | byte BPE ~128K | pretok/corpus for multilingual compression |
+| **Kimi K2** | tiktoken-like ~163K | Han-friendlier regex |
+| **Legacy BERT** | WordPiece | encoder era; **not interchangeable** with decoder BPE |
+| **Some multilingual** | Unigram + SentencePiece | still used; different rules |
+
+Consensus: trainers ship one table with the recipe; users only load that checkpoint’s tokenizer; next gens often grow V and improve multilingual/code regex.
+
+### 6. Code (this course)
 
 ```bash
 python chapters/01-inference/ep02_teach_bpe.py
 ```
 
-Expect `vocab_size`, ids, round-trip decode, rough `fertility≈`.
-
-Then the **official Llama 3.2 table** (paired with weights; needs license):
-
 ```python
 from arche.tokenizer import load_tokenizer
 tok = load_tokenizer()
 ids = tok.encode("The cat sat on the mat.")
-text = tok.decode(ids)
 ```
 
 ```bash
@@ -80,43 +114,10 @@ huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 ```
 
-### 5. What “good” means
-
-| Check | Plain meaning | How to see it |
-| --- | --- | --- |
-| **Reversible** | encode→decode recovers text (modulo normalizations) | Compare decode in scripts |
-| **Compression / fertility** | Fewer tokens is cheaper; fertility = pieces per word (**higher = more fragmented**) | Toy script prints it; compare parallel corpora on official tables |
-| **Parity** | Similar meaning across languages shouldn’t explode length | Parallel token counts |
-| **Structure** | Don’t wreck code, URLs, numbers | Spot checks |
-| **Checkpoint pairing** | id `i` must match embedding row `i` | **Hard**; foreign tables break models |
-| **Vocab size** | Bigger often shorter sequences but fatter embeddings | Product tradeoff |
-| **Downstream** | Final judge includes trained model quality | One main referee |
-
-Pairing: train saw `the`→`65`→row 65; another table maps `the`→`902` → wrong row.
-
-| When tables differ | Example |
-| --- | --- |
-| Model family | Llama ≠ Qwen ≠ `cl100k` |
-| Generation bump | GPT-3.5 ~100K → GPT-4o ~200K |
-| Train from scratch | New BPE; old embeds don’t fit |
-| New specials | Append ids |
-| Ops mistake | Llama weights + foreign `tokenizer.json` |
-
-### 6. What labs ship · what we do
-
-| Line | ~vocab | Note |
-| --- | --- | --- |
-| GPT tiktoken | 100K–200K | BPE |
-| Llama 3.2 | 128K+ | **Course official table** |
-| DeepSeek / Qwen / Kimi | ~128K–163K | Same family of ideas |
-
-Toy training shows **generation**; official table shows **pairing**. Never mix them.
-
 ## Run
 
 ```bash
 python chapters/01-inference/ep02_teach_bpe.py
-
 huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 ```
@@ -125,8 +126,8 @@ Optional: `export HF_ENDPOINT=https://hf-mirror.com`
 
 ## Fix
 
-Official table: license / login / `401` / slow download. Teaching BPE needs no network.
+Official table: license / login / mirror. Teaching BPE needs no network.
 
 ## Next
 
-**Embedding** (`?c=embedding`): after ids, how the embedding table is built, looked up, and judged.
+**Embedding** (`?c=embedding`): after the vocab is frozen, how to build the embedding table from zero, judge it, improve it, and what open models do.

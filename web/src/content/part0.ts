@@ -12,9 +12,9 @@ export const PART0_EN: Chapter[] = [
     estimatedMinutes: 5,
     markdown: `## Idea
 
-**What you will learn:** what the computer is actually doing when a chatbot replies—write that path until it runs; then make it faster, try a tiny bit of training, and see the extra tricks used by more advanced models. No jargon required up front; absolute beginners start here.
+**What you will learn:** treat the LLM as something you **train from zero toward frontier-ready**—how tokenizer/embedding tables are made, what “good” means, how to improve them and what that does to the whole model; hand-write the trunk until it runs; then speed, a bit of training, and a map of MoE/MLA-style tips. No jargon required up front.
 
-We use a small **Llama 3.2** model (~1 billion parameters) as the specimen: small enough to hold in your head, downloadable weights, same building blocks you meet in production.
+We use **Llama 3.2** ~1B as the specimen: production-like dense parts; official table+weights show a shipped pair; teaching scripts show the **from-scratch** work you do when you train your own.
 
 **The full path (five stages):**
 

@@ -4,6 +4,8 @@
 
 This chapter picks the specimen: a **Llama 3.2-style** next-token stack—tokenize → embed → block stack → LM head—often called a **dense decoder**. Every later chapter hangs on this trunk.
 
+From zero to frontier-ready: freeze the tokenizer, then size the embedding and pretrain—this specimen shows a shipped industry pair; the tokenizer/embedding chapters also cover **generating your own**.
+
 ### 2. Why the course needs it
 
 You need one small, open, production-like model to hand-write end to end. Without a shared specimen, RMSNorm / RoPE / GQA won’t share one config.
