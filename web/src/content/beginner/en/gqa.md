@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** **Grouped-Query Attention (GQA)** — more query heads than KV heads; groups of Q heads **share** one KV head. Still causal.
+**Grouped-Query Attention (GQA)** uses more query heads than KV heads: groups of Q heads **share** one K/V head. It is still fully causal attention. Full multi-head attention stores a separate KV pair per Q head, so decode memory grows fast with sequence length; GQA shrinks the KV cache with a usually small quality cost. Llama 3.2 ~1B runs **32 Q / 8 KV**. Pick divisible `n_q` and `n_kv`, project, apply RoPE, **repeat_interleave** KV to line up with Q, then SDPA; the cache stores only `n_kv` heads.
 
-**Why:** Full MHA stores a KV pair per Q head → decode VRAM explodes with length. GQA cuts cache size with small quality hit. Llama 3.2 ~1B uses **32 Q / 8 KV**.
-
-**How:** Choose divisible `n_q` / `n_kv`, project, RoPE, **repeat_interleave** KV to match Q, then SDPA; cache stores only `n_kv`.
-
-### 1. What — shapes in this repo
+### Shapes in this repo
 
 [`CausalSelfAttention`](https://github.com/chaxus/arche/blob/main/arche/attention.py):
 
@@ -21,7 +17,7 @@ attn = F.scaled_dot_product_attention(q, k_full, v_full, is_causal=...)
 
 `n_rep = num_heads // num_kv_heads`. Cache appends **narrow** K/V; broadcast only for the matmul.
 
-### 2. Why — MHA / GQA / MQA / MLA
+### MHA, GQA, MQA, and MLA
 
 | Layout | Idea | Cost |
 | --- | --- | --- |
@@ -30,9 +26,9 @@ attn = F.scaled_dot_product_attention(q, k_full, v_full, is_causal=...)
 | **MQA** | `n_kv = 1` | Extreme cache save |
 | **MLA** | Compressed latent KV | Frontier (DeepSeek)—later part |
 
-Head-count change ⇒ **retrain** (or lose the checkpoint).
+Changing head counts ⇒ **retrain** (or lose the checkpoint).
 
-### 3. How — from zero
+### Wiring from scratch
 
 | Step | Do |
 | --- | --- |
@@ -41,15 +37,13 @@ Head-count change ⇒ **retrain** (or lose the checkpoint).
 | 3 | Bias-free Q/K/V/O linears (Llama contract) |
 | 4 | Causal mask on prefill; with cache, attend all past keys |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Valid groups; causal; weight head counts match config |
-| **Soft** | Cache bytes ≈ `n_kv/n_q` of MHA |
-| **Soft** | Quality holds vs MHA at same width |
+- Valid groups; causal; weight head counts match config.
+- Cache bytes ≈ `n_kv/n_q` of MHA.
+- Quality holds vs MHA at the same width.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -57,7 +51,7 @@ Head-count change ⇒ **retrain** (or lose the checkpoint).
 | Too few | Quality cliff |
 | MLA path | Different compression story (Frontier) |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep06_gqa.py

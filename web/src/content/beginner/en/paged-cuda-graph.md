@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** Two serving accelerators — **paged KV** (block table + shared page pool) fights memory fragmentation; **CUDA Graph** captures a fixed-shape decode step to cut launch tax.
+Two serving accelerators share this lesson: **paged KV** (block table + shared page pool) fights memory fragmentation, and **CUDA Graph** captures a fixed-shape decode step to cut launch overhead. Continuous batching without paging wastes VRAM on ragged lengths; eager CUDA launches tax every tiny decode. Together they point at vLLM-class engines—here you get a teaching stand-in, not a drop-in replacement. Logical KV → alloc/free pages via block table → `gather_kv` for attention; optionally capture graphs when decode shapes stay stable.
 
-**Why:** Continuous batching without paging wastes VRAM on ragged lengths; eager CUDA launches tax every tiny decode. Together they point at vLLM-class engines—this lesson is a teaching stand-in, not a drop-in.
-
-**How:** Logical KV → alloc/free pages via block table → `gather_kv` for attention; optional graph capture on stable decode shapes.
-
-### 1. What — paged KV
+### Paged KV
 
 [`PagedKVPool` / `BlockTable` / `gather_kv`](https://github.com/chaxus/arche/blob/main/arche/paged_kv.py):
 
@@ -19,11 +15,11 @@ cache = gather_kv(pool, table)
 
 Physical pages are shared; each sequence owns a list of page ids.
 
-### 2. What — CUDA Graph (optional)
+### CUDA Graph (optional)
 
 [`capture_module_step` / `generate_with_optional_graph`](https://github.com/chaxus/arche/blob/main/arche/cuda_graphs.py): capture a module step when CUDA is available; replay instead of re-launching. Needs **stable shapes**—why engines care about batching policy.
 
-### 3. Why — toward engines
+### Toward real engines
 
 | Piece | Pain it hits |
 | --- | --- |
@@ -31,7 +27,7 @@ Physical pages are shared; each sequence owns a list of page ids.
 | Graphs | Per-step CPU launch overhead |
 | Neither changes weights | Raises the serving ceiling only |
 
-### 4. How — from zero
+### Wire it up
 
 | Step | Do |
 | --- | --- |
@@ -40,15 +36,13 @@ Physical pages are shared; each sequence owns a list of page ids.
 | 3 | Gather before attention (teaching path) |
 | 4 | Optional graph on decode when shapes freeze |
 
-### 5. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Gather matches logical cache; tables in-bounds |
-| **Soft** | Less fragmentation / launch tax; higher throughput |
-| **Soft** | Clear skip when no CUDA |
+| Must hold | Gather matches logical cache; tables in-bounds |
+| Worth aiming for | Less fragmentation / launch tax; higher throughput |
+| Worth aiming for | Clear skip when no CUDA |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep23_paged_cuda_graph.py

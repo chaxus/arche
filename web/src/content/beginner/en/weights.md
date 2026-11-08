@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** **Load** an open Llama 3.2 checkpoint into your handwritten stack via a **key map** (safetensors / HF → `state_dict`).
+This chapter **loads** an open Llama 3.2 checkpoint into your handwritten stack: safetensors / HF names land in arche’s `state_dict` through a **key map**. Random weights mean a correct graph with nonsense text—official floats turn the same forward into a language model right away. You already saw how pretrain *writes* those floats; here you **borrow** a finished run so generate and HF align work without your own cluster. Accept the license, download, map keys, pair the **official tokenizer**, and sanity-check shapes.
 
-**Why:** Random weights = correct graph, nonsense text. Official floats make the same forward a language model *now*. You already saw how pretrain *writes* floats; this chapter **borrows** a finished run so generate/align work without a cluster.
-
-**How:** Accept license → download → map keys → pair the **official tokenizer** → sanity-check shapes.
-
-### 1. What — entry
+### Entry point
 
 [`from_pretrained`](https://github.com/chaxus/arche/blob/main/arche/load_weights.py) builds `Llama(cfg)` and copies HF tensors into matching names.
 
@@ -16,7 +12,7 @@
 | **Pretrain (earlier)** | How those floats get written from zero |
 | **HF align (next-next)** | Proof map + formulas match HF logits |
 
-### 2. Why — map carefully
+### Mapping pitfalls
 
 | Risk | Effect |
 | --- | --- |
@@ -25,7 +21,7 @@
 | Dtype / device slip | Slow or NaN |
 | Partial load | “Runs” but broken layers |
 
-### 3. How — checklist
+### Checklist
 
 | Step | Do |
 | --- | --- |
@@ -34,15 +30,13 @@
 | 3 | Config → empty `Llama` → copy weights |
 | 4 | Always use the **same** tokenizer as the checkpoint |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | No missing/unexpected keys; shapes match |
-| **Hard** | Tokenizer vocabulary size = embed rows |
-| **Soft** | Short generate looks like language; HF align later |
+| Must hold | No missing/unexpected keys; shapes match |
+| Must hold | Tokenizer vocabulary size = embed rows |
+| Worth aiming for | Short generate looks like language; HF align later |
 
-### 5. Improve · whole-model impact
+### Tuning the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -50,7 +44,7 @@
 | Resume your own ckpt | Same API, your floats |
 | Quantized loads | Later serve chapters |
 
-### 6. This course
+### This course
 
 ```bash
 huggingface-cli login

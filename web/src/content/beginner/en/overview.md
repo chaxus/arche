@@ -1,12 +1,12 @@
 ## Idea
 
-**What:** The **course map** — one path from zero toward frontier-ready, with **Llama 3.2 ~1B** as the running dense example and a printed config to nail sizes.
+This chapter is the **course map**: one path from zero toward frontier-ready, with **Llama 3.2 ~1B** as the running dense example. You will print its config early so sizes stay real, not hand-wavy.
 
-**Why:** Wrong example recipe ⇒ later “how industry does it” won’t match. You need one spine (tables → next-token train → bricks → align → serve → MoE/MLA) before any single brick makes sense.
+If the example recipe drifts, later “how industry does it” will not line up. The spine is tables → next-token train → bricks → align → serve → MoE/MLA—each brick gets a place on that line before the details matter.
 
-**How:** Fix the example → grow tokenizer/embed → train next-token (objective→data→optim→scale) → hand-write RMSNorm…stack → load/generate/HF align → SFT/DPO → serve → frontier primers.
+In practice: nail the example → grow tokenizer and embed → train next-token (objective → data → optim → scale) → hand-write RMSNorm…stack → load, generate, HF checks → SFT/DPO → serve → frontier primers.
 
-### 1. What — the path
+### The path
 
 | Stage | Plain words |
 | --- | --- |
@@ -28,11 +28,9 @@ flowchart LR
 
 You hand-write a **Llama 3.2-style dense decoder**. Official Llama files are that recipe’s finished pair—not a second curriculum.
 
-### 2. Why — Llama 3.2 ~1B
+### Why Llama 3.2 ~1B
 
-**Frontier dense architecture, teachable scale.**
-
-Same brick set as larger Llama 3 / many Qwen-class dense stacks: **RMSNorm + RoPE + GQA + SwiGLU + byte BPE**. ~1B keeps V/D/depth/heads countable and downloadable.
+Same brick set as larger Llama 3 and many Qwen-class dense stacks: **RMSNorm + RoPE + GQA + SwiGLU + byte BPE**. At ~1B, vocab, width, depth, and head counts stay countable and the weights are downloadable—**frontier-shaped architecture at a teachable scale**.
 
 | Pick | Meaning |
 | --- | --- |
@@ -41,9 +39,9 @@ Same brick set as larger Llama 3 / many Qwen-class dense stacks: **RMSNorm + RoP
 | Open finished pair | Tokenizer + checkpoint for real checks |
 | Dense first | MoE/MLA later as maps |
 
-Not “smartest chatbot,” not “train 70B at home.”
+This is not “smartest chatbot” and not “train 70B at home.”
 
-### 3. Why — where DeepSeek sits
+### Where DeepSeek fits
 
 | | **Llama 3.2 (example)** | **DeepSeek-V2/V3** |
 | --- | --- | --- |
@@ -51,11 +49,11 @@ Not “smartest chatbot,” not “train 70B at home.”
 | KV | **GQA** | **MLA** latents |
 | In-course | Parts 1–3 | Part 4 primers |
 
-Same Transformer family; different upgrades. Dense trunk first.
+Same Transformer family; different upgrades. You build the dense trunk first.
 
-### 4. How — config you will keep seeing
+### Config you will keep seeing
 
-Lab ([`ep01_overview.py`](https://github.com/chaxus/arche/blob/main/chapters/01-inference/ep01_overview.py)) prints [`llama32_1b()`](https://github.com/chaxus/arche/blob/main/arche/config.py):
+The lab ([`ep01_overview.py`](https://github.com/chaxus/arche/blob/main/chapters/01-inference/ep01_overview.py)) prints [`llama32_1b()`](https://github.com/chaxus/arche/blob/main/arche/config.py):
 
 | Field | ~1B idea |
 | --- | --- |
@@ -65,19 +63,17 @@ Lab ([`ep01_overview.py`](https://github.com/chaxus/arche/blob/main/chapters/01-
 | `num_heads` / `num_kv_heads` | 32 / 8 (GQA) |
 | `rope_theta` | 500000 |
 
-### 5. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Config self-consistent; bricks match the claimed recipe |
-| **Hard** | Supports from-zero: tables trainable, net stackable, weights loadable |
-| **Soft** | Docs + obtainable weights; room for MoE/MLA primers |
+- Config is self-consistent; bricks match the claimed recipe.
+- From zero still works: tables trainable, net stackable, weights loadable.
+- Docs and obtainable weights exist; MoE/MLA primers have somewhere to attach.
 
-### 6. Improve · whole-model impact
+### Changing the example
 
-Swap example (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ retrain. This course keeps 1B and uses primers for larger ideas.
+Swap the example (e.g. Qwen) and you retarget tokenizer, embeds, and blocks. Wider or deeper means retrain. This course keeps 1B and uses primers for larger ideas.
 
-### 7. This course
+### In this repo
 
 ```bash
 python chapters/01-inference/ep01_overview.py

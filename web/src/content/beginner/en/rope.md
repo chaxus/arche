@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** **RoPE** (Rotary Position Embedding) — rotate Q and K by token position so **relative distance** enters the attention dot product.
+**RoPE** (Rotary Position Embedding) rotates query and key vectors by token position so **relative distance** shows up in the attention dot product. Embeddings say *which* token; attention still needs *where*. Absolute position tables on the embedding are an older pattern; modern dense Llama, Qwen, and DeepSeek apply RoPE on Q and K. Pick `rope_theta`, cache cos/sin, combine with `rotate_half` on Q/K; long-context scaling is a later knob.
 
-**Why:** Embeddings say *which* token; attention still needs *where*. Absolute PE tables on embeds are older; modern dense Llama/Qwen/DeepSeek use RoPE on Q/K.
-
-**How:** Pick `rope_theta`, cache cos/sin, `rotate_half` + combine on Q/K; long-context scaling is a later knob.
-
-### 1. What — apply step
+### Apply step in code
 
 Repo ([`arche/rope.py`](https://github.com/chaxus/arche/blob/main/arche/rope.py)):
 
@@ -17,16 +13,16 @@ def apply_rotary_emb(x, cos, sin):
 
 `build_rope_cache` precomputes cos/sin for `0 .. seq_len-1`. Attention slices by `start_pos` when decoding with cache.
 
-### 2. Why — design
+### Design choices
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | Rotate Q/K only | V stays content; positions live in scores |
 | Relative via rotation | Dot(q_m, k_n) depends on `m-n` |
 | Large `theta` (Llama 3: 500k) | Supports longer contexts than old 10k |
 | Match checkpoint `theta`/scale | Wrong PE ⇒ silent quality death under loaded weights |
 
-### 3. How — from zero
+### Wiring from scratch
 
 | Step | Do |
 | --- | --- |
@@ -35,15 +31,13 @@ def apply_rotary_emb(x, cos, sin):
 | 3 | Apply after Q/K project, before SDPA |
 | 4 | Long context: Llama-3 wavelength smoothing (`rope-scaling` later) |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Shape unchanged; even head dim; applied to Q and K |
-| **Hard** | Checkpoint `theta` / scale factors match |
-| **Soft** | Nearby tokens score differently than far ones |
+- Shapes unchanged; even head dim; RoPE on both Q and K.
+- Checkpoint `theta` and scale factors match.
+- Nearby tokens score differently than distant ones.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -51,7 +45,7 @@ def apply_rotary_emb(x, cos, sin):
 | Absolute PE → RoPE | Modern default; don’t mix families with foreign weights |
 | Skip RoPE | Model can’t reliably use order |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep05_rope.py

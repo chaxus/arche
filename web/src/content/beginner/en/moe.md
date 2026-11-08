@@ -1,12 +1,10 @@
 ## Idea
 
-**What:** **Mixture-of-Experts (MoE)** — replace the dense SwiGLU with **many experts + a router**; each token runs **top-k** only.
+**Mixture-of-Experts (MoE)** swaps the dense SwiGLU for many experts plus a router; each token only runs **top-k** of them. You get huge parameter capacity while per-token compute stays near the dense case. DeepSeek-V3’s open story is largely MoE for capacity and MLA for KV; Mixtral is another open MoE. This course stayed on dense Llama 3.2 first so you can read the FFN before the sparse map.
 
-**Why:** Huge parameter capacity at near-dense **per-token** compute. **DeepSeek-V3**’s open story is largely **MoE (capacity) + MLA (KV)**; Mixtral is another open MoE. This course’s Llama 3.2 example stayed **dense** on purpose—MoE is the map after you can read the dense FFN.
+Pick `E` and `top_k`, wire experts and a gate, add load-balance loss in serious training, and plan how experts land in checkpoints.
 
-**How:** Pick `E` / `top_k`; experts + gate; aux load-balance in real trains; sparse infer; shard experts in checkpoints.
-
-### 1. What — forward
+### Forward pass
 
 [`MoESwiGLU`](https://github.com/chaxus/arche/blob/main/arche/moe.py):
 
@@ -17,9 +15,9 @@ top_probs, top_idx = probs.topk(self.top_k, dim=-1)
 # weighted sum of selected SwiGLU experts
 ```
 
-Same decoder spine; only the MLP slot changes.
+The decoder spine stays the same; only the MLP slot changes.
 
-### 2. Why — dense vs sparse
+### Dense vs sparse
 
 | | Dense SwiGLU | MoE |
 | --- | --- | --- |
@@ -27,7 +25,7 @@ Same decoder spine; only the MLP slot changes.
 | Per-token FLOPs | Full FFN | ≈ `top_k` experts |
 | Failure mode | — | Expert collapse without balancing |
 
-### 3. How — from zero
+### From zero
 
 | Step | Do |
 | --- | --- |
@@ -36,15 +34,13 @@ Same decoder spine; only the MLP slot changes.
 | 3 | Add load-balance loss in serious training |
 | 4 | Plan expert-parallel / sharded loads |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Valid routes; merge weights sum sanely |
-| **Soft** | Balanced expert load; quality/capacity trade OK |
-| **Soft** | Checkpoint maps cover all experts |
+- Routes are valid; merge weights sum sanely.
+- Expert load stays roughly balanced; quality/capacity trade feels OK.
+- Checkpoint maps cover every expert.
 
-### 5. Improve · whole-model impact
+### Levers
 
 | Lever | Impact |
 | --- | --- |
@@ -52,7 +48,7 @@ Same decoder spine; only the MLP slot changes.
 | Balance loss | Fights collapse |
 | Expert parallel | Multi-GPU engineering cost |
 
-### 6. Industry map
+### Industry map
 
 | Line | Role |
 | --- | --- |
@@ -60,7 +56,7 @@ Same decoder spine; only the MLP slot changes.
 | **Mixtral** | Top-2 SwiGLU experts |
 | **Llama 3.2 ~1B (course)** | Dense first |
 
-### 7. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep14_moe.py

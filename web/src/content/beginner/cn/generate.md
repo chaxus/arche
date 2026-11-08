@@ -1,12 +1,8 @@
 ## 要点
 
-**是什么（What）：** **自回归生成**——把 logits 变成文本的循环：打分 → 选下一 id → 拼上 → 停止。
+**自回归生成**是把 logits 变成文本的环：打分 → 选下一 token id → 拼上 → 停止。训好或加载好的栈只会吐分数，得用这条环包起来；产品差在采样与停止规则，形状都一样。取最后位置 logits，可选 temperature / top-k，贪心或采样，遇 EOS 或达长度停下——下一章的 KV cache 让长输出时这条环变快。
 
-**为什么（Why）：** 训好/加载好的栈只吐分数。产品差在采样与停止规则；共同点是这条环。没有它只有「分类器形」前向，没有聊天。
-
-**怎么做（How）：** 最后位置 logits → 可选 temperature / top-k → 贪心或采样 → 追加 → 遇 EOS 或达长度停下。KV cache（下一部分）让同一环变快。
-
-### 1. What — 骨架
+### 环的骨架
 
 [`arche/generate.py`](https://github.com/chaxus/arche/blob/main/arche/generate.py) 大致：
 
@@ -19,7 +15,7 @@ next_id = sample(logits[:, -1, :], temperature=..., top_k=...)  # 或 argmax
 
 Prefill 一次跑完 prompt；开 cache 时 decode 每次只喂新 token。
 
-### 2. Why — 旋钮 ≠ 权重
+### 旋钮改的不是权重
 
 | 旋钮 | 改变的是 |
 | --- | --- |
@@ -28,7 +24,7 @@ Prefill 一次跑完 prompt；开 cache 时 decode 每次只喂新 token。
 | EOS / 最大长度 | 体验与安全边界 |
 | Chat template | 角色如何变成 id（后章） |
 
-### 3. How — 从零
+### 接上整条链路
 
 | 步骤 | 做什么 |
 | --- | --- |
@@ -37,24 +33,22 @@ Prefill 一次跑完 prompt；开 cache 时 decode 每次只喂新 token。
 | 3 | 采样或 argmax → 追加 id |
 | 4 | 直到停止；id 解码回文本 |
 
-### 4. 怎么样算好
+### 自己核对
 
-| 类型 | 标准 |
-| --- | --- |
-| **硬** | 会停；只见过去；合法词表 id |
-| **软** | 真权重下短补全连贯 |
-| **软** | 同 prompt + 贪心 ≈ 可复现 |
+| 必须成立 | 会停；只见过去；合法词表 id |
+| 尽量做到 | 真权重下短补全连贯 |
+| 尽量做到 | 同 prompt + 贪心 ≈ 可复现 |
 
-### 5. 如何改进 · 对整模影响
+### 不重训也能调的行为
 
 | 杠杆 | 影响 |
 | --- | --- |
 | 只改采样 | 不重训也能改行为 |
-| 无 KV cache | 正确但体感 O(T²)—下一部分修 |
+| 无 KV cache | 正确但体感 O(T²)—下一章修 |
 | 约束解码 | 结构化输出 |
 | 停止规则差 | 跑飞或截断 |
 
-### 6. 本课
+### 本课
 
 ```bash
 python chapters/01-inference/ep11_generate.py

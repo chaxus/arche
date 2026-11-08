@@ -13,13 +13,13 @@ export const CHAPTERS_EN: Chapter[] = [
     estimatedMinutes: 12,
     markdown: `## Idea
 
-**What:** The **course map** — one path from zero toward frontier-ready, with **Llama 3.2 ~1B** as the running dense example and a printed config to nail sizes.
+This chapter is the **course map**: one path from zero toward frontier-ready, with **Llama 3.2 ~1B** as the running dense example. You will print its config early so sizes stay real, not hand-wavy.
 
-**Why:** Wrong example recipe ⇒ later “how industry does it” won’t match. You need one spine (tables → next-token train → bricks → align → serve → MoE/MLA) before any single brick makes sense.
+If the example recipe drifts, later “how industry does it” will not line up. The spine is tables → next-token train → bricks → align → serve → MoE/MLA—each brick gets a place on that line before the details matter.
 
-**How:** Fix the example → grow tokenizer/embed → train next-token (objective→data→optim→scale) → hand-write RMSNorm…stack → load/generate/HF align → SFT/DPO → serve → frontier primers.
+In practice: nail the example → grow tokenizer and embed → train next-token (objective → data → optim → scale) → hand-write RMSNorm…stack → load, generate, HF checks → SFT/DPO → serve → frontier primers.
 
-### 1. What — the path
+### The path
 
 | Stage | Plain words |
 | --- | --- |
@@ -41,11 +41,9 @@ flowchart LR
 
 You hand-write a **Llama 3.2-style dense decoder**. Official Llama files are that recipe’s finished pair—not a second curriculum.
 
-### 2. Why — Llama 3.2 ~1B
+### Why Llama 3.2 ~1B
 
-**Frontier dense architecture, teachable scale.**
-
-Same brick set as larger Llama 3 / many Qwen-class dense stacks: **RMSNorm + RoPE + GQA + SwiGLU + byte BPE**. ~1B keeps V/D/depth/heads countable and downloadable.
+Same brick set as larger Llama 3 and many Qwen-class dense stacks: **RMSNorm + RoPE + GQA + SwiGLU + byte BPE**. At ~1B, vocab, width, depth, and head counts stay countable and the weights are downloadable—**frontier-shaped architecture at a teachable scale**.
 
 | Pick | Meaning |
 | --- | --- |
@@ -54,9 +52,9 @@ Same brick set as larger Llama 3 / many Qwen-class dense stacks: **RMSNorm + RoP
 | Open finished pair | Tokenizer + checkpoint for real checks |
 | Dense first | MoE/MLA later as maps |
 
-Not “smartest chatbot,” not “train 70B at home.”
+This is not “smartest chatbot” and not “train 70B at home.”
 
-### 3. Why — where DeepSeek sits
+### Where DeepSeek fits
 
 | | **Llama 3.2 (example)** | **DeepSeek-V2/V3** |
 | --- | --- | --- |
@@ -64,11 +62,11 @@ Not “smartest chatbot,” not “train 70B at home.”
 | KV | **GQA** | **MLA** latents |
 | In-course | Parts 1–3 | Part 4 primers |
 
-Same Transformer family; different upgrades. Dense trunk first.
+Same Transformer family; different upgrades. You build the dense trunk first.
 
-### 4. How — config you will keep seeing
+### Config you will keep seeing
 
-Lab ([\`ep01_overview.py\`](https://github.com/chaxus/arche/blob/main/chapters/01-inference/ep01_overview.py)) prints [\`llama32_1b()\`](https://github.com/chaxus/arche/blob/main/arche/config.py):
+The lab ([\`ep01_overview.py\`](https://github.com/chaxus/arche/blob/main/chapters/01-inference/ep01_overview.py)) prints [\`llama32_1b()\`](https://github.com/chaxus/arche/blob/main/arche/config.py):
 
 | Field | ~1B idea |
 | --- | --- |
@@ -78,19 +76,17 @@ Lab ([\`ep01_overview.py\`](https://github.com/chaxus/arche/blob/main/chapters/0
 | \`num_heads\` / \`num_kv_heads\` | 32 / 8 (GQA) |
 | \`rope_theta\` | 500000 |
 
-### 5. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Config self-consistent; bricks match the claimed recipe |
-| **Hard** | Supports from-zero: tables trainable, net stackable, weights loadable |
-| **Soft** | Docs + obtainable weights; room for MoE/MLA primers |
+- Config is self-consistent; bricks match the claimed recipe.
+- From zero still works: tables trainable, net stackable, weights loadable.
+- Docs and obtainable weights exist; MoE/MLA primers have somewhere to attach.
 
-### 6. Improve · whole-model impact
+### Changing the example
 
-Swap example (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ retrain. This course keeps 1B and uses primers for larger ideas.
+Swap the example (e.g. Qwen) and you retarget tokenizer, embeds, and blocks. Wider or deeper means retrain. This course keeps 1B and uses primers for larger ideas.
 
-### 7. This course
+### In this repo
 
 \`\`\`bash
 python chapters/01-inference/ep01_overview.py
@@ -121,13 +117,13 @@ python chapters/01-inference/ep01_overview.py
     demo: 'tokenizer',
     markdown: `## Idea
 
-**What:** The **tokenizer table** — cut rules + vocab (piece ↔ id) that turn text into integer ids and back.
+The **tokenizer table** is cut rules plus a vocab: each text piece maps to an integer id and back. It is the first table you choose or train when building from zero.
 
-**Why:** First table you choose or train when building from zero. Embeddings, pretraining, and inference cost all bind to this id space; swap mid-flight ≈ rebuild embeds + heavy retrain.
+Everything downstream—embeddings, pretraining cost, inference—locks to this id space. Swap the table mid-flight and you are roughly rebuilding embeds and running a heavy retrain.
 
-**How:** Corpus mix → pretokenizer → byte base → BPE merges → specials → freeze/version → then embed + pretrain. This course: tiny teach-BPE to *see* growth, plus Llama’s finished table for the example.
+Open decoders usually grow the table as: corpus mix → pretokenizer → byte base → BPE merges → specials → freeze and version → then embed and pretrain. In this course you get a tiny teach-BPE to *see* growth, plus Llama’s finished table for the running example.
 
-### 1. What — cut and number
+### Cut and number
 
 Tokenizer table = **cut rules + vocab (piece ↔ id)**.
 
@@ -148,7 +144,7 @@ flowchart LR
 
 No table ⇒ embedding has no row indices; next-token pretraining has no vocab.
 
-### 2. From zero: how you generate the table
+### Growing the table from zero
 
 Open decoders mostly use **byte-level BPE** (GPT/Llama family). From-scratch order:
 
@@ -167,20 +163,18 @@ This course (same path):
 - **How a table is grown:** \`arche/teach_bpe.py\` trains a tiny table so you see generation  
 - **The Llama example’s finished table:** official Llama 3.2 tokenizer paired with its weights
 
-### 3. What counts as a good table
+### What makes a good table
 
-**Hard constraints**
+**Must-haves**
 
-| Check | Plain meaning |
-| --- | --- |
-| **Reversible** | encode→decode recovers normal text |
-| **Coverage** | any byte string representable |
-| **Stable** | same text → same ids |
-| **Train-time identity** | same table for pretrain/finetune/infer |
+- **Reversible:** encode→decode recovers normal text.  
+- **Coverage:** any byte string representable.  
+- **Stable:** same text → same ids.  
+- **Train-time identity:** same table for pretrain, finetune, and infer.
 
-**Optimization targets**
+**Tradeoffs** (there is no single score):
 
-| Check | Plain meaning | Impact on the whole model |
+| Concern | Plain meaning | Impact on the whole model |
 | --- | --- | --- |
 | **Compression / fertility** | fewer tokens better; fertility = pieces/word | longer effective context; cheaper train/infer |
 | **Parity** | similar meaning shouldn’t explode across languages | unfair ⇒ short effective context, expensive, undertrained |
@@ -190,9 +184,9 @@ This course (same path):
 | **Special design** | clear chat/tool boundaries | alignment & agents |
 | **Downstream** | loss/evals under same trunk | one final referee |
 
-“Good” is a tradeoff among compression, parity, size, and downstream—not one score.
+“Good” balances compression, parity, size, and downstream—not one leaderboard number.
 
-### 4. How to improve · impact on the whole LLM
+### Improving the table · whole-model impact
 
 | Lever | How | Whole-model impact |
 | --- | --- | --- |
@@ -203,9 +197,9 @@ This course (same path):
 | **Change algorithm family** | BPE ↔ Unigram… | **new table**; rebuild embeds; retrain |
 | **Extend inherited table** | append domain pieces | cheaper than full reset |
 
-Frontier-from-zero practice: freeze tokenizer after data goals are clear → set \`vocab_size\` → embed → pretrain. Mid-flight table swaps are extremely expensive.
+Frontier-from-zero practice: freeze the tokenizer after data goals are clear → set \`vocab_size\` → embed → pretrain. Mid-flight table swaps are extremely expensive.
 
-### 5. Industry · well-known open models
+### What open models do
 
 Most sit in **byte BPE / tiktoken-like** land; differences are corpus and regex, not “words vs characters” as the main split.
 
@@ -222,7 +216,7 @@ Most sit in **byte BPE / tiktoken-like** land; differences are corpus and regex,
 
 Consensus: trainers ship one table with the recipe; users only load that checkpoint’s tokenizer; next gens often grow V and improve multilingual/code regex.
 
-### 6. Code (this course)
+### In this course
 
 \`\`\`bash
 python chapters/01-inference/ep02_teach_bpe.py
@@ -270,13 +264,11 @@ Official table: license / login / mirror. Teaching BPE needs no network.
     demo: 'embedding',
     markdown: `## Idea
 
-**What:** The **embedding** — a \`V×D\` table; each token id **looks up** one row of \`D\` floats (\`gather\` / \`nn.Embedding\`).
+The **embedding** is a \`V×D\` table: each token id **looks up** one row of \`D\` floats (\`gather\` / \`nn.Embedding\`). Neural nets only add and multiply tensors; ids are labels with no geometry. Without float rows, attention and FFN have nothing to eat—and **pretrain writes those rows**.
 
-**Why:** Nets only add/multiply tensors. Ids are labels with no geometry; without float rows there is nothing for attention/FFN to eat. Pretrain **writes** those rows.
+After you freeze the tokenizer, set \`V\` and \`D\` (and tying), random-init the table, and let next-token training rewrite the rows you actually see. Or load official floats together with the paired tokenizer.
 
-**How:** Freeze tokenizer → set \`V,D\` (and tying) → random init → next-token train rewrites rows; or load official floats with the paired tokenizer.
-
-### 1. How does an id become floats—and why bother?
+### How an id becomes floats
 
 Think **locker wall**, not a dictionary gloss:
 
@@ -296,21 +288,11 @@ Tiny fake example (\`D=3\`):
 
 Ids \`[7, 3, 7]\` → three rows: row 7, then row 3, then row 7 again. **No formula turns 7 into floats**—it is a lookup.
 
-**Why floats at all?**
-
-| With only ids | With embeddings |
-| --- | --- |
-| Ids are labels; you cannot really matmul them with weights | Attention / FFN **only eat float tensors** |
-| \`cat=3\` vs \`dog=9\` has no geometry | Training nudges rows so co-occurring tokens get useful starting faces |
-| Renumbering the tokenizer breaks everything | Row index must stay locked to tokenizer id |
+**Why floats at all?** Attention and FFN only eat float tensors. Training nudges rows so co-occurring tokens get useful starting faces; renumbering the tokenizer breaks everything unless row index stays locked to tokenizer id.
 
 One line: **tokenizer numbers tokens; embedding gives each number a trainable vector the rest of the net can compute on.** Bad table ⇒ later layers train on noise; wrong pairing with the tokenizer ⇒ the pipeline is junk.
 
-**Where do those floats come from?**  
-At first they are **random** (almost no meaning). Then the whole net trains on next-token prediction; wrong guesses backprop and **rewrite rows that showed up**—frequent tokens move most. Results are saved in the checkpoint; inference only loads and gathers. This course can also load Llama’s already-trained rows.
-
-**Why a float row per token at all?**  
-Later layers are continuous math (matmul, add, nonlinearities). Integer ids are not valid inputs for that; float rows are. Training tends to push co-occurring / similar-role tokens into vectors that help “guess the next token”—a side effect of the objective, not hand-drawn word maps.
+At first rows are **random** (almost no meaning). Next-token training backprops through wrong guesses and **rewrites rows that showed up**—frequent tokens move most. Results land in the checkpoint; inference loads and gathers. This course can also load Llama’s already-trained rows.
 
 The playground on this page is exactly “gather by id.”
 
@@ -321,7 +303,7 @@ flowchart LR
   floats --> blocks[later layers eat floats only]
 \`\`\`
 
-### 2. From zero: how you generate the table
+### Building the table from zero
 
 **Not** hand-filled glosses, **not** another BPE. BPE assigns ids; embedding stores the float rows—mostly **written by pretrain**.
 
@@ -337,30 +319,18 @@ flowchart LR
 
 Init is an empty locker wall; **training writes the numbers**. This lesson’s toy table shows gather + one update; real tables come from official weights or your pretrain.
 
-### 3. What counts as a good table
+### What counts as a good table
 
-**Hard constraints**
+**Check yourself**
 
-| Check | Plain meaning |
-| --- | --- |
-| **Shape** | \`(V, D)\` matches config/tokenizer; \`T\` ids → \`T\` rows |
-| **Pairing** | row \`i\` ↔ tokenizer id \`i\` |
-| **Healthy values** | no NaN/Inf; RMSNorm can steady scales |
-| **Contract** | this stack: RoPE later; no absolute PE on embeds |
+- **Shape:** \`(V, D)\` matches config and tokenizer; \`T\` ids → \`T\` rows.  
+- **Pairing:** row \`i\` ↔ tokenizer id \`i\`.  
+- **Healthy values:** no NaN/Inf; RMSNorm can steady scales.  
+- **Contract:** this stack uses RoPE later; no absolute PE on embeds.
 
-**Optimization targets** (rarely a solo “embedding score”)
+You rarely get a solo “embedding score.” Judges are downstream loss and same-architecture compares under a fixed setup—fitting the pretrain objective, dim budget, rare-token updates, and tie/untie choices all show up there.
 
-| Check | Plain meaning | Whole-model impact |
-| --- | --- | --- |
-| **Fits pretrain objective** | frequent rows get updates | base LM skill |
-| **Dim budget** | too small → weak; too big → hungry | capacity vs stability |
-| **Rare tokens** | long-tail ids barely move | weak rare words |
-| **Tying** | tie often helps small models | params & output calibration |
-| **Downstream / loss** | same-architecture compare | **main judge** |
-
-Unlike fertility, embedding quality is judged mainly via the **full model** under a fixed setup.
-
-### 4. How to improve · impact on the whole LLM
+### Improving embeddings · whole-model impact
 
 | Lever | How | Whole-model impact |
 | --- | --- | --- |
@@ -374,7 +344,7 @@ Unlike fertility, embedding quality is judged mainly via the **full model** unde
 
 From-zero order: freeze tokenizer → set \`V,D\` & tying → random embed + pretrain → append rows only when protocols need new specials. **Never** mix Llama embeds with a Qwen tokenizer.
 
-### 5. Industry · well-known open models
+### What open models do
 
 | Model / line | How embeddings are done | Notes |
 | --- | --- | --- |
@@ -387,7 +357,7 @@ From-zero order: freeze tokenizer → set \`V,D\` & tying → random embed + pre
 
 Consensus: embeddings are a **learnable lookup** factory-paired with the tokenizer; improving them ≈ better pretrain/tokenizer; open checkpoints store the matrix in safetensors—you write the same when training from zero.
 
-### 6. Code (this course)
+### In this course
 
 \`\`\`python
 self.weight = nn.Embedding(vocab_size, embed_dim)
@@ -424,15 +394,11 @@ python chapters/01-inference/ep03_embedding.py
     demo: 'pretrain',
     markdown: `## Idea
 
-**What:** *Causal language modeling* / **next-token pretraining** — given tokens to the left, score every vocab id as “what comes next,” then train so the true next id gets high probability.
+**Causal language modeling** (next-token pretraining) is the self-supervised loop that turns raw text into useful weights. Given all tokens to the left, the model scores every vocabulary id for “what comes next,” and training raises the probability on the true next id. That objective writes embedding rows and almost the entire trunk—without it you only have a random shell, or you load someone else’s floats (as in the Llama example later). In one line: tokenize text → embed → forward → **shift** so position \`t\` predicts id \`t+1\` → cross-entropy → backward → optimizer step, repeated on huge corpora.
 
-**Why it matters:** This single self-supervised objective is what **writes** embedding rows and almost all trunk weights. Without it you have a random shell (or you load someone else’s floats, like the Llama example later).
+Industry uses the same names: nanoGPT’s \`X,Y\` windows, Hugging Face “causal LM,” Llama 3 / DeepSeek “pretrain then align.”
 
-**How (one line):** tokenize text → embed → forward → **shift** so position \`t\` predicts id \`t+1\` → cross-entropy → backward → optimizer step. Repeat on huge corpora.
-
-Industry names the same thing: nanoGPT’s \`X,Y\` windows, Hugging Face “causal LM”, Llama 3 / DeepSeek “pretrain then align.”
-
-### 1. What — the objective
+### The objective
 
 For a token sequence \\(x_1,\\ldots,x_T\\):
 
@@ -448,9 +414,9 @@ Training minimizes average **negative log-likelihood** = token-level **cross-ent
 | **next-token CE** | At each time, punish low probability on the true next id |
 | **causal** | Position \`t\` must not see tokens after \`t\` (mask / decoder stack) |
 
-### 2. Why — why this design
+### Why this design
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | Predict **next** id | Turns any raw text into infinite training signal |
 | One forward → many positions | Length-\`T\` sequence yields ~\`T-1\` supervised guesses (causal mask makes each legal) |
@@ -466,7 +432,7 @@ Inference vs training:
 | After logits | sample / argmax | CE vs true id |
 | Weights | usually frozen | updated every step |
 
-### 3. How — shift, loss, one step (real code)
+### Shift, loss, and one step
 
 Tiny example ids \`[10, 20, 30]\` (“The cat sat” style, fake ids):
 
@@ -512,18 +478,16 @@ flowchart LR
   bwd --> adam[AdamW_step]
 \`\`\`
 
-Sanity: at random init, loss ≈ \`log(V)\` (uniform over vocab).
+At random init, loss ≈ \`log(V)\` (uniform over vocab).
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Shift is one token; causal (no future leak) |
-| **Hard** | Grads reach embed rows + trunk; no NaN |
-| **Soft** | Loss falls; samples less nonsense |
-| **Soft** | Matches published recipe at scale (later chapters) |
+- Shift is exactly one token; causality holds (no future leak).
+- Gradients reach embedding rows and trunk; no NaNs.
+- Loss trends down over a sensible window; samples get less random.
+- At scale, the recipe matches published pretrain practice (later chapters).
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -532,16 +496,16 @@ Sanity: at random init, loss ≈ \`log(V)\` (uniform over vocab).
 | LR / clip / accum | Finishability (next chapter) |
 | Under-train | Weak embeds **and** deep layers |
 
-Next lessons split **data windows**, **optimizers**, and **frontier scale recipes** so this chapter stays the objective + one step.
+Up next: **data windows**, **optimizers**, and **frontier scale recipes**—this chapter stays focused on the objective plus one step.
 
-### 6. Industry pointers
+### Industry pointers
 
 - Raschka FAQ: constructing input/target windows  
 - nanoGPT \`train.py\`: readable full loop  
 - HF LLM Course ch7.6: causal LM from scratch  
 - Llama 3 / DeepSeek reports: same family of objective, different scale & architecture  
 
-### 7. This course
+### This course
 
 \`\`\`bash
 python chapters/02-training/ep18_pretrain.py
@@ -571,13 +535,9 @@ python chapters/02-training/ep18_pretrain.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-**What:** How pretraining turns raw text into **\`(batch, time)\` id tensors** the loss can eat—document → tokenize → pack/cut windows → batch → (optional) pad/mask.
+Pretraining needs tensors the loss can actually score: **\`(batch, time)\` id matrices** built from raw text. The path is document → tokenize → pack or cut fixed windows → batch → (optional) pad and mask. The objective from the previous chapter is fixed; **data shape** decides what signal each step sees. Bad windows—padding counted as labels, leaked future context, sloppy packing—quietly waste or corrupt training. Keep **labels aligned with the same shift rule** as \`lm_loss\`, whether you shift in the collator or inside the model.
 
-**Why:** The objective in *Pretrain* is fixed; **data shape** decides what signal each step sees. Wrong windows (empty pads as labels, leaked future, broken packing) silently waste or corrupt training.
-
-**How:** Build fixed-length contexts (or pack many docs into one stream), form batches, keep **labels aligned with the same shift rule** as your loss.
-
-### 1. What — pieces of a batch
+### What goes into a batch
 
 | Piece | Role |
 | --- | --- |
@@ -594,7 +554,7 @@ Two common layouts:
 | **Sliding / chunked** | Cut long token streams into non-overlap or stride-\`T\` blocks (nanoGPT style) |
 | **Packed** | Concatenate many short docs with separators / attention boundaries so GPUs stay full |
 
-### 2. Why — design pressure
+### Design pressures
 
 | Pressure | Consequence |
 | --- | --- |
@@ -603,7 +563,7 @@ Two common layouts:
 | Pad tokens | Must **not** train as if they were real next words (mask or ignore_index) |
 | Doc boundaries | Blind concat can invent fake “next tokens” across unrelated docs unless you mask |
 
-### 3. How — toy window (matches this repo)
+### Toy windows in this repo
 
 Lab batches are random ids for teaching the **loop**, not real corpora:
 
@@ -635,16 +595,14 @@ flowchart TD
   bat --> loss[same_shift_as_lm_loss]
 \`\`\`
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Every supervised position has a real next id (or masked) |
-| **Hard** | Label/input shift matches the loss implementation |
-| **Soft** | High token utilization (little pure padding) |
-| **Soft** | Mix covers the domains you care about |
+- Every supervised position has a real next id (or is masked out).
+- Label/input shift matches your loss implementation—no double shift.
+- Token utilization is high (little pure padding).
+- The domain mix matches what you want the model to learn.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -653,7 +611,7 @@ flowchart TD
 | Packing quality | Throughput and effective updates/day |
 | Domain mix | What the model becomes “fluent” at |
 
-### 6. This course
+### This course
 
 No separate script yet—reuse:
 
@@ -685,13 +643,9 @@ python chapters/02-training/ep18_pretrain.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-**What:** The **optimizer side** of one pretrain step—AdamW, learning rate (and schedules), gradient clipping, and gradient accumulation—so the CE objective actually moves weights stably.
+Once the loss is right, **the optimizer side** of each step decides whether weights move in a stable way. AdamW, learning rate (and schedules), gradient clipping, and gradient accumulation are the usual knobs. Correct CE with a bad optimizer still gives NaNs, divergence, or a flat loss—past toy scale, **how you step** is what makes a run finish. The skeleton is: \`zero_grad\` → forward → loss → \`backward\` → (optional clip) → \`optimizer.step\` → (optional lr schedule; accumulate over micro-batches when VRAM forces small \`B\`).
 
-**Why:** Correct loss + bad optim → NaNs, divergence, or “loss stuck.” At any scale past toys, **how you step** decides whether a run finishes.
-
-**How:** \`zero_grad\` → forward → loss → \`backward\` → (optional clip) → \`optimizer.step\` → (optional lr schedule). Accumulate grads over micro-batches when \`B\` must stay small.
-
-### 1. What — knobs
+### Knobs you will touch
 
 | Knob | Role |
 | --- | --- |
@@ -713,11 +667,11 @@ for batch in batches:
     opt.step()
 \`\`\`
 
-No schedule/clip yet—on purpose. Production adds them around the same skeleton.
+No schedule or clip yet—on purpose. Production adds them around the same skeleton.
 
-### 2. Why — each piece
+### Why each piece exists
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | AdamW over plain SGD | Sparse-ish token grads + many params; adaptive scales help |
 | Weight decay | Mild regularization; AdamW’s form matches LLM practice |
@@ -725,7 +679,7 @@ No schedule/clip yet—on purpose. Production adds them around the same skeleton
 | Clip | One bad batch shouldn’t blow FP math |
 | Accum | Fit long \`T\` / big models on limited VRAM while keeping effective batch |
 
-### 3. How — accumulation sketch
+### Gradient accumulation sketch
 
 \`\`\`python
 opt.zero_grad(set_to_none=True)
@@ -745,16 +699,14 @@ flowchart LR
   step --> sch[lr_schedule]
 \`\`\`
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | No NaN/Inf in loss or grads after clip |
-| **Hard** | \`zero_grad\` each **optimizer** step (not forgotten under accum) |
-| **Soft** | Loss trends down over a sensible window |
-| **Soft** | lr schedule matches a known recipe when you scale up |
+- No NaN/Inf in loss or grads after clip.
+- \`zero_grad\` runs once per **optimizer** step—not forgotten under accumulation.
+- Loss trends down over a sensible window.
+- When you scale up, lr schedule matches a known recipe.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -763,7 +715,7 @@ flowchart LR
 | clip threshold | Spike survival vs under-updating |
 | Wrong decay | Over-shrink or under-regularize weights |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/02-training/ep18_pretrain.py
@@ -793,13 +745,9 @@ python chapters/02-training/ep18_pretrain.py
     estimatedMinutes: 10,
     markdown: `## Idea
 
-**What:** A **primer** on scaling the same next-token loop—more tokens, stages, parallelism—without leaving the beginner spine for a full systems course.
+The next-token loop you already know is the same one frontier labs run—they stretch it with **more tokens, staged recipes, and parallelism**, not a different objective. Llama 3.2 ~1B and trillion-token runs share **CE + one step**; they differ in data volume, lr schedules, cluster math, and sometimes **architecture** (dense vs MoE). This chapter is a map so “toy loss went down” does not feel like graduation. Read published recipes as extensions of pretrain, pretrain-data, and pretrain-optim: same loss, harder data, optim, and engineering.
 
-**Why:** Llama 3.2 ~1B and frontier runs share **objective + step**; they differ in **data volume, staged recipes, cluster math, and (sometimes) architecture** (dense vs MoE). Knowing the map prevents “my toy loss went down, so I’m done.”
-
-**How:** Read published recipes as *extensions* of chapters you already have: same CE, harder data/optim/engineering.
-
-### 1. What — scale axes
+### Axes that change with scale
 
 | Axis | Toy (this course) | Frontier-shaped |
 | --- | --- | --- |
@@ -813,7 +761,7 @@ Llama 3-style public reports: long pretrain on curated mixes, then shorter high-
 
 DeepSeek-V2/V3: **same causal LM family**, different **block** (MLA + MoE)—see Frontier chapters; training still CE + big-data optim.
 
-### 2. Why — why not stop at ep18
+### Common illusions after ep18
 
 | Illusion | Reality |
 | --- | --- |
@@ -822,7 +770,7 @@ DeepSeek-V2/V3: **same causal LM family**, different **block** (MLA + MoE)—see
 | “Bigger model only” | Data quality × tokens often dominate |
 | “SFT will fix a bad base” | Align edits style; weak pretrain stays weak |
 
-### 3. How — read a recipe in four lines
+### Reading a recipe in four lines
 
 When you open Llama / DeepSeek / Megatron writeups, map:
 
@@ -839,15 +787,13 @@ flowchart TD
   sys --> align[then_SFT_DPO]
 \`\`\`
 
-### 4. What “good” means (beginner bar)
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | You can point to which axis a paper changed |
-| **Soft** | You don’t confuse MoE **architecture** with a different **loss** |
-| **Soft** | You expect engineering chapters before “reproduce Llama” |
+- You can name which axis a paper changed (data, optim, systems, arch).
+- MoE **architecture** is not a different **loss**.
+- You expect more engineering before “reproduce Llama.”
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -856,7 +802,7 @@ flowchart TD
 | Parallel efficiency | Whether the budget is usable |
 | Arch (GQA/MoE/MLA) | Cost per token & memory—not a new objective |
 
-### 6. This course
+### This course
 
 Still the toy entry:
 
@@ -888,13 +834,9 @@ python chapters/02-training/ep18_pretrain.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-**What:** **RMSNorm** — per-token scale control: divide by root-mean-square, multiply learnable \`γ\`. No mean subtract, no bias.
+**RMSNorm** keeps each token’s activations on a stable scale: divide by root-mean-square, then multiply a learnable \`γ\`. There is no mean subtraction and no bias. Deep next-token stacks blow up or collapse without that steadying step; Llama-style **pre-norm** (normalize before attention and MLP) is what makes depth trainable from scratch. In practice you place \`RMSNorm(D)\` at each pre-norm site, initialize \`γ ≈ 1\`, and train it with the rest of the net.
 
-**Why:** Deep next-token stacks blow up or die without steady scales. Llama-style **pre-norm** (norm → attn / MLP) is what makes depth trainable from zero.
-
-**How:** \`RMSNorm(D)\` at each pre-norm site; \`γ ≈ 1\` at init; train with the net.
-
-### 1. What — formula
+### Formula and code
 
 \\[
 \\mathrm{RMSNorm}(x)=\\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}}\\odot\\gamma
@@ -908,20 +850,20 @@ x_normed = x_f * torch.rsqrt(variance + self.eps)
 return (self.weight.float() * x_normed).to(orig_dtype)
 \`\`\`
 
-Math in float32, cast back—same stability trick HF Llama uses.
+Math runs in float32, then casts back—the same stability trick HF Llama uses.
 
-### 2. Why — vs LayerNorm / placement
+### Compared with LayerNorm and placement
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | No mean center | Slightly cheaper; Llama/Qwen recipe |
 | Learnable \`γ\` only | Scale per channel after unit-RMS |
 | **Pre-norm** | Stabilize *inputs* to attn/MLP so depth survives |
 | After embed, before bricks | First “steady the ruler” once vectors exist |
 
-GPT-2-era teaching often: LayerNorm + post-norm. This course’s example is **RMSNorm + pre-norm**.
+GPT-2-era teaching often used LayerNorm + post-norm. This course’s example is **RMSNorm + pre-norm**.
 
-### 3. How — wire it
+### Wiring it in
 
 | Step | Do |
 | --- | --- |
@@ -930,15 +872,13 @@ GPT-2-era teaching often: LayerNorm + post-norm. This course’s example is **RM
 | 3 | Match \`ε\` to the checkpoint (\`norm_eps\`) |
 | 4 | Train / load; don’t swap LN↔RMSN under foreign weights |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Same shape as input; \`ε\` present; pre-norm sites match recipe |
-| **Soft** | With \`γ=1\`, RMS≈1; fewer NaNs in deep forward |
-| **Soft** | Full-model loss / HF align is the real judge |
+- Output shape matches input; \`ε\` is set; pre-norm sites match the recipe.
+- With \`γ=1\`, per-token RMS ≈ 1; fewer NaNs in a deep forward.
+- Full-model loss and HF align are the real judge.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -946,7 +886,7 @@ GPT-2-era teaching often: LayerNorm + post-norm. This course’s example is **RM
 | Pre vs post | Depth trainability |
 | \`γ\` / lr | Couples to convergence |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep04_rmsnorm.py
@@ -977,13 +917,9 @@ python chapters/01-inference/ep04_rmsnorm.py
     demo: 'rope',
     markdown: `## Idea
 
-**What:** **RoPE** (Rotary Position Embedding) — rotate Q and K by token position so **relative distance** enters the attention dot product.
+**RoPE** (Rotary Position Embedding) rotates query and key vectors by token position so **relative distance** shows up in the attention dot product. Embeddings say *which* token; attention still needs *where*. Absolute position tables on the embedding are an older pattern; modern dense Llama, Qwen, and DeepSeek apply RoPE on Q and K. Pick \`rope_theta\`, cache cos/sin, combine with \`rotate_half\` on Q/K; long-context scaling is a later knob.
 
-**Why:** Embeddings say *which* token; attention still needs *where*. Absolute PE tables on embeds are older; modern dense Llama/Qwen/DeepSeek use RoPE on Q/K.
-
-**How:** Pick \`rope_theta\`, cache cos/sin, \`rotate_half\` + combine on Q/K; long-context scaling is a later knob.
-
-### 1. What — apply step
+### Apply step in code
 
 Repo ([\`arche/rope.py\`](https://github.com/chaxus/arche/blob/main/arche/rope.py)):
 
@@ -994,16 +930,16 @@ def apply_rotary_emb(x, cos, sin):
 
 \`build_rope_cache\` precomputes cos/sin for \`0 .. seq_len-1\`. Attention slices by \`start_pos\` when decoding with cache.
 
-### 2. Why — design
+### Design choices
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | Rotate Q/K only | V stays content; positions live in scores |
 | Relative via rotation | Dot(q_m, k_n) depends on \`m-n\` |
 | Large \`theta\` (Llama 3: 500k) | Supports longer contexts than old 10k |
 | Match checkpoint \`theta\`/scale | Wrong PE ⇒ silent quality death under loaded weights |
 
-### 3. How — from zero
+### Wiring from scratch
 
 | Step | Do |
 | --- | --- |
@@ -1012,15 +948,13 @@ def apply_rotary_emb(x, cos, sin):
 | 3 | Apply after Q/K project, before SDPA |
 | 4 | Long context: Llama-3 wavelength smoothing (\`rope-scaling\` later) |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Shape unchanged; even head dim; applied to Q and K |
-| **Hard** | Checkpoint \`theta\` / scale factors match |
-| **Soft** | Nearby tokens score differently than far ones |
+- Shapes unchanged; even head dim; RoPE on both Q and K.
+- Checkpoint \`theta\` and scale factors match.
+- Nearby tokens score differently than distant ones.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -1028,7 +962,7 @@ def apply_rotary_emb(x, cos, sin):
 | Absolute PE → RoPE | Modern default; don’t mix families with foreign weights |
 | Skip RoPE | Model can’t reliably use order |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep05_rope.py
@@ -1059,13 +993,9 @@ python chapters/01-inference/ep05_rope.py
     demo: 'gqa',
     markdown: `## Idea
 
-**What:** **Grouped-Query Attention (GQA)** — more query heads than KV heads; groups of Q heads **share** one KV head. Still causal.
+**Grouped-Query Attention (GQA)** uses more query heads than KV heads: groups of Q heads **share** one K/V head. It is still fully causal attention. Full multi-head attention stores a separate KV pair per Q head, so decode memory grows fast with sequence length; GQA shrinks the KV cache with a usually small quality cost. Llama 3.2 ~1B runs **32 Q / 8 KV**. Pick divisible \`n_q\` and \`n_kv\`, project, apply RoPE, **repeat_interleave** KV to line up with Q, then SDPA; the cache stores only \`n_kv\` heads.
 
-**Why:** Full MHA stores a KV pair per Q head → decode VRAM explodes with length. GQA cuts cache size with small quality hit. Llama 3.2 ~1B uses **32 Q / 8 KV**.
-
-**How:** Choose divisible \`n_q\` / \`n_kv\`, project, RoPE, **repeat_interleave** KV to match Q, then SDPA; cache stores only \`n_kv\`.
-
-### 1. What — shapes in this repo
+### Shapes in this repo
 
 [\`CausalSelfAttention\`](https://github.com/chaxus/arche/blob/main/arche/attention.py):
 
@@ -1080,7 +1010,7 @@ attn = F.scaled_dot_product_attention(q, k_full, v_full, is_causal=...)
 
 \`n_rep = num_heads // num_kv_heads\`. Cache appends **narrow** K/V; broadcast only for the matmul.
 
-### 2. Why — MHA / GQA / MQA / MLA
+### MHA, GQA, MQA, and MLA
 
 | Layout | Idea | Cost |
 | --- | --- | --- |
@@ -1089,9 +1019,9 @@ attn = F.scaled_dot_product_attention(q, k_full, v_full, is_causal=...)
 | **MQA** | \`n_kv = 1\` | Extreme cache save |
 | **MLA** | Compressed latent KV | Frontier (DeepSeek)—later part |
 
-Head-count change ⇒ **retrain** (or lose the checkpoint).
+Changing head counts ⇒ **retrain** (or lose the checkpoint).
 
-### 3. How — from zero
+### Wiring from scratch
 
 | Step | Do |
 | --- | --- |
@@ -1100,15 +1030,13 @@ Head-count change ⇒ **retrain** (or lose the checkpoint).
 | 3 | Bias-free Q/K/V/O linears (Llama contract) |
 | 4 | Causal mask on prefill; with cache, attend all past keys |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Valid groups; causal; weight head counts match config |
-| **Soft** | Cache bytes ≈ \`n_kv/n_q\` of MHA |
-| **Soft** | Quality holds vs MHA at same width |
+- Valid groups; causal; weight head counts match config.
+- Cache bytes ≈ \`n_kv/n_q\` of MHA.
+- Quality holds vs MHA at the same width.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -1116,7 +1044,7 @@ Head-count change ⇒ **retrain** (or lose the checkpoint).
 | Too few | Quality cliff |
 | MLA path | Different compression story (Frontier) |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep06_gqa.py
@@ -1144,13 +1072,9 @@ python chapters/01-inference/ep06_gqa.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-**What:** **SwiGLU** — gated feed-forward: \`down(silu(gate(x)) * up(x))\` with three **bias-free** linears.
+**SwiGLU** is the gated feed-forward block: \`down(silu(gate(x)) * up(x))\` with three **bias-free** linear layers. Attention mixes *across* positions; the FFN transforms *each* position on its own. SwiGLU—not a plain GELU MLP—is the dense default in Llama and Qwen; MoE experts are often the same brick. Pick \`intermediate_dim\`, three projection matrices, and place the module after the second pre-norm in each block.
 
-**Why:** Attention mixes *across* positions; the FFN transforms *each* position. SwiGLU (not plain GELU MLP) is the dense default in Llama/Qwen; MoE experts are often the same unit.
-
-**How:** Pick \`intermediate_dim\`, three mats, wire after the second pre-norm in the block.
-
-### 1. What — code
+### Code in the repo
 
 [\`arche/mlp.py\`](https://github.com/chaxus/arche/blob/main/arche/mlp.py):
 
@@ -1162,16 +1086,16 @@ class SwiGLU(nn.Module):
 
 Gate and up expand \`D → I\`; down returns \`I → D\`. No bias—matches Llama weight files.
 
-### 2. Why — gated vs plain MLP
+### Gated FFN vs plain MLP
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | SiLU gate × up | Soft gating; empirically strong for LMs |
 | Three mats | Slightly more params than two-mat GELU MLP at same \`I\` |
 | No bias | Smaller, matches open Llama/Qwen tensors |
 | Position-wise | Parallelizable; pairs with residual |
 
-### 3. How — from zero
+### Wiring from scratch
 
 | Step | Do |
 | --- | --- |
@@ -1180,14 +1104,12 @@ Gate and up expand \`D → I\`; down returns \`I → D\`. No bias—matches Llam
 | 3 | Place after \`post_attention_layernorm\` |
 | 4 | MoE later: many SwiGLUs + router |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | In/out dim \`D\`; no bias; activation is SiLU on gate |
-| **Soft** | Judge via full-model loss / quality, not isolated FFN |
+- In/out dim \`D\`; no bias; SiLU on the gate branch.
+- Judge via full-model loss / quality, not an isolated FFN.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -1195,7 +1117,7 @@ Gate and up expand \`D → I\`; down returns \`I → D\`. No bias—matches Llam
 | GELU → SwiGLU | Needs retrain |
 | MoE experts | Same brick × E, sparse fire |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep07_swiglu.py
@@ -1224,13 +1146,9 @@ python chapters/01-inference/ep07_swiglu.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-**What:** One **Transformer block** — the repeatable layer: pre-RMSNorm → attention → residual → pre-RMSNorm → SwiGLU → residual.
+One **Transformer block** is the repeatable layer in a decoder stack: pre-RMSNorm → attention → residual → pre-RMSNorm → SwiGLU → residual. Residuals are what let you stack many identical layers without the gradient dying—the input and output stay the same shape so you can repeat the block \`N\` times (Llama 3.2 ~1B uses **N=16**). In arche you wire this sandwich once in [\`block.py\`](https://github.com/chaxus/arche/blob/main/arche/block.py); each layer owns its own weights, and the stack chapter repeats the block.
 
-**Why:** Bricks only become a deep net when packaged with **residuals**. Same shape in and out so you can stack \`N\` times (Llama 3.2 ~1B: **N=16**).
-
-**How:** Wire the sandwich once; each layer gets its own weights; stack and train (or load).
-
-### 1. What — forward
+### Forward pass
 
 [\`TransformerBlock\`](https://github.com/chaxus/arche/blob/main/arche/block.py):
 
@@ -1251,33 +1169,33 @@ flowchart LR
   ffn --> add2[x_plus_ffn]
 \`\`\`
 
-### 2. Why — residuals + pre-norm
+### Residuals and pre-norm
 
-| Choice | Why |
+| Choice | Why it matters |
 | --- | --- |
 | Residual add | Gradient highway; identity path if sublayer ≈0 |
 | Pre-norm (not post) | Modern deep training stability |
 | Attn then MLP | Llama/Qwen mainline (not parallel attn∥MLP) |
 | Per-layer KV cache | Decode reuses past K/V per block |
 
-### 3. How — from zero
+### Build from scratch
 
 | Step | Do |
 | --- | --- |
-| 1 | Instantiatate norms, \`CausalSelfAttention\`, \`SwiGLU\` from config |
+| 1 | Instantiate norms, \`CausalSelfAttention\`, \`SwiGLU\` from config |
 | 2 | Keep in/out \`embed_dim\` |
 | 3 | Thread \`cache\` / \`start_pos\` for generate |
 | 4 | Repeat \`N\` times in the stack |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
+| Must hold | |
 | --- | --- |
-| **Hard** | Residuals are adds; pre-norm placement; shape \`(B,T,D)\` |
-| **Hard** | Cache isolated per layer |
-| **Soft** | Deep stack still trains / loads without NaNs |
+| Residuals are adds; pre-norm placement; shape \`(B,T,D)\` | |
+| Cache isolated per layer | |
+| Worth aiming for | Deep stack still trains / loads without NaNs |
 
-### 5. Improve · whole-model impact
+### Tuning the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -1285,7 +1203,7 @@ flowchart LR
 | Post → pre-norm | Enables deep from-zero training |
 | Swap insides (MLA/MoE) | Frontier variants; block boundary stays |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep08_block.py
@@ -1313,13 +1231,9 @@ python chapters/01-inference/ep08_block.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
-**What:** The full **dense causal LM shell**: \`ids → embed → Block×N → final RMSNorm → Linear(V) → logits\`.
+The **dense causal LM shell** wires embedding, \`Block×N\`, final RMSNorm, and the vocabulary head: \`ids → embed → Block×N → final RMSNorm → Linear(V) → logits\`. A single block is not yet a language model—this stack is what pretrain’s \`model(batch)\` has been calling from the outside. Build from config (\`V,D,N,heads,…\`), optionally **tie** LM head and embeddings (common on small Llamas), then init, load, or pretrain.
 
-**Why:** One block is not a language model. The stack is what \`model(batch)\` in pretrain called—a black box until now.
-
-**How:** Build from config (\`V,D,N,heads,…\`); optional **tie** LM head ↔ embed (small Llamas often do); init, then load or pretrain.
-
-### 1. What — forward
+### Forward pass
 
 [\`Llama\`](https://github.com/chaxus/arche/blob/main/arche/model.py):
 
@@ -1333,16 +1247,16 @@ return self.lm_head(x), new_caches
 
 Logits shape \`(B, T, V)\` — exactly what \`lm_loss\` consumes after shift.
 
-### 2. Why — tying and final norm
+### Tying and final norm
 
-| Choice | Why |
+| Choice | Why it matters |
 | --- | --- |
 | Final RMSNorm | Stabilize before vocab projection |
 | Tie head↔embed | Fewer params; common at ~1B |
 | Untied head | More freedom at larger scales |
 | Shared config object | One source of truth for HF map |
 
-### 3. How — from zero
+### Build from scratch
 
 | Step | Do |
 | --- | --- |
@@ -1351,14 +1265,12 @@ Logits shape \`(B, T, V)\` — exactly what \`lm_loss\` consumes after shift.
 | 3 | Set \`tie_word_embeddings\` before init/load |
 | 4 | Train with pretrain loop **or** \`from_pretrained\` |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Logits \`(B,T,V)\`; config ↔ weights; tying consistent |
-| **Soft** | Quality after load or enough pretrain steps |
+| Must hold | Logits \`(B,T,V)\`; config ↔ weights; tying consistent |
+| Worth aiming for | Quality after load or enough pretrain steps |
 
-### 5. Improve · whole-model impact
+### Tuning the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -1366,7 +1278,7 @@ Logits shape \`(B, T, V)\` — exactly what \`lm_loss\` consumes after shift.
 | MoE swap | Replaces SwiGLU inside blocks—skeleton stays |
 | Optimize modules | Don’t “tune the stack alone” without data/optim |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep09_stack.py
@@ -1394,13 +1306,9 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-**What:** **Load** an open Llama 3.2 checkpoint into your handwritten stack via a **key map** (safetensors / HF → \`state_dict\`).
+This chapter **loads** an open Llama 3.2 checkpoint into your handwritten stack: safetensors / HF names land in arche’s \`state_dict\` through a **key map**. Random weights mean a correct graph with nonsense text—official floats turn the same forward into a language model right away. You already saw how pretrain *writes* those floats; here you **borrow** a finished run so generate and HF align work without your own cluster. Accept the license, download, map keys, pair the **official tokenizer**, and sanity-check shapes.
 
-**Why:** Random weights = correct graph, nonsense text. Official floats make the same forward a language model *now*. You already saw how pretrain *writes* floats; this chapter **borrows** a finished run so generate/align work without a cluster.
-
-**How:** Accept license → download → map keys → pair the **official tokenizer** → sanity-check shapes.
-
-### 1. What — entry
+### Entry point
 
 [\`from_pretrained\`](https://github.com/chaxus/arche/blob/main/arche/load_weights.py) builds \`Llama(cfg)\` and copies HF tensors into matching names.
 
@@ -1410,7 +1318,7 @@ python chapters/01-inference/ep09_stack.py
 | **Pretrain (earlier)** | How those floats get written from zero |
 | **HF align (next-next)** | Proof map + formulas match HF logits |
 
-### 2. Why — map carefully
+### Mapping pitfalls
 
 | Risk | Effect |
 | --- | --- |
@@ -1419,7 +1327,7 @@ python chapters/01-inference/ep09_stack.py
 | Dtype / device slip | Slow or NaN |
 | Partial load | “Runs” but broken layers |
 
-### 3. How — checklist
+### Checklist
 
 | Step | Do |
 | --- | --- |
@@ -1428,15 +1336,13 @@ python chapters/01-inference/ep09_stack.py
 | 3 | Config → empty \`Llama\` → copy weights |
 | 4 | Always use the **same** tokenizer as the checkpoint |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | No missing/unexpected keys; shapes match |
-| **Hard** | Tokenizer vocabulary size = embed rows |
-| **Soft** | Short generate looks like language; HF align later |
+| Must hold | No missing/unexpected keys; shapes match |
+| Must hold | Tokenizer vocabulary size = embed rows |
+| Worth aiming for | Short generate looks like language; HF align later |
 
-### 5. Improve · whole-model impact
+### Tuning the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -1444,7 +1350,7 @@ python chapters/01-inference/ep09_stack.py
 | Resume your own ckpt | Same API, your floats |
 | Quantized loads | Later serve chapters |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 huggingface-cli login
@@ -1478,13 +1384,9 @@ License, login, mirror—same class of issues as tokenizer download.
     estimatedMinutes: 15,
     markdown: `## Idea
 
-**What:** **Autoregressive generation** — turn logits into text by looping: score → pick next id → append → stop.
+**Autoregressive generation** is the loop that turns logits into text: score → pick the next token id → append → stop. A trained or loaded stack only emits scores until you wrap it in this loop; products differ in sampling and stop rules, but they all share the same shape. Take last-position logits, optional temperature / top-k, greedy or sample, halt on EOS or max length—KV cache (next chapter) makes the same loop fast at long outputs.
 
-**Why:** A trained/loaded stack only emits scores. Products differ in sampling and stop rules; they share this loop. Without it you have a classifier-shaped forward, not a chatbot.
-
-**How:** Last-position logits → optional temperature / top-k → greedy or sample → append → halt on EOS or max length. KV cache (next part) makes the same loop fast.
-
-### 1. What — skeleton
+### Loop skeleton
 
 [\`arche/generate.py\`](https://github.com/chaxus/arche/blob/main/arche/generate.py) roughly:
 
@@ -1497,7 +1399,7 @@ next_id = sample(logits[:, -1, :], temperature=..., top_k=...)  # or argmax
 
 Prefill runs the full prompt once; decode feeds one new token at a time when cache is on.
 
-### 2. Why — knobs ≠ weights
+### Knobs are not weights
 
 | Knob | Changes |
 | --- | --- |
@@ -1506,7 +1408,7 @@ Prefill runs the full prompt once; decode feeds one new token at a time when cac
 | EOS / max length | UX and safety bounds |
 | Chat template | How roles become ids (later device/quant/chat) |
 
-### 3. How — from zero
+### Wire it up
 
 | Step | Do |
 | --- | --- |
@@ -1515,15 +1417,13 @@ Prefill runs the full prompt once; decode feeds one new token at a time when cac
 | 3 | Sample or argmax → append id |
 | 4 | Repeat until stop; decode ids → text |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Stops; only past tokens visible; valid vocab ids |
-| **Soft** | With real weights, coherent short completions |
-| **Soft** | Same prompt + greedy ≈ stable across runs |
+| Must hold | Stops; only past tokens visible; valid vocab ids |
+| Worth aiming for | With real weights, coherent short completions |
+| Worth aiming for | Same prompt + greedy ≈ stable across runs |
 
-### 5. Improve · whole-model impact
+### Tuning behavior without retraining
 
 | Lever | Impact |
 | --- | --- |
@@ -1532,7 +1432,7 @@ Prefill runs the full prompt once; decode feeds one new token at a time when cac
 | Constrained decoding | Structured outputs |
 | Bad stop rules | Runaway or clipped answers |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep11_generate.py
@@ -1560,13 +1460,9 @@ python chapters/01-inference/ep11_generate.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-**What:** **Numeric check** — same short prompt through arche vs Hugging Face Llama 3.2; compare logits (max abs diff + argmax match).
+**HF align** runs the same short prompt through arche and Hugging Face Llama 3.2, then compares logits—max absolute diff and whether argmax matches. That’s the Part 1 proof your key map, RMSNorm, RoPE, GQA, SwiGLU, and stack layout aren’t merely shape-correct. Fix dtype, load both models, encode one prompt, forward, and report; skip cleanly when weights or login aren’t available.
 
-**Why:** End of Part 1 proof: key map, RMSNorm, RoPE, GQA, SwiGLU, stack layout aren’t “shape-right but wrong.” Catch bugs before serve/optim chapters hide them.
-
-**How:** Fixed dtype; load both models; encode one prompt; forward; report. Skip cleanly if weights/login unavailable.
-
-### 1. What — report
+### What the script reports
 
 [\`compare_logits_to_hf\`](https://github.com/chaxus/arche/blob/main/arche/align_hf.py):
 
@@ -1579,7 +1475,7 @@ argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
 
 \`run_align_or_explain\` returns \`None\` when HF weights aren’t reachable—**skip ≠ broken lesson logic**.
 
-### 2. Why — this gate
+### When numbers disagree
 
 | Failure mode | Likely cause |
 | --- | --- |
@@ -1587,7 +1483,7 @@ argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
 | Argmax mismatch | Same—plus dtype / device mismatch |
 | Skip | No login / gated / offline—fix env, not formulas |
 
-### 3. How — from zero
+### Run the check
 
 | Step | Do |
 | --- | --- |
@@ -1596,15 +1492,13 @@ argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
 | 3 | Short prompt (“The cat sat”) |
 | 4 | Assert within tolerance or print skip reason |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | With weights: argmax match; \`max_abs\` under lab tol |
-| **Hard** | Without weights: explicit skip, not a fake pass |
-| **Soft** | Longer prompts / more positions in CI later |
+| Must hold | With weights: argmax match; \`max_abs\` under lab tol |
+| Must hold | Without weights: explicit skip, not a fake pass |
+| Worth aiming for | Longer prompts / more positions in CI later |
 
-### 5. Improve · whole-model impact
+### If you fail or pass
 
 | Lever | Impact |
 | --- | --- |
@@ -1612,7 +1506,7 @@ argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
 | Pass | Safe to move to align (SFT/DPO) and serve |
 | Engine CI | Same idea gates vLLM-class numeric regs |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 huggingface-cli login
@@ -1649,13 +1543,9 @@ No weights/login → skip means “can’t download,” not “your math is wron
     demo: 'kv',
     markdown: `## Idea
 
-**What:** **KV cache** — after prefill, keep each layer’s Keys/Values and **append** one new step at decode instead of recomputing the whole past.
+**KV cache** keeps each layer’s Keys and Values after prefill, then **appends** one new step at decode instead of recomputing the full past every token. A correct generate loop without cache recomputes attention over growing history on every step—fine for demos, unusable at product lengths. Production decoders all cache KV; GQA, MLA, and paging shrink what you store on top of that.
 
-**Why:** A correct generate loop without cache recomputes attention over growing history every token → unusable at product lengths. Every production decoder caches KV.
-
-**How:** Per-layer \`KVCache\`; prefill writes full K/V; decode concatenates the new slice; GQA/MLA/paging shrink what you store.
-
-### 1. What — structure
+### Cache structure
 
 [\`KVCache\`](https://github.com/chaxus/arche/blob/main/arche/cache.py):
 
@@ -1671,7 +1561,7 @@ class KVCache:
 
 Attention ([\`CausalSelfAttention\`](https://github.com/chaxus/arche/blob/main/arche/attention.py)) RoPE-applies the new Q/K, merges into cache, then SDPA over **full** cached K/V.
 
-### 2. Why — cost shape
+### Cost shape
 
 | Mode | Work per new token |
 | --- | --- |
@@ -1681,7 +1571,7 @@ Attention ([\`CausalSelfAttention\`](https://github.com/chaxus/arche/blob/main/a
 
 GQA already cut \`n_kv\`; paging (later) fights fragmentation across users.
 
-### 3. How — from zero
+### Wire decode
 
 | Step | Do |
 | --- | --- |
@@ -1690,15 +1580,13 @@ GQA already cut \`n_kv\`; paging (later) fights fragmentation across users.
 | 3 | Decode: pass cache + \`start_pos\`, append one step |
 | 4 | Never mix layers’ caches |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Matches full recompute numerically (toy check) |
-| **Hard** | No layer mixups; seq dim only grows |
-| **Soft** | Memory fits target context × batch |
+| Must hold | Matches full recompute numerically (toy check) |
+| Must hold | No layer mixups; seq dim only grows |
+| Worth aiming for | Memory fits target context × batch |
 
-### 5. Improve · whole-model impact
+### Tuning memory
 
 | Lever | Impact |
 | --- | --- |
@@ -1706,7 +1594,7 @@ GQA already cut \`n_kv\`; paging (later) fights fragmentation across users.
 | Paging | Multi-user packing |
 | No cache | Toy lengths only |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep12_kv_cache.py
@@ -1734,19 +1622,15 @@ python chapters/01-inference/ep12_kv_cache.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-**What:** **RoPE scaling** — adjust rotary frequencies (Llama 3-style wavelength smoothing) so positions beyond the original train window stay usable.
+**RoPE scaling** adjusts rotary frequencies (Llama 3-style wavelength smoothing) so positions beyond the original training window stay usable. Short-context pretrain plus naive long indices makes rotations wrap badly and quality collapses far out. Long-context products need a **recipe extension**, not “just set max_seq bigger.” Match checkpoint \`theta\` and scale factors, optionally continue-train on long data, and eval both short and long.
 
-**Why:** Short-context pretrain + naive long indices → rotations wrap badly; quality collapses far out. Long-context products need a **recipe extension**, not “just set max_seq bigger.”
-
-**How:** Match checkpoint \`theta\` + scale factors; optionally continue-train on long data; eval short and long.
-
-### 1. What — code hook
+### Code hook
 
 [\`llama3_inv_freq\`](https://github.com/chaxus/arche/blob/main/arche/rope.py) / \`build_rope_cache(..., scale_factor=..., low_freq_factor=..., high_freq_factor=..., original_max_position=...)\`.
 
 When \`scale_factor == 1.0\`, plain RoPE. Otherwise wavelength bands are scaled/smoothed the HF Llama-3 way—**same math the 128k-class configs advertise**.
 
-### 2. Why — not free length
+### Length is not free
 
 | Illusion | Reality |
 | --- | --- |
@@ -1754,7 +1638,7 @@ When \`scale_factor == 1.0\`, plain RoPE. Otherwise wavelength bands are scaled/
 | Bigger window free | KV memory ↑ with length |
 | Scaling = long knowledge | Still need data / continued train for hard long tasks |
 
-### 3. How — from zero
+### Apply the recipe
 
 | Step | Do |
 | --- | --- |
@@ -1763,15 +1647,13 @@ When \`scale_factor == 1.0\`, plain RoPE. Otherwise wavelength bands are scaled/
 | 3 | Keep short-context sanity checks |
 | 4 | Long-bench / needle tests before claiming 128k |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Factors match the checkpoint |
-| **Soft** | Near context still stable; far context usable |
-| **Soft** | Long-bench acceptable for the product bar |
+| Must hold | Factors match the checkpoint |
+| Worth aiming for | Near context still stable; far context usable |
+| Worth aiming for | Long-bench acceptable for the product bar |
 
-### 5. Improve · whole-model impact
+### Whole-model impact
 
 | Lever | Impact |
 | --- | --- |
@@ -1779,7 +1661,7 @@ When \`scale_factor == 1.0\`, plain RoPE. Otherwise wavelength bands are scaled/
 | YaRN / NTK / … | Other open recipes—don’t mix under Llama weights |
 | Longer windows | Always pay in KV |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep13_rope_scaling.py
@@ -1807,13 +1689,11 @@ python chapters/01-inference/ep13_rope_scaling.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-**What:** **Mixture-of-Experts (MoE)** — replace the dense SwiGLU with **many experts + a router**; each token runs **top-k** only.
+**Mixture-of-Experts (MoE)** swaps the dense SwiGLU for many experts plus a router; each token only runs **top-k** of them. You get huge parameter capacity while per-token compute stays near the dense case. DeepSeek-V3’s open story is largely MoE for capacity and MLA for KV; Mixtral is another open MoE. This course stayed on dense Llama 3.2 first so you can read the FFN before the sparse map.
 
-**Why:** Huge parameter capacity at near-dense **per-token** compute. **DeepSeek-V3**’s open story is largely **MoE (capacity) + MLA (KV)**; Mixtral is another open MoE. This course’s Llama 3.2 example stayed **dense** on purpose—MoE is the map after you can read the dense FFN.
+Pick \`E\` and \`top_k\`, wire experts and a gate, add load-balance loss in serious training, and plan how experts land in checkpoints.
 
-**How:** Pick \`E\` / \`top_k\`; experts + gate; aux load-balance in real trains; sparse infer; shard experts in checkpoints.
-
-### 1. What — forward
+### Forward pass
 
 [\`MoESwiGLU\`](https://github.com/chaxus/arche/blob/main/arche/moe.py):
 
@@ -1824,9 +1704,9 @@ top_probs, top_idx = probs.topk(self.top_k, dim=-1)
 # weighted sum of selected SwiGLU experts
 \`\`\`
 
-Same decoder spine; only the MLP slot changes.
+The decoder spine stays the same; only the MLP slot changes.
 
-### 2. Why — dense vs sparse
+### Dense vs sparse
 
 | | Dense SwiGLU | MoE |
 | --- | --- | --- |
@@ -1834,7 +1714,7 @@ Same decoder spine; only the MLP slot changes.
 | Per-token FLOPs | Full FFN | ≈ \`top_k\` experts |
 | Failure mode | — | Expert collapse without balancing |
 
-### 3. How — from zero
+### From zero
 
 | Step | Do |
 | --- | --- |
@@ -1843,15 +1723,13 @@ Same decoder spine; only the MLP slot changes.
 | 3 | Add load-balance loss in serious training |
 | 4 | Plan expert-parallel / sharded loads |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Valid routes; merge weights sum sanely |
-| **Soft** | Balanced expert load; quality/capacity trade OK |
-| **Soft** | Checkpoint maps cover all experts |
+- Routes are valid; merge weights sum sanely.
+- Expert load stays roughly balanced; quality/capacity trade feels OK.
+- Checkpoint maps cover every expert.
 
-### 5. Improve · whole-model impact
+### Levers
 
 | Lever | Impact |
 | --- | --- |
@@ -1859,7 +1737,7 @@ Same decoder spine; only the MLP slot changes.
 | Balance loss | Fights collapse |
 | Expert parallel | Multi-GPU engineering cost |
 
-### 6. Industry map
+### Industry map
 
 | Line | Role |
 | --- | --- |
@@ -1867,7 +1745,7 @@ Same decoder spine; only the MLP slot changes.
 | **Mixtral** | Top-2 SwiGLU experts |
 | **Llama 3.2 ~1B (course)** | Dense first |
 
-### 7. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep14_moe.py
@@ -1895,13 +1773,11 @@ python chapters/01-inference/ep14_moe.py
     estimatedMinutes: 18,
     markdown: `## Idea
 
-**What:** **Multi-head Latent Attention (MLA)** — compress KV into low-rank **latents** (+ a small RoPE stream) instead of caching full per-head K/V.
+**Multi-head Latent Attention (MLA)** compresses KV into low-rank **latents** plus a small RoPE stream, instead of caching full per-head K/V. After GQA, long-context cache can still explode; DeepSeek-V2/V3 push MLA here while Llama/Qwen dense mainlines stay on GQA. Read with MoE: capacity vs KV.
 
-**Why:** After GQA, long-context KV can still explode. DeepSeek-V2/V3 push MLA for cache; Llama/Qwen dense mainlines stay on **GQA**. Together with MoE: **MoE = capacity, MLA = KV**.
+This lesson is a **shape primer**, not a bit-exact DeepSeek port. Pick a latent rank, project, cache latent + RoPE key, expand when attending.
 
-**How:** Pick latent rank; project to latent; cache latent + RoPE key; expand when attending. This lesson is a **shape primer**, not bit-exact DeepSeek.
-
-### 1. What — cache shape
+### Cache shape
 
 [\`MLACache\` / \`MultiHeadLatentAttention\`](https://github.com/chaxus/arche/blob/main/arche/mla.py):
 
@@ -1912,9 +1788,9 @@ class MLACache:
     k_rope: torch.Tensor     # (batch, seq, rope_dim)
 \`\`\`
 
-Much smaller than \`(batch, kv_heads, seq, head_dim)\` full KV when rank ≪ heads×dim.
+When rank ≪ heads×dim, this is much smaller than full \`(batch, kv_heads, seq, head_dim)\` KV.
 
-### 2. Why — vs GQA
+### Versus GQA
 
 | | GQA (Llama path) | MLA (DeepSeek path) |
 | --- | --- | --- |
@@ -1922,39 +1798,37 @@ Much smaller than \`(batch, kv_heads, seq, head_dim)\` full KV when rank ≪ hea
 | Goal | Cut heads | Cut rank further |
 | Swap cost | Architecture-level either way |
 
-### 3. How — from zero
+### From zero
 
 | Step | Do |
 | --- | --- |
 | 1 | Choose \`kv_lora_rank\`, optional \`q_lora_rank\` |
 | 2 | Decouple RoPE dims from content latent |
 | 3 | Cache latents across decode steps |
-| 4 | Compare memory vs GQA at same quality bar |
+| 4 | Compare memory vs GQA at the same quality bar |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Consistent shapes; cache append along seq |
-| **Soft** | Smaller cache; quality near full KV for the product bar |
-| **Soft** | Engines gaining MLA support over time |
+- Shapes stay consistent; cache appends along seq.
+- Cache is smaller; quality near full KV for your product bar.
+- Don’t drop MLA under Llama GQA weights.
 
-### 5. Improve · whole-model impact
+### Levers
 
 | Lever | Impact |
 | --- | --- |
 | Smaller latent | Save memory / risk quality |
 | + paging | Same serve tricks as GQA stacks |
-| Don’t mix under Llama GQA weights | Silent wrong attention |
+| Mix under wrong weights | Silent wrong attention |
 
-### 6. Industry map
+### Industry map
 
 | Line | Attention / KV |
 | --- | --- |
 | **DeepSeek-V2 / V3** | MLA (+ MoE body) |
 | **Llama 3 / Qwen dense** | GQA mainline |
 
-### 7. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep15_mla.py
@@ -1983,13 +1857,9 @@ python chapters/01-inference/ep15_mla.py
     demo: 'chat',
     markdown: `## Idea
 
-**What:** Shipping glue — **device** placement, a teaching **INT8** shrink, and **chat templates** that turn roles into token ids.
+This chapter is shipping glue: **device** placement, a teaching **INT8** shrink, and **chat templates** that turn roles into token ids. A correct dense stack still fails users if it won’t run on their hardware, doesn’t fit memory, or formats chat wrong—these aren’t new layers, they’re the last mile. Probe device, optional quant recipe, apply **this model’s** template, then wire into generate and KV.
 
-**Why:** A correct dense stack still fails users if it can’t run on their box, doesn’t fit memory, or formats chat wrong. These are not new layers; they are the last mile.
-
-**How:** Probe device → optional quant recipe → apply **this model’s** template → wire into generate / KV.
-
-### 1. What — pieces
+### Pieces in the repo
 
 | Piece | Role in repo |
 | --- | --- |
@@ -1999,7 +1869,7 @@ python chapters/01-inference/ep15_mla.py
 
 Wrong template ⇒ model “ignores” system/user structure even with perfect weights.
 
-### 2. Why — product constraints
+### Product constraints
 
 | Pressure | Response |
 | --- | --- |
@@ -2008,7 +1878,7 @@ Wrong template ⇒ model “ignores” system/user structure even with perfect w
 | Multi-turn UX | Official chat template + specials |
 | Multi-backend | Engineering cost, not math |
 
-### 3. How — from zero
+### Ship a demo
 
 | Step | Do |
 | --- | --- |
@@ -2017,15 +1887,13 @@ Wrong template ⇒ model “ignores” system/user structure even with perfect w
 | 3 | Format messages with the **paired** template |
 | 4 | Generate with KV as usual |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Fallback runs; template matches tokenizer/model |
-| **Soft** | Quant quality acceptable for the demo bar |
-| **Soft** | Roles render clearly in the prompt string/ids |
+| Must hold | Fallback runs; template matches tokenizer/model |
+| Worth aiming for | Quant quality acceptable for the demo bar |
+| Worth aiming for | Roles render clearly in the prompt string/ids |
 
-### 5. Improve · whole-model impact
+### Beyond the toy path
 
 | Lever | Impact |
 | --- | --- |
@@ -2033,7 +1901,7 @@ Wrong template ⇒ model “ignores” system/user structure even with perfect w
 | Wrong template | Junk dialogues |
 | Prod quant (GPTQ/AWQ/FP8) | Engine territory (vLLM/TGI/llama.cpp) |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep16_device_quant_chat.py
@@ -2062,13 +1930,9 @@ python chapters/01-inference/ep16_device_quant_chat.py
     demo: 'batch',
     markdown: `## Idea
 
-**What:** **Continuous batching** — a serving **scheduler** shape: many users share decode steps; finished jobs retire; new ones admit mid-flight.
+**Continuous batching** is the serving **scheduler** shape: many users share decode steps; finished jobs retire and new ones admit mid-flight. A single-user generate loop wastes GPU when one sequence ends early. Engines like vLLM, TGI, and SGLang keep the device busy by stepping only **active** requests together. Active set → pad actives → sample → retire on EOS/max → repeat—the teaching scheduler is not a full paged-attention engine.
 
-**Why:** Single-user generate wastes GPU when one sequence finishes early. Industry engines (vLLM, TGI, SGLang…) keep the device busy by stepping only **active** requests together.
-
-**How:** Active set → pad/step actives → sample → retire EOS/max → repeat. Teaching scheduler ≠ full paged-attention engine.
-
-### 1. What — loop
+### Scheduler loop
 
 [\`generate_continuous\`](https://github.com/chaxus/arche/blob/main/arche/batching.py):
 
@@ -2080,7 +1944,7 @@ while any(not item.done for item in live):
 
 Each request carries its own temperature / top-k / max tokens. No weight change—pure scheduling.
 
-### 2. Why — throughput
+### Throughput picture
 
 | Single loop | Continuous batch |
 | --- | --- |
@@ -2088,7 +1952,7 @@ Each request carries its own temperature / top-k / max tokens. No weight change�
 | Idle after short finish | Retire + admit keeps GPU full |
 | Simple | Needs careful KV layout in prod |
 
-### 3. How — from zero
+### Build the toy scheduler
 
 | Step | Do |
 | --- | --- |
@@ -2097,15 +1961,13 @@ Each request carries its own temperature / top-k / max tokens. No weight change�
 | 3 | Retire on EOS / length |
 | 4 | Later: paged KV so memory matches the schedule |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Finished jobs stop; no cross-talk between rows |
-| **Soft** | Higher tokens/s on mixed-length traffic |
-| **Soft** | Steadier tail latency under load |
+| Must hold | Finished jobs stop; no cross-talk between rows |
+| Worth aiming for | Higher tokens/s on mixed-length traffic |
+| Worth aiming for | Steadier tail latency under load |
 
-### 5. Improve · whole-model impact
+### Serving ceiling
 
 | Lever | Impact |
 | --- | --- |
@@ -2113,7 +1975,7 @@ Each request carries its own temperature / top-k / max tokens. No weight change�
 | Coupled to KV layout | Prod needs paging / blocks |
 | Ignoring batching | Leaves GPU on the table |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep17_continuous_batching.py
@@ -2142,13 +2004,9 @@ python chapters/01-inference/ep17_continuous_batching.py
     demo: 'train',
     markdown: `## Idea
 
-**What:** **Alignment after pretrain** — SFT teaches “answer like the demos”; DPO (and RLHF-family methods) push **chosen vs rejected** preferences without a full RL loop in this lesson.
+**Alignment after pretrain**: SFT teaches the model to answer like your demos; DPO (and RLHF-family methods) nudge **chosen vs rejected** preferences without a full RL loop in this lesson. Next-token pretrain gives you a capable base LM—it does not by itself follow instructions or match product taste. Alignment steers an existing net; it does not invent the base skill. Flow: instruction data → mask-prompt SFT from a base ckpt → preference pairs → DPO → regression evals.
 
-**Why:** Next-token pretrain makes a base LM; it does not by itself follow instructions or match product prefs. Align steers an already capable net—it does **not** invent the base skill.
-
-**How:** Instruction data → mask-prompt SFT from a base ckpt → preference pairs → DPO (or RLHF) → eval regressions.
-
-### 1. What — SFT loss
+### SFT loss
 
 [\`sft_loss\`](https://github.com/chaxus/arche/blob/main/arche/train/sft.py): same shift as pretrain, but **only response tokens** get CE:
 
@@ -2160,7 +2018,7 @@ return losses[mask].mean()
 
 Prompt tokens are context, not supervised targets—otherwise the model “learns to rewrite the user.”
 
-### 2. What — DPO sketch
+### DPO sketch
 
 [\`dpo_loss\`](https://github.com/chaxus/arche/blob/main/arche/train/dpo.py): policy vs frozen **reference**; prefer chosen completion over rejected (β-scaled).
 
@@ -2170,9 +2028,9 @@ Prompt tokens are context, not supervised targets—otherwise the model “learn
 | **DPO** | prompt + chosen/rejected | Prefer chosen logprob margin vs ref |
 | **RLHF** (map only) | reward model + PPO-like | Not coded here |
 
-### 3. Why — order and risks
+### Order and risks
 
-| Choice | Why |
+| Choice | Why it matters |
 | --- | --- |
 | After pretrain | Need a next-token-capable base |
 | Mask prompts | Don’t burn loss on user text |
@@ -2181,7 +2039,7 @@ Prompt tokens are context, not supervised targets—otherwise the model “learn
 
 Over-align can dull base capability; often paired with new specials / chat templates.
 
-### 4. How — from zero
+### Run a toy training step
 
 | Step | Do |
 | --- | --- |
@@ -2190,15 +2048,13 @@ Over-align can dull base capability; often paired with new specials / chat templ
 | 3 | \`train_sft_step\` / \`train_dpo_step\` toys |
 | 4 | Eval following + regressions before ship |
 
-### 5. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Correct masks/shapes; ref frozen in DPO |
-| **Soft** | Better following / safety; limited capability loss |
-| **Soft** | Template + tokenizer stay paired |
+| Must hold | Correct masks/shapes; ref frozen in DPO |
+| Worth aiming for | Better following / safety; limited capability loss |
+| Worth aiming for | Template + tokenizer stay paired |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/02-training/ep19_sft_dpo.py
@@ -2226,17 +2082,15 @@ python chapters/02-training/ep19_sft_dpo.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-**What:** Speak **checkpoint names and shapes** for MoE/MLA-style open weights—save/load with a key map, including Mixtral-like \`w1/w2/w3\` expert tensors.
+Frontier MoE/MLA only helps if you can speak their **checkpoint names and shapes**—save and load with a key map, including Mixtral-like \`w1/w2/w3\` expert tensors. Structure on paper is useless if tensors won’t round-trip; a bad map leaves silent random experts.
 
-**Why:** Frontier structure on paper is useless if you can’t round-trip tensors. Bad maps → silent random experts.
+Map open names into your modules, use [\`save_checkpoint\` / \`load_checkpoint\`](https://github.com/chaxus/arche/blob/main/arche/checkpoint.py), and fail loudly on missing keys.
 
-**How:** Name map ↔ open names; [\`save_checkpoint\` / \`load_checkpoint\`](https://github.com/chaxus/arche/blob/main/arche/checkpoint.py); fail loudly on missing keys.
+### Round-trip
 
-### 1. What — round-trip
+Teaching ckpts write state + meta, reload into a matching module graph, and assert alignment. Every expert key must be present—partial MoE loads can “run” while one expert is noise.
 
-Teaching ckpts exercise: write state + meta, reload into a matching module graph, assert alignment. Expert keys must all be present—partial MoE loads look “fine” until one expert is noise.
-
-### 2. Why — naming debt
+### Naming debt
 
 | Risk | Effect |
 | --- | --- |
@@ -2244,24 +2098,22 @@ Teaching ckpts exercise: write state + meta, reload into a matching module graph
 | Expert index off-by-one | One dead expert forever |
 | Strict=False abuse | Hides map bugs |
 
-### 3. How — from zero
+### From zero
 
 | Step | Do |
 | --- | --- |
 | 1 | List open hub key patterns (Mixtral / DeepSeek docs) |
-| 2 | Build explicit map into your modules |
-| 3 | Round-trip on a tiny synthetic ckpt first |
+| 2 | Build an explicit map into your modules |
+| 3 | Round-trip a tiny synthetic ckpt first |
 | 4 | Only then touch multi-GB downloads |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Round-trip \`allclose\`; no missing experts |
-| **Hard** | Unexpected keys fail or are explicitly ignored |
-| **Soft** | Hooks ready for real hubs |
+- Round-trip \`allclose\`; no missing experts.
+- Unexpected keys fail or are explicitly ignored.
+- Hooks are ready for real hubs.
 
-### 5. Improve · whole-model impact
+### Levers
 
 | Lever | Impact |
 | --- | --- |
@@ -2269,7 +2121,7 @@ Teaching ckpts exercise: write state + meta, reload into a matching module graph
 | Bad maps | Silent quality holes |
 | Converters as standard | Same story as dense HF maps |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/02-training/ep20_frontier_ckpt.py
@@ -2297,13 +2149,11 @@ python chapters/02-training/ep20_frontier_ckpt.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-**What:** Open frontier weights arrive as **\`index.json\` + shards**, not one file. Learn to pack/unpack that layout.
+Open frontier weights usually arrive as **\`index.json\` + shards**, not one file. If you can’t assemble shards, you can’t load Llama/Qwen/DeepSeek/Mixtral-class hubs; bad concat silently corrupts tensors.
 
-**Why:** Can’t assemble shards ⇒ can’t load Llama/Qwen/DeepSeek/Mixtral-class hubs. Bad concat ⇒ silent wrong tensors.
+Use an HF-style index, partition keys, write shard files, and aggregate on load—toy size, same protocol.
 
-**How:** HF-style index; partition keys; write shard files; aggregate on load—toy size, same protocol.
-
-### 1. What — API
+### API
 
 [\`write_sharded_state\` / \`load_sharded_state\`](https://github.com/chaxus/arche/blob/main/arche/shards.py):
 
@@ -2312,9 +2162,9 @@ write_sharded_state(directory, state_dict, shard_size=...)
 state = load_sharded_state(directory)  # rebuild full dict via index
 \`\`\`
 
-Synthetic pack/unpack + \`allclose\` teaches the protocol **without** multi-tens-of-GB downloads.
+Synthetic pack/unpack plus \`allclose\` teaches the protocol **without** multi-tens-of-GB downloads.
 
-### 2. Why — scale reality
+### Why hubs shard
 
 | Single file | Sharded |
 | --- | --- |
@@ -2322,7 +2172,7 @@ Synthetic pack/unpack + \`allclose\` teaches the protocol **without** multi-tens
 | One download stream | Parallel shard fetch |
 | Peak RAM = full model | Still careful—assemble wisely |
 
-### 3. How — from zero
+### From zero
 
 | Step | Do |
 | --- | --- |
@@ -2331,15 +2181,13 @@ Synthetic pack/unpack + \`allclose\` teaches the protocol **without** multi-tens
 | 3 | Load: read index, pull only needed shards |
 | 4 | Fail clearly on missing pieces |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Index matches shards; reload aligns |
-| **Hard** | Missing shard/key errors are loud |
-| **Soft** | Shard policy balances download vs peak RAM |
+- Index matches shards; reload aligns.
+- Missing shard/key errors are loud.
+- Shard policy balances download vs peak RAM.
 
-### 5. Improve · whole-model impact
+### Levers
 
 | Lever | Impact |
 | --- | --- |
@@ -2347,7 +2195,7 @@ Synthetic pack/unpack + \`allclose\` teaches the protocol **without** multi-tens
 | Bad concat | Silent bad weights |
 | safetensors + index | Industry dominant pair |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/02-training/ep22_sharded_frontier.py
@@ -2377,13 +2225,9 @@ Path complete—revisit weak chapters, or re-run HF align with weights.
     estimatedMinutes: 18,
     markdown: `## Idea
 
-**What:** Two serving accelerators — **paged KV** (block table + shared page pool) fights memory fragmentation; **CUDA Graph** captures a fixed-shape decode step to cut launch tax.
+Two serving accelerators share this lesson: **paged KV** (block table + shared page pool) fights memory fragmentation, and **CUDA Graph** captures a fixed-shape decode step to cut launch overhead. Continuous batching without paging wastes VRAM on ragged lengths; eager CUDA launches tax every tiny decode. Together they point at vLLM-class engines—here you get a teaching stand-in, not a drop-in replacement. Logical KV → alloc/free pages via block table → \`gather_kv\` for attention; optionally capture graphs when decode shapes stay stable.
 
-**Why:** Continuous batching without paging wastes VRAM on ragged lengths; eager CUDA launches tax every tiny decode. Together they point at vLLM-class engines—this lesson is a teaching stand-in, not a drop-in.
-
-**How:** Logical KV → alloc/free pages via block table → \`gather_kv\` for attention; optional graph capture on stable decode shapes.
-
-### 1. What — paged KV
+### Paged KV
 
 [\`PagedKVPool\` / \`BlockTable\` / \`gather_kv\`](https://github.com/chaxus/arche/blob/main/arche/paged_kv.py):
 
@@ -2396,11 +2240,11 @@ cache = gather_kv(pool, table)
 
 Physical pages are shared; each sequence owns a list of page ids.
 
-### 2. What — CUDA Graph (optional)
+### CUDA Graph (optional)
 
 [\`capture_module_step\` / \`generate_with_optional_graph\`](https://github.com/chaxus/arche/blob/main/arche/cuda_graphs.py): capture a module step when CUDA is available; replay instead of re-launching. Needs **stable shapes**—why engines care about batching policy.
 
-### 3. Why — toward engines
+### Toward real engines
 
 | Piece | Pain it hits |
 | --- | --- |
@@ -2408,7 +2252,7 @@ Physical pages are shared; each sequence owns a list of page ids.
 | Graphs | Per-step CPU launch overhead |
 | Neither changes weights | Raises the serving ceiling only |
 
-### 4. How — from zero
+### Wire it up
 
 | Step | Do |
 | --- | --- |
@@ -2417,15 +2261,13 @@ Physical pages are shared; each sequence owns a list of page ids.
 | 3 | Gather before attention (teaching path) |
 | 4 | Optional graph on decode when shapes freeze |
 
-### 5. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Gather matches logical cache; tables in-bounds |
-| **Soft** | Less fragmentation / launch tax; higher throughput |
-| **Soft** | Clear skip when no CUDA |
+| Must hold | Gather matches logical cache; tables in-bounds |
+| Worth aiming for | Less fragmentation / launch tax; higher throughput |
+| Worth aiming for | Clear skip when no CUDA |
 
-### 6. This course
+### This course
 
 \`\`\`bash
 python chapters/01-inference/ep23_paged_cuda_graph.py

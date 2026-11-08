@@ -1,14 +1,10 @@
 ## Idea
 
-**What:** *Causal language modeling* / **next-token pretraining** — given tokens to the left, score every vocab id as “what comes next,” then train so the true next id gets high probability.
+**Causal language modeling** (next-token pretraining) is the self-supervised loop that turns raw text into useful weights. Given all tokens to the left, the model scores every vocabulary id for “what comes next,” and training raises the probability on the true next id. That objective writes embedding rows and almost the entire trunk—without it you only have a random shell, or you load someone else’s floats (as in the Llama example later). In one line: tokenize text → embed → forward → **shift** so position `t` predicts id `t+1` → cross-entropy → backward → optimizer step, repeated on huge corpora.
 
-**Why it matters:** This single self-supervised objective is what **writes** embedding rows and almost all trunk weights. Without it you have a random shell (or you load someone else’s floats, like the Llama example later).
+Industry uses the same names: nanoGPT’s `X,Y` windows, Hugging Face “causal LM,” Llama 3 / DeepSeek “pretrain then align.”
 
-**How (one line):** tokenize text → embed → forward → **shift** so position `t` predicts id `t+1` → cross-entropy → backward → optimizer step. Repeat on huge corpora.
-
-Industry names the same thing: nanoGPT’s `X,Y` windows, Hugging Face “causal LM”, Llama 3 / DeepSeek “pretrain then align.”
-
-### 1. What — the objective
+### The objective
 
 For a token sequence \(x_1,\ldots,x_T\):
 
@@ -24,9 +20,9 @@ Training minimizes average **negative log-likelihood** = token-level **cross-ent
 | **next-token CE** | At each time, punish low probability on the true next id |
 | **causal** | Position `t` must not see tokens after `t` (mask / decoder stack) |
 
-### 2. Why — why this design
+### Why this design
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | Predict **next** id | Turns any raw text into infinite training signal |
 | One forward → many positions | Length-`T` sequence yields ~`T-1` supervised guesses (causal mask makes each legal) |
@@ -42,7 +38,7 @@ Inference vs training:
 | After logits | sample / argmax | CE vs true id |
 | Weights | usually frozen | updated every step |
 
-### 3. How — shift, loss, one step (real code)
+### Shift, loss, and one step
 
 Tiny example ids `[10, 20, 30]` (“The cat sat” style, fake ids):
 
@@ -88,18 +84,16 @@ flowchart LR
   bwd --> adam[AdamW_step]
 ```
 
-Sanity: at random init, loss ≈ `log(V)` (uniform over vocab).
+At random init, loss ≈ `log(V)` (uniform over vocab).
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Shift is one token; causal (no future leak) |
-| **Hard** | Grads reach embed rows + trunk; no NaN |
-| **Soft** | Loss falls; samples less nonsense |
-| **Soft** | Matches published recipe at scale (later chapters) |
+- Shift is exactly one token; causality holds (no future leak).
+- Gradients reach embedding rows and trunk; no NaNs.
+- Loss trends down over a sensible window; samples get less random.
+- At scale, the recipe matches published pretrain practice (later chapters).
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -108,16 +102,16 @@ Sanity: at random init, loss ≈ `log(V)` (uniform over vocab).
 | LR / clip / accum | Finishability (next chapter) |
 | Under-train | Weak embeds **and** deep layers |
 
-Next lessons split **data windows**, **optimizers**, and **frontier scale recipes** so this chapter stays the objective + one step.
+Up next: **data windows**, **optimizers**, and **frontier scale recipes**—this chapter stays focused on the objective plus one step.
 
-### 6. Industry pointers
+### Industry pointers
 
 - Raschka FAQ: constructing input/target windows  
 - nanoGPT `train.py`: readable full loop  
 - HF LLM Course ch7.6: causal LM from scratch  
 - Llama 3 / DeepSeek reports: same family of objective, different scale & architecture  
 
-### 7. This course
+### This course
 
 ```bash
 python chapters/02-training/ep18_pretrain.py

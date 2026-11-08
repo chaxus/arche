@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** The full **dense causal LM shell**: `ids → embed → Block×N → final RMSNorm → Linear(V) → logits`.
+The **dense causal LM shell** wires embedding, `Block×N`, final RMSNorm, and the vocabulary head: `ids → embed → Block×N → final RMSNorm → Linear(V) → logits`. A single block is not yet a language model—this stack is what pretrain’s `model(batch)` has been calling from the outside. Build from config (`V,D,N,heads,…`), optionally **tie** LM head and embeddings (common on small Llamas), then init, load, or pretrain.
 
-**Why:** One block is not a language model. The stack is what `model(batch)` in pretrain called—a black box until now.
-
-**How:** Build from config (`V,D,N,heads,…`); optional **tie** LM head ↔ embed (small Llamas often do); init, then load or pretrain.
-
-### 1. What — forward
+### Forward pass
 
 [`Llama`](https://github.com/chaxus/arche/blob/main/arche/model.py):
 
@@ -20,16 +16,16 @@ return self.lm_head(x), new_caches
 
 Logits shape `(B, T, V)` — exactly what `lm_loss` consumes after shift.
 
-### 2. Why — tying and final norm
+### Tying and final norm
 
-| Choice | Why |
+| Choice | Why it matters |
 | --- | --- |
 | Final RMSNorm | Stabilize before vocab projection |
 | Tie head↔embed | Fewer params; common at ~1B |
 | Untied head | More freedom at larger scales |
 | Shared config object | One source of truth for HF map |
 
-### 3. How — from zero
+### Build from scratch
 
 | Step | Do |
 | --- | --- |
@@ -38,14 +34,12 @@ Logits shape `(B, T, V)` — exactly what `lm_loss` consumes after shift.
 | 3 | Set `tie_word_embeddings` before init/load |
 | 4 | Train with pretrain loop **or** `from_pretrained` |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Logits `(B,T,V)`; config ↔ weights; tying consistent |
-| **Soft** | Quality after load or enough pretrain steps |
+| Must hold | Logits `(B,T,V)`; config ↔ weights; tying consistent |
+| Worth aiming for | Quality after load or enough pretrain steps |
 
-### 5. Improve · whole-model impact
+### Tuning the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -53,7 +47,7 @@ Logits shape `(B, T, V)` — exactly what `lm_loss` consumes after shift.
 | MoE swap | Replaces SwiGLU inside blocks—skeleton stays |
 | Optimize modules | Don’t “tune the stack alone” without data/optim |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep09_stack.py

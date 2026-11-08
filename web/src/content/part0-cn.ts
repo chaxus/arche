@@ -12,13 +12,11 @@ export const PART0_CN: Chapter[] = [
     estimatedMinutes: 5,
     markdown: `## 要点
 
-**是什么（What）：** 本课——**一条从零对接前沿的路**，以 Llama 3.2 ~1B 为稠密例子。
+本课是**一条从零对接前沿的路**，以 **Llama 3.2 ~1B** 作稠密例子——规模够小，能在本机走完。术语先行容易迷路；这里的脊柱是：建表 → 猜词训练 → 手写主干 → 对齐 → 服务 → 最后的 MoE/MLA 地图。
 
-**为什么（Why）：** 术语先行容易迷路。需要可走完的脊柱：建表 → 猜词训练 → 手写主干 → 对齐 → 服务 → MoE/MLA 地图。
+按左侧章节读，每章跑实验；「标记已读」只在本机。代码仓库：[github.com/chaxus/arche](https://github.com/chaxus/arche)。
 
-**怎么做（How）：** 读左侧章节；跑每个实验；「标记已读」只在本机。仓库：[github.com/chaxus/arche](https://github.com/chaxus/arche)
-
-**例子：** Llama 3.2 ~1B = 前沿 dense 积木（RMSNorm、RoPE、GQA、SwiGLU、字节 BPE）× 可学规模。官方分词 + 权重 = 验收用手写栈的成品一对。
+**Llama 3.2 ~1B** 把前沿 dense 积木（RMSNorm、RoPE、GQA、SwiGLU、字节 BPE）缩到可学规模。官方分词 + 权重是后面真对照用的成品一对，不是第二条课。
 
 | 阶段 | 人话 |
 | --- | --- |
@@ -28,7 +26,7 @@ export const PART0_CN: Chapter[] = [
 | **3 服务加速** | KV、长上下文、设备/量化、连续批、分页 |
 | **4 前沿** | MoE + MLA 地图、检查点、分片 |
 
-课内 = **能跑的原理 + 前沿地图**。完整引擎 / 超大集群 / 多模态 = 带着地图再爬。
+课内给你**能跑的原理 + 前沿地图**。完整引擎、超大集群、多模态要带着这张地图再爬。
 
 ## 下一章
 
@@ -45,15 +43,13 @@ export const PART0_CN: Chapter[] = [
     estimatedMinutes: 5,
     markdown: `## 要点
 
-**是什么（What）：** 推理时大模型在**猜下一个 token**；训练时用对错**改写小数**学会这件事。
+推理时大模型在**猜下一个 token**；训练时用对错**改写小数**，学会这件事。聊天界面把回路藏起来了，但权重不是魔法文件——是海量 next-token 练习（再可选对齐）的结果。
 
-**为什么（Why）：** 聊天界面把回路藏起来了。权重不是魔法文件——是海量 next-token 练习（再可选对齐）的结果。
+**推理：** 给词表每个 id 打分 → 选出（argmax/采样）→ 拼上 → 重复。
 
-**怎么做（推理）：** 给词表每个 id 打分 → 选出（argmax/采样）→ 拼上 → 重复。
+**训练：** 真下一 id 已知 → 交叉熵 → 反传 → 嵌入行和主干权重移动。嵌入之后走 [\`/cn/pretrain/\`](/cn/pretrain/)（目标→数据→优化→规模），再写 dense 积木。
 
-**怎么做（训练）：** 真下一 id 已知 → 交叉熵 → 反传 → 嵌入行和主干权重移动。嵌入之后：[\`/cn/pretrain/\`](/cn/pretrain/) → 数据 → 优化 → 规模 → 再写 dense 积木。
-
-三个名字：**token** = 小块；**embedding** = 一排小数；**logits** = 下一 id 的分数。
+三个名字先记住：**token** = 小块；**embedding** = 一排小数；**logits** = 下一 id 的分数。
 
 \`\`\`mermaid
 flowchart LR
@@ -80,11 +76,9 @@ flowchart LR
     estimatedMinutes: 15,
     markdown: `## 要点
 
-**是什么（What）：** 一套能跑后续实验的 Python 环境。
+后面每章都默认你能跑 Python。没有 venv 和依赖，「跑本章」在碰到模型想法之前就会挂。初学路径**不需要**显卡。
 
-**为什么（Why）：** 没有 venv + 依赖，「跑本章」在碰到模型想法之前就会失败。初学路径不需要显卡。
-
-**怎么做（How）：** Python ≥ 3.10 → venv → \`pip install -r requirements.txt\` → 检查脚本打印 \`OK\`。
+用 Python ≥ 3.10，建 venv，\`pip install -r requirements.txt\`，跑检查脚本直到打印 \`OK\`。
 
 ## 动手
 
@@ -117,19 +111,15 @@ python chapters/00-start/ep00_check_setup.py
     estimatedMinutes: 5,
     markdown: `## 要点
 
-**是什么（What）：** 每个实验默认你会的几条壳命令：在哪、列文件、进仓库、激活 venv。
+实验默认你会：看当前目录、列文件、进仓库、开 venv。早期翻车多半是「目录错了」或「没开 venv」，不是数学错了。
 
-**为什么（Why）：** 早期翻车多半是「目录错了」或「没开 venv」，不是数学错了。
-
-**怎么做（How）：**
+报错先看 traceback **最后一段**，那里通常是真因。
 
 | 目的 | macOS / Linux | Windows |
 | --- | --- | --- |
 | 在哪 | \`pwd\` | \`pwd\` |
 | 列表 | \`ls\` | \`dir\` |
 | 进目录 | \`cd arche\` | \`cd arche\` |
-
-报错先看 traceback **最后一段**。
 
 ## 动手
 
@@ -154,16 +144,11 @@ python chapters/01-inference/ep01_overview.py   # 可选
     estimatedMinutes: 4,
     markdown: `## 要点
 
-**是什么（What）：** 站点怎么展示代码——库实现（\`arche/\`）vs 实验脚本（\`chapters/...\`）。
+站点把代码分成**库实现**（\`arche/\`）和**实验脚本**（\`chapters/...\`）。第一天靠跑和读学，不靠默写 Python。知道往哪看，胜过背 API。
 
-**为什么（Why）：** 第一天靠跑和读学，不靠默写 Python。知道往哪看，胜过背 API。
+每章打开 **代码** 卡片：**库实现**是本课模块；**实验脚本**是你要跑的文件。
 
-**怎么做（How）：** 每章打开 **代码** 卡片：
-
-1. **库实现** — 本课对应的模块  
-2. **实验脚本** — 你要跑的文件  
-
-在脚本里认出：说明 → \`import\` → \`def main\` → \`print\` → \`if __name__\`。
+脚本里按顺序扫：说明 → \`import\` → \`def main\` → \`print\` → \`if __name__\`。
 
 ## 下一章
 
@@ -180,11 +165,9 @@ python chapters/01-inference/ep01_overview.py   # 可选
     estimatedMinutes: 3,
     markdown: `## 要点
 
-**是什么（What）：** 一页看清五段路，以及何时需要 Hugging Face 登录。
+一页看清五段路，以及 Hugging Face 登录什么时候才需要。没有地图，第 1 部分会像随机积木。登录只在加载/对齐**官方 Llama** 时用——教学 BPE 和多数形状实验不需要。
 
-**为什么（Why）：** 没有地图，第 1 部分会像随机积木。登录只在加载/对齐官方 Llama 时需要——教学 BPE 与多数形状实验不需要。
-
-**怎么做（How）：** 跟 Previous/Next；心里留着这张图：
+跟 Previous/Next，心里留着这张图：
 
 \`\`\`mermaid
 flowchart LR

@@ -1,12 +1,8 @@
 ## 要点
 
-**是什么（What）：** **KV cache**——prefill 之后保留每层的 K/V，解码时**追加**一步，而不是每步重算全部历史。
+**KV cache** 在 prefill 之后保留每层的 K/V，解码时 **追加** 一步，而不是每个新 token 都把整段历史重算一遍。没有 cache 的正确生成环在每一步上对 growing 历史做注意力——实验长度还行，产品长度会拖死。生产解码器都会缓存 KV；GQA、MLA、paging 是在此之上再缩小存量。
 
-**为什么（Why）：** 没有 cache 的正确生成环会在每个新 token 上对整段历史重算注意力 → 产品长度不可用。生产解码器都会缓存 KV。
-
-**怎么做（How）：** 每层一个 `KVCache`；prefill 写入完整 K/V；decode 拼接新切片；GQA/MLA/paging 再缩小存量。
-
-### 1. What — 结构
+### 结构
 
 [`KVCache`](https://github.com/chaxus/arche/blob/main/arche/cache.py)：
 
@@ -22,7 +18,7 @@ class KVCache:
 
 注意力（[`CausalSelfAttention`](https://github.com/chaxus/arche/blob/main/arche/attention.py)）对新 Q/K 做 RoPE，并入 cache，再对**完整**缓存 K/V 做 SDPA。
 
-### 2. Why — 成本形状
+### 成本长什么样
 
 | 模式 | 每个新 token 的活 |
 | --- | --- |
@@ -32,7 +28,7 @@ class KVCache:
 
 GQA 已砍 `n_kv`；paging（后章）解决多用户碎片。
 
-### 3. How — 从零
+### 解码怎么接
 
 | 步骤 | 做什么 |
 | --- | --- |
@@ -41,15 +37,13 @@ GQA 已砍 `n_kv`；paging（后章）解决多用户碎片。
 | 3 | Decode：传入 cache + `start_pos`，追加一步 |
 | 4 | 绝不串层混用 cache |
 
-### 4. 怎么样算好
+### 自己核对
 
-| 类型 | 标准 |
-| --- | --- |
-| **硬** | 玩具上与全量重算数值一致 |
-| **硬** | 不串层；只在 seq 维增长 |
-| **软** | 目标上下文 × batch 装得下 |
+| 必须成立 | 玩具上与全量重算数值一致 |
+| 必须成立 | 不串层；只在 seq 维增长 |
+| 尽量做到 | 目标上下文 × batch 装得下 |
 
-### 5. 如何改进 · 对整模影响
+### 省显存的杠杆
 
 | 杠杆 | 影响 |
 | --- | --- |
@@ -57,7 +51,7 @@ GQA 已砍 `n_kv`；paging（后章）解决多用户碎片。
 | Paging | 多用户打包 |
 | 无 cache | 只适合玩具长度 |
 
-### 6. 本课
+### 本课
 
 ```bash
 python chapters/01-inference/ep12_kv_cache.py

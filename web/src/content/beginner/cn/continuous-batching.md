@@ -1,12 +1,8 @@
 ## 要点
 
-**是什么（What）：** **连续批处理**——服务端**调度**形状：多用户共享解码 step；完成的退役；新请求中途准入。
+**连续批处理**是服务端 **调度** 形状：多用户共享解码 step，完成的退役、新请求中途准入。单用户 generate 在短序列早结束后会空转 GPU。vLLM、TGI、SGLang 等引擎只对 **活跃** 请求一起迈步，把设备喂饱。活跃集 → pad → 采样 → EOS/长度退役 → 重复——教学调度器不是完整 paged-attention 引擎。
 
-**为什么（Why）：** 单用户 generate 在短序列早结束后浪费 GPU。工业引擎（vLLM、TGI、SGLang…）只对**活跃**请求一起迈步，把设备喂饱。
-
-**怎么做（How）：** 活跃集 → pad/步进 → 采样 → EOS/长度退役 → 重复。教学调度器 ≠ 完整 paged-attention 引擎。
-
-### 1. What — 环
+### 调度环
 
 [`generate_continuous`](https://github.com/chaxus/arche/blob/main/arche/batching.py)：
 
@@ -18,7 +14,7 @@ while any(not item.done for item in live):
 
 每个请求自带 temperature / top-k / 最大长度。不改权重——纯调度。
 
-### 2. Why — 吞吐
+### 吞吐对比
 
 | 单环 | 连续批 |
 | --- | --- |
@@ -26,7 +22,7 @@ while any(not item.done for item in live):
 | 短请求结束后空转 | 退役 + 准入保持 GPU 满 |
 | 简单 | 生产要小心 KV 布局 |
 
-### 3. How — 从零
+### 搭玩具调度器
 
 | 步骤 | 做什么 |
 | --- | --- |
@@ -35,15 +31,13 @@ while any(not item.done for item in live):
 | 3 | EOS / 长度时退役 |
 | 4 | 随后用 paged KV 让显存匹配调度 |
 
-### 4. 怎么样算好
+### 自己核对
 
-| 类型 | 标准 |
-| --- | --- |
-| **硬** | 完成的会停；行间不串话 |
-| **软** | 长短混合流量下 tokens/s 更高 |
-| **软** | 负载下尾延迟更稳 |
+| 必须成立 | 完成的会停；行间不串话 |
+| 尽量做到 | 长短混合流量下 tokens/s 更高 |
+| 尽量做到 | 负载下尾延迟更稳 |
 
-### 5. 如何改进 · 对整模影响
+### 服务天花板
 
 | 杠杆 | 影响 |
 | --- | --- |
@@ -51,7 +45,7 @@ while any(not item.done for item in live):
 | 耦合 KV 布局 | 生产要 paging / block |
 | 忽略批处理 | GPU 白白闲着 |
 
-### 6. 本课
+### 本课
 
 ```bash
 python chapters/01-inference/ep17_continuous_batching.py

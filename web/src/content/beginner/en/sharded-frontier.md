@@ -1,12 +1,10 @@
 ## Idea
 
-**What:** Open frontier weights arrive as **`index.json` + shards**, not one file. Learn to pack/unpack that layout.
+Open frontier weights usually arrive as **`index.json` + shards**, not one file. If you can’t assemble shards, you can’t load Llama/Qwen/DeepSeek/Mixtral-class hubs; bad concat silently corrupts tensors.
 
-**Why:** Can’t assemble shards ⇒ can’t load Llama/Qwen/DeepSeek/Mixtral-class hubs. Bad concat ⇒ silent wrong tensors.
+Use an HF-style index, partition keys, write shard files, and aggregate on load—toy size, same protocol.
 
-**How:** HF-style index; partition keys; write shard files; aggregate on load—toy size, same protocol.
-
-### 1. What — API
+### API
 
 [`write_sharded_state` / `load_sharded_state`](https://github.com/chaxus/arche/blob/main/arche/shards.py):
 
@@ -15,9 +13,9 @@ write_sharded_state(directory, state_dict, shard_size=...)
 state = load_sharded_state(directory)  # rebuild full dict via index
 ```
 
-Synthetic pack/unpack + `allclose` teaches the protocol **without** multi-tens-of-GB downloads.
+Synthetic pack/unpack plus `allclose` teaches the protocol **without** multi-tens-of-GB downloads.
 
-### 2. Why — scale reality
+### Why hubs shard
 
 | Single file | Sharded |
 | --- | --- |
@@ -25,7 +23,7 @@ Synthetic pack/unpack + `allclose` teaches the protocol **without** multi-tens-o
 | One download stream | Parallel shard fetch |
 | Peak RAM = full model | Still careful—assemble wisely |
 
-### 3. How — from zero
+### From zero
 
 | Step | Do |
 | --- | --- |
@@ -34,15 +32,13 @@ Synthetic pack/unpack + `allclose` teaches the protocol **without** multi-tens-o
 | 3 | Load: read index, pull only needed shards |
 | 4 | Fail clearly on missing pieces |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Index matches shards; reload aligns |
-| **Hard** | Missing shard/key errors are loud |
-| **Soft** | Shard policy balances download vs peak RAM |
+- Index matches shards; reload aligns.
+- Missing shard/key errors are loud.
+- Shard policy balances download vs peak RAM.
 
-### 5. Improve · whole-model impact
+### Levers
 
 | Lever | Impact |
 | --- | --- |
@@ -50,7 +46,7 @@ Synthetic pack/unpack + `allclose` teaches the protocol **without** multi-tens-o
 | Bad concat | Silent bad weights |
 | safetensors + index | Industry dominant pair |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/02-training/ep22_sharded_frontier.py

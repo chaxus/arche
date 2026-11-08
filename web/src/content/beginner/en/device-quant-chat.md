@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** Shipping glue — **device** placement, a teaching **INT8** shrink, and **chat templates** that turn roles into token ids.
+This chapter is shipping glue: **device** placement, a teaching **INT8** shrink, and **chat templates** that turn roles into token ids. A correct dense stack still fails users if it won’t run on their hardware, doesn’t fit memory, or formats chat wrong—these aren’t new layers, they’re the last mile. Probe device, optional quant recipe, apply **this model’s** template, then wire into generate and KV.
 
-**Why:** A correct dense stack still fails users if it can’t run on their box, doesn’t fit memory, or formats chat wrong. These are not new layers; they are the last mile.
-
-**How:** Probe device → optional quant recipe → apply **this model’s** template → wire into generate / KV.
-
-### 1. What — pieces
+### Pieces in the repo
 
 | Piece | Role in repo |
 | --- | --- |
@@ -16,7 +12,7 @@
 
 Wrong template ⇒ model “ignores” system/user structure even with perfect weights.
 
-### 2. Why — product constraints
+### Product constraints
 
 | Pressure | Response |
 | --- | --- |
@@ -25,7 +21,7 @@ Wrong template ⇒ model “ignores” system/user structure even with perfect w
 | Multi-turn UX | Official chat template + specials |
 | Multi-backend | Engineering cost, not math |
 
-### 3. How — from zero
+### Ship a demo
 
 | Step | Do |
 | --- | --- |
@@ -34,15 +30,13 @@ Wrong template ⇒ model “ignores” system/user structure even with perfect w
 | 3 | Format messages with the **paired** template |
 | 4 | Generate with KV as usual |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Fallback runs; template matches tokenizer/model |
-| **Soft** | Quant quality acceptable for the demo bar |
-| **Soft** | Roles render clearly in the prompt string/ids |
+| Must hold | Fallback runs; template matches tokenizer/model |
+| Worth aiming for | Quant quality acceptable for the demo bar |
+| Worth aiming for | Roles render clearly in the prompt string/ids |
 
-### 5. Improve · whole-model impact
+### Beyond the toy path
 
 | Lever | Impact |
 | --- | --- |
@@ -50,7 +44,7 @@ Wrong template ⇒ model “ignores” system/user structure even with perfect w
 | Wrong template | Junk dialogues |
 | Prod quant (GPTQ/AWQ/FP8) | Engine territory (vLLM/TGI/llama.cpp) |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep16_device_quant_chat.py

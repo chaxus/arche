@@ -1,12 +1,8 @@
 ## 要点
 
-**是什么（What）：** 预训练一步的**优化器一侧**——AdamW、学习率（与日程）、梯度裁剪、梯度累积——让 CE 目标能稳定改写权重。
+损失写对之后，**每步的优化器一侧**决定权重能不能稳定更新。AdamW、学习率（与日程）、梯度裁剪、梯度累积是常见旋钮。CE 对了、优化器烂了，仍会得到 NaN、发散或 loss 不动——离开玩具规模，**怎么迈步**决定跑不跑得完。骨架是：`zero_grad` → 前向 → loss → `backward` →（可选 clip）→ `optimizer.step` →（可选 lr schedule；显存不够时用微 batch **累积梯度**）。
 
-**为什么（Why）：** 损失写对了、优化器写烂 → NaN、发散或 loss 卡死。离开玩具规模后，**怎么迈步**决定跑得完跑不完。
-
-**怎么做（How）：** `zero_grad` → 前向 → loss → `backward` →（可选 clip）→ `optimizer.step` →（可选 lr schedule）。`B` 必须很小时，用微 batch **累积梯度**。
-
-### 1. What — 旋钮
+### 会动到的旋钮
 
 | 旋钮 | 作用 |
 | --- | --- |
@@ -30,7 +26,7 @@ for batch in batches:
 
 尚无 schedule/clip——刻意如此。生产在同一骨架外包一层。
 
-### 2. Why — 各自的理由
+### 各自在解决什么
 
 | 选择 | 原因 |
 | --- | --- |
@@ -40,7 +36,7 @@ for batch in batches:
 | Clip | 一个坏 batch 不该炸掉浮点 |
 | 累积 | 显存不够时仍保持有效 batch |
 
-### 3. How — 累积草图
+### 累积草图
 
 ```python
 opt.zero_grad(set_to_none=True)
@@ -60,16 +56,14 @@ flowchart LR
   step --> sch[lr日程]
 ```
 
-### 4. 怎么样算好
+### 自己核对
 
-| 类型 | 标准 |
-| --- | --- |
-| **硬** | loss/梯度无 NaN/Inf（clip 后） |
-| **硬** | 每个**优化器**步才 `zero_grad`（累积时别清早了） |
-| **软** | 合理窗口内 loss 下行 |
-| **软** | 放大时 lr 日程对齐已知菜谱 |
+- loss / 梯度无 NaN/Inf（clip 后）。
+- 每个**优化器**步才 `zero_grad`（累积时别清早了）。
+- 合理窗口内 loss 下行。
+- 放大时 lr 日程对齐已知菜谱。
 
-### 5. 如何改进 · 对整模影响
+### 对整模的影响
 
 | 杠杆 | 影响 |
 | --- | --- |
@@ -78,7 +72,7 @@ flowchart LR
 | clip 阈值 | 扛尖峰 vs 更新过弱 |
 | decay 设错 | 过度收缩或正则不足 |
 
-### 6. 本课
+### 本课
 
 ```bash
 python chapters/02-training/ep18_pretrain.py

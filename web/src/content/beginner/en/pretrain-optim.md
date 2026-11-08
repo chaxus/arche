@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** The **optimizer side** of one pretrain step—AdamW, learning rate (and schedules), gradient clipping, and gradient accumulation—so the CE objective actually moves weights stably.
+Once the loss is right, **the optimizer side** of each step decides whether weights move in a stable way. AdamW, learning rate (and schedules), gradient clipping, and gradient accumulation are the usual knobs. Correct CE with a bad optimizer still gives NaNs, divergence, or a flat loss—past toy scale, **how you step** is what makes a run finish. The skeleton is: `zero_grad` → forward → loss → `backward` → (optional clip) → `optimizer.step` → (optional lr schedule; accumulate over micro-batches when VRAM forces small `B`).
 
-**Why:** Correct loss + bad optim → NaNs, divergence, or “loss stuck.” At any scale past toys, **how you step** decides whether a run finishes.
-
-**How:** `zero_grad` → forward → loss → `backward` → (optional clip) → `optimizer.step` → (optional lr schedule). Accumulate grads over micro-batches when `B` must stay small.
-
-### 1. What — knobs
+### Knobs you will touch
 
 | Knob | Role |
 | --- | --- |
@@ -28,11 +24,11 @@ for batch in batches:
     opt.step()
 ```
 
-No schedule/clip yet—on purpose. Production adds them around the same skeleton.
+No schedule or clip yet—on purpose. Production adds them around the same skeleton.
 
-### 2. Why — each piece
+### Why each piece exists
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | AdamW over plain SGD | Sparse-ish token grads + many params; adaptive scales help |
 | Weight decay | Mild regularization; AdamW’s form matches LLM practice |
@@ -40,7 +36,7 @@ No schedule/clip yet—on purpose. Production adds them around the same skeleton
 | Clip | One bad batch shouldn’t blow FP math |
 | Accum | Fit long `T` / big models on limited VRAM while keeping effective batch |
 
-### 3. How — accumulation sketch
+### Gradient accumulation sketch
 
 ```python
 opt.zero_grad(set_to_none=True)
@@ -60,16 +56,14 @@ flowchart LR
   step --> sch[lr_schedule]
 ```
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | No NaN/Inf in loss or grads after clip |
-| **Hard** | `zero_grad` each **optimizer** step (not forgotten under accum) |
-| **Soft** | Loss trends down over a sensible window |
-| **Soft** | lr schedule matches a known recipe when you scale up |
+- No NaN/Inf in loss or grads after clip.
+- `zero_grad` runs once per **optimizer** step—not forgotten under accumulation.
+- Loss trends down over a sensible window.
+- When you scale up, lr schedule matches a known recipe.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -78,7 +72,7 @@ flowchart LR
 | clip threshold | Spike survival vs under-updating |
 | Wrong decay | Over-shrink or under-regularize weights |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/02-training/ep18_pretrain.py

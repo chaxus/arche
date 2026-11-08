@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** **Autoregressive generation** — turn logits into text by looping: score → pick next id → append → stop.
+**Autoregressive generation** is the loop that turns logits into text: score → pick the next token id → append → stop. A trained or loaded stack only emits scores until you wrap it in this loop; products differ in sampling and stop rules, but they all share the same shape. Take last-position logits, optional temperature / top-k, greedy or sample, halt on EOS or max length—KV cache (next chapter) makes the same loop fast at long outputs.
 
-**Why:** A trained/loaded stack only emits scores. Products differ in sampling and stop rules; they share this loop. Without it you have a classifier-shaped forward, not a chatbot.
-
-**How:** Last-position logits → optional temperature / top-k → greedy or sample → append → halt on EOS or max length. KV cache (next part) makes the same loop fast.
-
-### 1. What — skeleton
+### Loop skeleton
 
 [`arche/generate.py`](https://github.com/chaxus/arche/blob/main/arche/generate.py) roughly:
 
@@ -19,7 +15,7 @@ next_id = sample(logits[:, -1, :], temperature=..., top_k=...)  # or argmax
 
 Prefill runs the full prompt once; decode feeds one new token at a time when cache is on.
 
-### 2. Why — knobs ≠ weights
+### Knobs are not weights
 
 | Knob | Changes |
 | --- | --- |
@@ -28,7 +24,7 @@ Prefill runs the full prompt once; decode feeds one new token at a time when cac
 | EOS / max length | UX and safety bounds |
 | Chat template | How roles become ids (later device/quant/chat) |
 
-### 3. How — from zero
+### Wire it up
 
 | Step | Do |
 | --- | --- |
@@ -37,15 +33,13 @@ Prefill runs the full prompt once; decode feeds one new token at a time when cac
 | 3 | Sample or argmax → append id |
 | 4 | Repeat until stop; decode ids → text |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Stops; only past tokens visible; valid vocab ids |
-| **Soft** | With real weights, coherent short completions |
-| **Soft** | Same prompt + greedy ≈ stable across runs |
+| Must hold | Stops; only past tokens visible; valid vocab ids |
+| Worth aiming for | With real weights, coherent short completions |
+| Worth aiming for | Same prompt + greedy ≈ stable across runs |
 
-### 5. Improve · whole-model impact
+### Tuning behavior without retraining
 
 | Lever | Impact |
 | --- | --- |
@@ -54,7 +48,7 @@ Prefill runs the full prompt once; decode feeds one new token at a time when cac
 | Constrained decoding | Structured outputs |
 | Bad stop rules | Runaway or clipped answers |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep11_generate.py

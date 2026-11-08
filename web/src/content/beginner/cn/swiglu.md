@@ -1,12 +1,8 @@
 ## 要点
 
-**是什么（What）：** **SwiGLU**——门控前馈：`down(silu(gate(x)) * up(x))`，三张**无 bias** 线性层。
+**SwiGLU** 是门控前馈：`down(silu(gate(x)) * up(x))`，三张**无 bias** 线性层。注意力在位置*之间*混合；FFN 在*每个*位置上单独变换。SwiGLU（不是纯 GELU MLP）是 Llama、Qwen 稠密默认；MoE 的 expert 常常就是同一块。选定 `intermediate_dim`、三张投影矩阵，接在 block 里第二次 pre-norm 之后。
 
-**为什么（Why）：** 注意力在位置*之间*混合；FFN 在*每个*位置上变换。SwiGLU（而非纯 GELU MLP）是 Llama/Qwen 稠密默认；MoE 的 expert 常常就是同一块。
-
-**怎么做（How）：** 选定 `intermediate_dim`，三张矩阵，接在 block 里第二次 pre-norm 之后。
-
-### 1. What — 代码
+### 仓库里的实现
 
 [`arche/mlp.py`](https://github.com/chaxus/arche/blob/main/arche/mlp.py)：
 
@@ -18,7 +14,7 @@ class SwiGLU(nn.Module):
 
 gate / up 把 `D → I`；down 回到 `I → D`。无 bias——对齐 Llama 权重文件。
 
-### 2. Why — 门控 vs 普通 MLP
+### 门控 FFN 与普通 MLP
 
 | 选择 | 原因 |
 | --- | --- |
@@ -27,7 +23,7 @@ gate / up 把 `D → I`；down 回到 `I → D`。无 bias——对齐 Llama 权
 | 无 bias | 更省，对齐开源 Llama/Qwen 张量 |
 | 按位置 | 易并行；配残差 |
 
-### 3. How — 从零
+### 从零接上
 
 | 步骤 | 做什么 |
 | --- | --- |
@@ -36,14 +32,12 @@ gate / up 把 `D → I`；down 回到 `I → D`。无 bias——对齐 Llama 权
 | 3 | 放在 `post_attention_layernorm` 后 |
 | 4 | 以后 MoE：许多 SwiGLU + router |
 
-### 4. 怎么样算好
+### 自己核对
 
-| 类型 | 标准 |
-| --- | --- |
-| **硬** | 进出维 `D`；无 bias；gate 上 SiLU |
-| **软** | 用整模 loss / 质量评判，不孤立看 FFN |
+- 进出维 `D`；无 bias；gate 上 SiLU。
+- 用整模 loss / 质量评判，不孤立看 FFN。
 
-### 5. 如何改进 · 对整模影响
+### 对整模的影响
 
 | 杠杆 | 影响 |
 | --- | --- |
@@ -51,7 +45,7 @@ gate / up 把 `D → I`；down 回到 `I → D`。无 bias——对齐 Llama 权
 | GELU → SwiGLU | 需重训 |
 | MoE experts | 同一砖 × E，稀疏点火 |
 
-### 6. 本课
+### 本课
 
 ```bash
 python chapters/01-inference/ep07_swiglu.py

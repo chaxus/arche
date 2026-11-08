@@ -1,12 +1,8 @@
 ## 要点
 
-**是什么（What）：** **RMSNorm**——按 token 稳住尺度：除以均方根，再乘可学习 `γ`。不减均值、无 bias。
+**RMSNorm** 按 token 稳住激活尺度：除以均方根，再乘可学习的 `γ`；不减均值、无 bias。深的 next-token 栈没有归一化容易炸或塌，Llama 风格 **pre-norm**（先 norm 再 attention / MLP）让从零堆深度训得动。实践上在每个 pre-norm 位点放 `RMSNorm(D)`，`γ` 初值约 1，与整网一起训练。
 
-**为什么（Why）：** 深 next-token 栈没有归一化容易炸或塌。Llama 风格 **pre-norm**（先 norm 再 attn / MLP）让从零堆深度训得动。
-
-**怎么做（How）：** 每个 pre-norm 位点放 `RMSNorm(D)`；`γ` 初值约 1；与整网一起训。
-
-### 1. What — 公式
+### 公式与代码
 
 \[
 \mathrm{RMSNorm}(x)=\frac{x}{\sqrt{\mathrm{mean}(x^2)+\varepsilon}}\odot\gamma
@@ -22,7 +18,7 @@ return (self.weight.float() * x_normed).to(orig_dtype)
 
 在 float32 里算再 cast 回去——与 HF Llama 同一类稳定性手法。
 
-### 2. Why — 相对 LayerNorm / 位置
+### 相对 LayerNorm 与摆放位置
 
 | 选择 | 原因 |
 | --- | --- |
@@ -33,7 +29,7 @@ return (self.weight.float() * x_normed).to(orig_dtype)
 
 GPT-2 教学常是 LayerNorm + post-norm。本课例子是 **RMSNorm + pre-norm**。
 
-### 3. How — 怎么接
+### 怎么接进网络
 
 | 步骤 | 做什么 |
 | --- | --- |
@@ -42,15 +38,13 @@ GPT-2 教学常是 LayerNorm + post-norm。本课例子是 **RMSNorm + pre-norm*
 | 3 | `ε` 对齐 checkpoint（`norm_eps`） |
 | 4 | 训或加载；勿在外来权重下 LN↔RMSN 混用 |
 
-### 4. 怎么样算好
+### 自己核对
 
-| 类型 | 标准 |
-| --- | --- |
-| **硬** | 形状不变；有 `ε`；pre-norm 位点对齐菜谱 |
-| **软** | `γ=1` 时 RMS≈1；深前向更少 NaN |
-| **软** | 整模 loss / HF 对齐才是终审 |
+- 形状不变；有 `ε`；pre-norm 位点对齐菜谱。
+- `γ=1` 时 RMS≈1；深前向更少 NaN。
+- 整模 loss / HF 对齐才是终审。
 
-### 5. 如何改进 · 对整模影响
+### 对整模的影响
 
 | 杠杆 | 影响 |
 | --- | --- |
@@ -58,7 +52,7 @@ GPT-2 教学常是 LayerNorm + post-norm。本课例子是 **RMSNorm + pre-norm*
 | Pre vs post | 深度可训性 |
 | `γ` / lr | 耦合收敛 |
 
-### 6. 本课
+### 本课
 
 ```bash
 python chapters/01-inference/ep04_rmsnorm.py

@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** One **Transformer block** — the repeatable layer: pre-RMSNorm → attention → residual → pre-RMSNorm → SwiGLU → residual.
+One **Transformer block** is the repeatable layer in a decoder stack: pre-RMSNorm → attention → residual → pre-RMSNorm → SwiGLU → residual. Residuals are what let you stack many identical layers without the gradient dying—the input and output stay the same shape so you can repeat the block `N` times (Llama 3.2 ~1B uses **N=16**). In arche you wire this sandwich once in [`block.py`](https://github.com/chaxus/arche/blob/main/arche/block.py); each layer owns its own weights, and the stack chapter repeats the block.
 
-**Why:** Bricks only become a deep net when packaged with **residuals**. Same shape in and out so you can stack `N` times (Llama 3.2 ~1B: **N=16**).
-
-**How:** Wire the sandwich once; each layer gets its own weights; stack and train (or load).
-
-### 1. What — forward
+### Forward pass
 
 [`TransformerBlock`](https://github.com/chaxus/arche/blob/main/arche/block.py):
 
@@ -27,33 +23,33 @@ flowchart LR
   ffn --> add2[x_plus_ffn]
 ```
 
-### 2. Why — residuals + pre-norm
+### Residuals and pre-norm
 
-| Choice | Why |
+| Choice | Why it matters |
 | --- | --- |
 | Residual add | Gradient highway; identity path if sublayer ≈0 |
 | Pre-norm (not post) | Modern deep training stability |
 | Attn then MLP | Llama/Qwen mainline (not parallel attn∥MLP) |
 | Per-layer KV cache | Decode reuses past K/V per block |
 
-### 3. How — from zero
+### Build from scratch
 
 | Step | Do |
 | --- | --- |
-| 1 | Instantiatate norms, `CausalSelfAttention`, `SwiGLU` from config |
+| 1 | Instantiate norms, `CausalSelfAttention`, `SwiGLU` from config |
 | 2 | Keep in/out `embed_dim` |
 | 3 | Thread `cache` / `start_pos` for generate |
 | 4 | Repeat `N` times in the stack |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
+| Must hold | |
 | --- | --- |
-| **Hard** | Residuals are adds; pre-norm placement; shape `(B,T,D)` |
-| **Hard** | Cache isolated per layer |
-| **Soft** | Deep stack still trains / loads without NaNs |
+| Residuals are adds; pre-norm placement; shape `(B,T,D)` | |
+| Cache isolated per layer | |
+| Worth aiming for | Deep stack still trains / loads without NaNs |
 
-### 5. Improve · whole-model impact
+### Tuning the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -61,7 +57,7 @@ flowchart LR
 | Post → pre-norm | Enables deep from-zero training |
 | Swap insides (MLA/MoE) | Frontier variants; block boundary stays |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep08_block.py

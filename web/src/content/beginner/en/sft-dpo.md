@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** **Alignment after pretrain** — SFT teaches “answer like the demos”; DPO (and RLHF-family methods) push **chosen vs rejected** preferences without a full RL loop in this lesson.
+**Alignment after pretrain**: SFT teaches the model to answer like your demos; DPO (and RLHF-family methods) nudge **chosen vs rejected** preferences without a full RL loop in this lesson. Next-token pretrain gives you a capable base LM—it does not by itself follow instructions or match product taste. Alignment steers an existing net; it does not invent the base skill. Flow: instruction data → mask-prompt SFT from a base ckpt → preference pairs → DPO → regression evals.
 
-**Why:** Next-token pretrain makes a base LM; it does not by itself follow instructions or match product prefs. Align steers an already capable net—it does **not** invent the base skill.
-
-**How:** Instruction data → mask-prompt SFT from a base ckpt → preference pairs → DPO (or RLHF) → eval regressions.
-
-### 1. What — SFT loss
+### SFT loss
 
 [`sft_loss`](https://github.com/chaxus/arche/blob/main/arche/train/sft.py): same shift as pretrain, but **only response tokens** get CE:
 
@@ -18,7 +14,7 @@ return losses[mask].mean()
 
 Prompt tokens are context, not supervised targets—otherwise the model “learns to rewrite the user.”
 
-### 2. What — DPO sketch
+### DPO sketch
 
 [`dpo_loss`](https://github.com/chaxus/arche/blob/main/arche/train/dpo.py): policy vs frozen **reference**; prefer chosen completion over rejected (β-scaled).
 
@@ -28,9 +24,9 @@ Prompt tokens are context, not supervised targets—otherwise the model “learn
 | **DPO** | prompt + chosen/rejected | Prefer chosen logprob margin vs ref |
 | **RLHF** (map only) | reward model + PPO-like | Not coded here |
 
-### 3. Why — order and risks
+### Order and risks
 
-| Choice | Why |
+| Choice | Why it matters |
 | --- | --- |
 | After pretrain | Need a next-token-capable base |
 | Mask prompts | Don’t burn loss on user text |
@@ -39,7 +35,7 @@ Prompt tokens are context, not supervised targets—otherwise the model “learn
 
 Over-align can dull base capability; often paired with new specials / chat templates.
 
-### 4. How — from zero
+### Run a toy training step
 
 | Step | Do |
 | --- | --- |
@@ -48,15 +44,13 @@ Over-align can dull base capability; often paired with new specials / chat templ
 | 3 | `train_sft_step` / `train_dpo_step` toys |
 | 4 | Eval following + regressions before ship |
 
-### 5. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Correct masks/shapes; ref frozen in DPO |
-| **Soft** | Better following / safety; limited capability loss |
-| **Soft** | Template + tokenizer stay paired |
+| Must hold | Correct masks/shapes; ref frozen in DPO |
+| Worth aiming for | Better following / safety; limited capability loss |
+| Worth aiming for | Template + tokenizer stay paired |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/02-training/ep19_sft_dpo.py

@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** How pretraining turns raw text into **`(batch, time)` id tensors** the loss can eat—document → tokenize → pack/cut windows → batch → (optional) pad/mask.
+Pretraining needs tensors the loss can actually score: **`(batch, time)` id matrices** built from raw text. The path is document → tokenize → pack or cut fixed windows → batch → (optional) pad and mask. The objective from the previous chapter is fixed; **data shape** decides what signal each step sees. Bad windows—padding counted as labels, leaked future context, sloppy packing—quietly waste or corrupt training. Keep **labels aligned with the same shift rule** as `lm_loss`, whether you shift in the collator or inside the model.
 
-**Why:** The objective in *Pretrain* is fixed; **data shape** decides what signal each step sees. Wrong windows (empty pads as labels, leaked future, broken packing) silently waste or corrupt training.
-
-**How:** Build fixed-length contexts (or pack many docs into one stream), form batches, keep **labels aligned with the same shift rule** as your loss.
-
-### 1. What — pieces of a batch
+### What goes into a batch
 
 | Piece | Role |
 | --- | --- |
@@ -23,7 +19,7 @@ Two common layouts:
 | **Sliding / chunked** | Cut long token streams into non-overlap or stride-`T` blocks (nanoGPT style) |
 | **Packed** | Concatenate many short docs with separators / attention boundaries so GPUs stay full |
 
-### 2. Why — design pressure
+### Design pressures
 
 | Pressure | Consequence |
 | --- | --- |
@@ -32,7 +28,7 @@ Two common layouts:
 | Pad tokens | Must **not** train as if they were real next words (mask or ignore_index) |
 | Doc boundaries | Blind concat can invent fake “next tokens” across unrelated docs unless you mask |
 
-### 3. How — toy window (matches this repo)
+### Toy windows in this repo
 
 Lab batches are random ids for teaching the **loop**, not real corpora:
 
@@ -64,16 +60,14 @@ flowchart TD
   bat --> loss[same_shift_as_lm_loss]
 ```
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Every supervised position has a real next id (or masked) |
-| **Hard** | Label/input shift matches the loss implementation |
-| **Soft** | High token utilization (little pure padding) |
-| **Soft** | Mix covers the domains you care about |
+- Every supervised position has a real next id (or is masked out).
+- Label/input shift matches your loss implementation—no double shift.
+- Token utilization is high (little pure padding).
+- The domain mix matches what you want the model to learn.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -82,7 +76,7 @@ flowchart TD
 | Packing quality | Throughput and effective updates/day |
 | Domain mix | What the model becomes “fluent” at |
 
-### 6. This course
+### This course
 
 No separate script yet—reuse:
 

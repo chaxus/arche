@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** **Numeric check** — same short prompt through arche vs Hugging Face Llama 3.2; compare logits (max abs diff + argmax match).
+**HF align** runs the same short prompt through arche and Hugging Face Llama 3.2, then compares logits—max absolute diff and whether argmax matches. That’s the Part 1 proof your key map, RMSNorm, RoPE, GQA, SwiGLU, and stack layout aren’t merely shape-correct. Fix dtype, load both models, encode one prompt, forward, and report; skip cleanly when weights or login aren’t available.
 
-**Why:** End of Part 1 proof: key map, RMSNorm, RoPE, GQA, SwiGLU, stack layout aren’t “shape-right but wrong.” Catch bugs before serve/optim chapters hide them.
-
-**How:** Fixed dtype; load both models; encode one prompt; forward; report. Skip cleanly if weights/login unavailable.
-
-### 1. What — report
+### What the script reports
 
 [`compare_logits_to_hf`](https://github.com/chaxus/arche/blob/main/arche/align_hf.py):
 
@@ -19,7 +15,7 @@ argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
 
 `run_align_or_explain` returns `None` when HF weights aren’t reachable—**skip ≠ broken lesson logic**.
 
-### 2. Why — this gate
+### When numbers disagree
 
 | Failure mode | Likely cause |
 | --- | --- |
@@ -27,7 +23,7 @@ argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
 | Argmax mismatch | Same—plus dtype / device mismatch |
 | Skip | No login / gated / offline—fix env, not formulas |
 
-### 3. How — from zero
+### Run the check
 
 | Step | Do |
 | --- | --- |
@@ -36,15 +32,13 @@ argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
 | 3 | Short prompt (“The cat sat”) |
 | 4 | Assert within tolerance or print skip reason |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | With weights: argmax match; `max_abs` under lab tol |
-| **Hard** | Without weights: explicit skip, not a fake pass |
-| **Soft** | Longer prompts / more positions in CI later |
+| Must hold | With weights: argmax match; `max_abs` under lab tol |
+| Must hold | Without weights: explicit skip, not a fake pass |
+| Worth aiming for | Longer prompts / more positions in CI later |
 
-### 5. Improve · whole-model impact
+### If you fail or pass
 
 | Lever | Impact |
 | --- | --- |
@@ -52,7 +46,7 @@ argmax_match = torch.equal(arche_logits.argmax(-1), hf_logits.argmax(-1))
 | Pass | Safe to move to align (SFT/DPO) and serve |
 | Engine CI | Same idea gates vLLM-class numeric regs |
 
-### 6. This course
+### This course
 
 ```bash
 huggingface-cli login

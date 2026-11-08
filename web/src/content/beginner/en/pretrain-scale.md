@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** A **primer** on scaling the same next-token loop—more tokens, stages, parallelism—without leaving the beginner spine for a full systems course.
+The next-token loop you already know is the same one frontier labs run—they stretch it with **more tokens, staged recipes, and parallelism**, not a different objective. Llama 3.2 ~1B and trillion-token runs share **CE + one step**; they differ in data volume, lr schedules, cluster math, and sometimes **architecture** (dense vs MoE). This chapter is a map so “toy loss went down” does not feel like graduation. Read published recipes as extensions of pretrain, pretrain-data, and pretrain-optim: same loss, harder data, optim, and engineering.
 
-**Why:** Llama 3.2 ~1B and frontier runs share **objective + step**; they differ in **data volume, staged recipes, cluster math, and (sometimes) architecture** (dense vs MoE). Knowing the map prevents “my toy loss went down, so I’m done.”
-
-**How:** Read published recipes as *extensions* of chapters you already have: same CE, harder data/optim/engineering.
-
-### 1. What — scale axes
+### Axes that change with scale
 
 | Axis | Toy (this course) | Frontier-shaped |
 | --- | --- | --- |
@@ -20,7 +16,7 @@ Llama 3-style public reports: long pretrain on curated mixes, then shorter high-
 
 DeepSeek-V2/V3: **same causal LM family**, different **block** (MLA + MoE)—see Frontier chapters; training still CE + big-data optim.
 
-### 2. Why — why not stop at ep18
+### Common illusions after ep18
 
 | Illusion | Reality |
 | --- | --- |
@@ -29,7 +25,7 @@ DeepSeek-V2/V3: **same causal LM family**, different **block** (MLA + MoE)—see
 | “Bigger model only” | Data quality × tokens often dominate |
 | “SFT will fix a bad base” | Align edits style; weak pretrain stays weak |
 
-### 3. How — read a recipe in four lines
+### Reading a recipe in four lines
 
 When you open Llama / DeepSeek / Megatron writeups, map:
 
@@ -46,15 +42,13 @@ flowchart TD
   sys --> align[then_SFT_DPO]
 ```
 
-### 4. What “good” means (beginner bar)
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | You can point to which axis a paper changed |
-| **Soft** | You don’t confuse MoE **architecture** with a different **loss** |
-| **Soft** | You expect engineering chapters before “reproduce Llama” |
+- You can name which axis a paper changed (data, optim, systems, arch).
+- MoE **architecture** is not a different **loss**.
+- You expect more engineering before “reproduce Llama.”
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -63,7 +57,7 @@ flowchart TD
 | Parallel efficiency | Whether the budget is usable |
 | Arch (GQA/MoE/MLA) | Cost per token & memory—not a new objective |
 
-### 6. This course
+### This course
 
 Still the toy entry:
 

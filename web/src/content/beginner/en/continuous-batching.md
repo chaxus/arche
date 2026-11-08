@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** **Continuous batching** — a serving **scheduler** shape: many users share decode steps; finished jobs retire; new ones admit mid-flight.
+**Continuous batching** is the serving **scheduler** shape: many users share decode steps; finished jobs retire and new ones admit mid-flight. A single-user generate loop wastes GPU when one sequence ends early. Engines like vLLM, TGI, and SGLang keep the device busy by stepping only **active** requests together. Active set → pad actives → sample → retire on EOS/max → repeat—the teaching scheduler is not a full paged-attention engine.
 
-**Why:** Single-user generate wastes GPU when one sequence finishes early. Industry engines (vLLM, TGI, SGLang…) keep the device busy by stepping only **active** requests together.
-
-**How:** Active set → pad/step actives → sample → retire EOS/max → repeat. Teaching scheduler ≠ full paged-attention engine.
-
-### 1. What — loop
+### Scheduler loop
 
 [`generate_continuous`](https://github.com/chaxus/arche/blob/main/arche/batching.py):
 
@@ -18,7 +14,7 @@ while any(not item.done for item in live):
 
 Each request carries its own temperature / top-k / max tokens. No weight change—pure scheduling.
 
-### 2. Why — throughput
+### Throughput picture
 
 | Single loop | Continuous batch |
 | --- | --- |
@@ -26,7 +22,7 @@ Each request carries its own temperature / top-k / max tokens. No weight change�
 | Idle after short finish | Retire + admit keeps GPU full |
 | Simple | Needs careful KV layout in prod |
 
-### 3. How — from zero
+### Build the toy scheduler
 
 | Step | Do |
 | --- | --- |
@@ -35,15 +31,13 @@ Each request carries its own temperature / top-k / max tokens. No weight change�
 | 3 | Retire on EOS / length |
 | 4 | Later: paged KV so memory matches the schedule |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | Finished jobs stop; no cross-talk between rows |
-| **Soft** | Higher tokens/s on mixed-length traffic |
-| **Soft** | Steadier tail latency under load |
+| Must hold | Finished jobs stop; no cross-talk between rows |
+| Worth aiming for | Higher tokens/s on mixed-length traffic |
+| Worth aiming for | Steadier tail latency under load |
 
-### 5. Improve · whole-model impact
+### Serving ceiling
 
 | Lever | Impact |
 | --- | --- |
@@ -51,7 +45,7 @@ Each request carries its own temperature / top-k / max tokens. No weight change�
 | Coupled to KV layout | Prod needs paging / blocks |
 | Ignoring batching | Leaves GPU on the table |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep17_continuous_batching.py

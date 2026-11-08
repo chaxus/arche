@@ -1,12 +1,10 @@
 ## Idea
 
-**What:** The **embedding** — a `V×D` table; each token id **looks up** one row of `D` floats (`gather` / `nn.Embedding`).
+The **embedding** is a `V×D` table: each token id **looks up** one row of `D` floats (`gather` / `nn.Embedding`). Neural nets only add and multiply tensors; ids are labels with no geometry. Without float rows, attention and FFN have nothing to eat—and **pretrain writes those rows**.
 
-**Why:** Nets only add/multiply tensors. Ids are labels with no geometry; without float rows there is nothing for attention/FFN to eat. Pretrain **writes** those rows.
+After you freeze the tokenizer, set `V` and `D` (and tying), random-init the table, and let next-token training rewrite the rows you actually see. Or load official floats together with the paired tokenizer.
 
-**How:** Freeze tokenizer → set `V,D` (and tying) → random init → next-token train rewrites rows; or load official floats with the paired tokenizer.
-
-### 1. How does an id become floats—and why bother?
+### How an id becomes floats
 
 Think **locker wall**, not a dictionary gloss:
 
@@ -26,21 +24,11 @@ Tiny fake example (`D=3`):
 
 Ids `[7, 3, 7]` → three rows: row 7, then row 3, then row 7 again. **No formula turns 7 into floats**—it is a lookup.
 
-**Why floats at all?**
-
-| With only ids | With embeddings |
-| --- | --- |
-| Ids are labels; you cannot really matmul them with weights | Attention / FFN **only eat float tensors** |
-| `cat=3` vs `dog=9` has no geometry | Training nudges rows so co-occurring tokens get useful starting faces |
-| Renumbering the tokenizer breaks everything | Row index must stay locked to tokenizer id |
+**Why floats at all?** Attention and FFN only eat float tensors. Training nudges rows so co-occurring tokens get useful starting faces; renumbering the tokenizer breaks everything unless row index stays locked to tokenizer id.
 
 One line: **tokenizer numbers tokens; embedding gives each number a trainable vector the rest of the net can compute on.** Bad table ⇒ later layers train on noise; wrong pairing with the tokenizer ⇒ the pipeline is junk.
 
-**Where do those floats come from?**  
-At first they are **random** (almost no meaning). Then the whole net trains on next-token prediction; wrong guesses backprop and **rewrite rows that showed up**—frequent tokens move most. Results are saved in the checkpoint; inference only loads and gathers. This course can also load Llama’s already-trained rows.
-
-**Why a float row per token at all?**  
-Later layers are continuous math (matmul, add, nonlinearities). Integer ids are not valid inputs for that; float rows are. Training tends to push co-occurring / similar-role tokens into vectors that help “guess the next token”—a side effect of the objective, not hand-drawn word maps.
+At first rows are **random** (almost no meaning). Next-token training backprops through wrong guesses and **rewrites rows that showed up**—frequent tokens move most. Results land in the checkpoint; inference loads and gathers. This course can also load Llama’s already-trained rows.
 
 The playground on this page is exactly “gather by id.”
 
@@ -51,7 +39,7 @@ flowchart LR
   floats --> blocks[later layers eat floats only]
 ```
 
-### 2. From zero: how you generate the table
+### Building the table from zero
 
 **Not** hand-filled glosses, **not** another BPE. BPE assigns ids; embedding stores the float rows—mostly **written by pretrain**.
 
@@ -67,30 +55,18 @@ flowchart LR
 
 Init is an empty locker wall; **training writes the numbers**. This lesson’s toy table shows gather + one update; real tables come from official weights or your pretrain.
 
-### 3. What counts as a good table
+### What counts as a good table
 
-**Hard constraints**
+**Check yourself**
 
-| Check | Plain meaning |
-| --- | --- |
-| **Shape** | `(V, D)` matches config/tokenizer; `T` ids → `T` rows |
-| **Pairing** | row `i` ↔ tokenizer id `i` |
-| **Healthy values** | no NaN/Inf; RMSNorm can steady scales |
-| **Contract** | this stack: RoPE later; no absolute PE on embeds |
+- **Shape:** `(V, D)` matches config and tokenizer; `T` ids → `T` rows.  
+- **Pairing:** row `i` ↔ tokenizer id `i`.  
+- **Healthy values:** no NaN/Inf; RMSNorm can steady scales.  
+- **Contract:** this stack uses RoPE later; no absolute PE on embeds.
 
-**Optimization targets** (rarely a solo “embedding score”)
+You rarely get a solo “embedding score.” Judges are downstream loss and same-architecture compares under a fixed setup—fitting the pretrain objective, dim budget, rare-token updates, and tie/untie choices all show up there.
 
-| Check | Plain meaning | Whole-model impact |
-| --- | --- | --- |
-| **Fits pretrain objective** | frequent rows get updates | base LM skill |
-| **Dim budget** | too small → weak; too big → hungry | capacity vs stability |
-| **Rare tokens** | long-tail ids barely move | weak rare words |
-| **Tying** | tie often helps small models | params & output calibration |
-| **Downstream / loss** | same-architecture compare | **main judge** |
-
-Unlike fertility, embedding quality is judged mainly via the **full model** under a fixed setup.
-
-### 4. How to improve · impact on the whole LLM
+### Improving embeddings · whole-model impact
 
 | Lever | How | Whole-model impact |
 | --- | --- | --- |
@@ -104,7 +80,7 @@ Unlike fertility, embedding quality is judged mainly via the **full model** unde
 
 From-zero order: freeze tokenizer → set `V,D` & tying → random embed + pretrain → append rows only when protocols need new specials. **Never** mix Llama embeds with a Qwen tokenizer.
 
-### 5. Industry · well-known open models
+### What open models do
 
 | Model / line | How embeddings are done | Notes |
 | --- | --- | --- |
@@ -117,7 +93,7 @@ From-zero order: freeze tokenizer → set `V,D` & tying → random embed + pretr
 
 Consensus: embeddings are a **learnable lookup** factory-paired with the tokenizer; improving them ≈ better pretrain/tokenizer; open checkpoints store the matrix in safetensors—you write the same when training from zero.
 
-### 6. Code (this course)
+### In this course
 
 ```python
 self.weight = nn.Embedding(vocab_size, embed_dim)

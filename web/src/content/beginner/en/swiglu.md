@@ -1,12 +1,8 @@
 ## Idea
 
-**What:** **SwiGLU** — gated feed-forward: `down(silu(gate(x)) * up(x))` with three **bias-free** linears.
+**SwiGLU** is the gated feed-forward block: `down(silu(gate(x)) * up(x))` with three **bias-free** linear layers. Attention mixes *across* positions; the FFN transforms *each* position on its own. SwiGLU—not a plain GELU MLP—is the dense default in Llama and Qwen; MoE experts are often the same brick. Pick `intermediate_dim`, three projection matrices, and place the module after the second pre-norm in each block.
 
-**Why:** Attention mixes *across* positions; the FFN transforms *each* position. SwiGLU (not plain GELU MLP) is the dense default in Llama/Qwen; MoE experts are often the same unit.
-
-**How:** Pick `intermediate_dim`, three mats, wire after the second pre-norm in the block.
-
-### 1. What — code
+### Code in the repo
 
 [`arche/mlp.py`](https://github.com/chaxus/arche/blob/main/arche/mlp.py):
 
@@ -18,16 +14,16 @@ class SwiGLU(nn.Module):
 
 Gate and up expand `D → I`; down returns `I → D`. No bias—matches Llama weight files.
 
-### 2. Why — gated vs plain MLP
+### Gated FFN vs plain MLP
 
-| Choice | Why |
+| Choice | Rationale |
 | --- | --- |
 | SiLU gate × up | Soft gating; empirically strong for LMs |
 | Three mats | Slightly more params than two-mat GELU MLP at same `I` |
 | No bias | Smaller, matches open Llama/Qwen tensors |
 | Position-wise | Parallelizable; pairs with residual |
 
-### 3. How — from zero
+### Wiring from scratch
 
 | Step | Do |
 | --- | --- |
@@ -36,14 +32,12 @@ Gate and up expand `D → I`; down returns `I → D`. No bias—matches Llama we
 | 3 | Place after `post_attention_layernorm` |
 | 4 | MoE later: many SwiGLUs + router |
 
-### 4. What “good” means
+### Check yourself
 
-| Kind | Check |
-| --- | --- |
-| **Hard** | In/out dim `D`; no bias; activation is SiLU on gate |
-| **Soft** | Judge via full-model loss / quality, not isolated FFN |
+- In/out dim `D`; no bias; SiLU on the gate branch.
+- Judge via full-model loss / quality, not an isolated FFN.
 
-### 5. Improve · whole-model impact
+### Levers for the whole model
 
 | Lever | Impact |
 | --- | --- |
@@ -51,7 +45,7 @@ Gate and up expand `D → I`; down returns `I → D`. No bias—matches Llama we
 | GELU → SwiGLU | Needs retrain |
 | MoE experts | Same brick × E, sparse fire |
 
-### 6. This course
+### This course
 
 ```bash
 python chapters/01-inference/ep07_swiglu.py

@@ -12,13 +12,11 @@ export const PART0_EN: Chapter[] = [
     estimatedMinutes: 5,
     markdown: `## Idea
 
-**What:** This course — **one path from zero toward frontier-ready**, with Llama 3.2 ~1B as the dense example.
+This course is **one path from zero toward frontier-ready**, with **Llama 3.2 ~1B** as the dense example you can finish on a laptop. Jargon-first tours leave you lost; here the spine is tables → next-token train → handwritten trunk → align → serve → a MoE/MLA map at the end.
 
-**Why:** Jargon-first tours leave you lost. You need a finishable spine: tables → next-token train → handwritten trunk → align → serve → MoE/MLA map.
+Read chapters in the left nav, run each lab, and use mark-as-read locally if you like. All code lives in [github.com/chaxus/arche](https://github.com/chaxus/arche).
 
-**How:** Read left-nav chapters; run each lab; mark-as-read is local-only. Repo: [github.com/chaxus/arche](https://github.com/chaxus/arche)
-
-**Example:** Llama 3.2 ~1B = frontier dense bricks (RMSNorm, RoPE, GQA, SwiGLU, byte BPE) at a teachable scale. Official tokenizer + weights = finished pair for checks.
+**Llama 3.2 ~1B** is frontier dense bricks (RMSNorm, RoPE, GQA, SwiGLU, byte BPE) at a teachable scale. The official tokenizer plus weights are the finished pair you will load for real checks—not a second curriculum.
 
 | Stage | In plain words |
 | --- | --- |
@@ -28,7 +26,7 @@ export const PART0_EN: Chapter[] = [
 | **3 Serve faster** | KV, long context, device/quant, continuous batch, paging |
 | **4 Frontier** | MoE + MLA map, checkpoints, shards |
 
-In-course = **runnable principles + a frontier map**. Full engines / huge clusters / multimodal = next climb *with* that map.
+In-course you get **runnable principles plus a frontier map**. Full engines, huge clusters, and multimodal stacks are the next climb *with* that map in hand.
 
 ## Next
 
@@ -45,15 +43,13 @@ In-course = **runnable principles + a frontier map**. Full engines / huge cluste
     estimatedMinutes: 5,
     markdown: `## Idea
 
-**What:** An LLM at inference **guesses the next token**; at training it learns that guess by rewriting floats.
+At inference an LLM **guesses the next token**; at training it learns that guess by rewriting floats. Chat UIs hide the loop, but weights are not magic files—they are the result of huge next-token practice, then optional alignment.
 
-**Why:** Chat UIs hide the loop. Weights are not magic files—they are the result of huge next-token practice (then optional align).
+**Inference:** score every vocab id → pick one (argmax or sample) → append → repeat.
 
-**How (inference):** score every vocab id → pick (argmax/sample) → append → repeat.
+**Training:** the true next id is known → cross-entropy → backprop → embedding rows and trunk weights move. After embedding comes [\`/pretrain/\`](/pretrain/) (objective → data → optim → scale), then you hand-write the dense bricks.
 
-**How (training):** true next id is known → cross-entropy → backprop → embed rows and trunk weights move. After embedding: [\`/pretrain/\`](/pretrain/) → data → optim → scale → then dense bricks.
-
-Three names: **token** = chunk; **embedding** = float row; **logits** = next-id scores.
+Three names worth locking in: **token** = text chunk; **embedding** = one float row per id; **logits** = scores for the next id.
 
 \`\`\`mermaid
 flowchart LR
@@ -80,11 +76,9 @@ flowchart LR
     estimatedMinutes: 15,
     markdown: `## Idea
 
-**What:** A working Python env so every later lab can run.
+Every later lab assumes a working Python environment. Without a venv and dependencies, “run the chapter” fails before any model idea shows up. The beginner path does **not** require a GPU.
 
-**Why:** Without a venv + deps, “run the chapter” fails before any model idea appears. No GPU required for the beginner path.
-
-**How:** Python ≥ 3.10 → venv → \`pip install -r requirements.txt\` → check script prints \`OK\`.
+Use Python ≥ 3.10, create a venv, install \`requirements.txt\`, and run the check script until it prints \`OK\`.
 
 ## Run
 
@@ -117,19 +111,15 @@ No \`git\`? Download the ZIP from GitHub instead.
     estimatedMinutes: 5,
     markdown: `## Idea
 
-**What:** The few shell moves every lab assumes: where you are, list files, enter the repo, activate venv.
+Labs assume you can see where you are, list files, enter the repo, and activate the venv. Most early failures are “wrong directory” or “venv off,” not bad math.
 
-**Why:** Most early failures are “wrong directory” or “venv off,” not bad math.
-
-**How:**
+On errors, read the **last** paragraph of the traceback first—that is usually the actual cause.
 
 | Goal | macOS / Linux | Windows |
 | --- | --- | --- |
 | Where am I? | \`pwd\` | \`pwd\` |
 | List | \`ls\` | \`dir\` |
 | Enter repo | \`cd arche\` | \`cd arche\` |
-
-On errors, read the **last** traceback paragraph first.
 
 ## Run
 
@@ -154,16 +144,11 @@ python chapters/01-inference/ep01_overview.py   # optional smoke
     estimatedMinutes: 4,
     markdown: `## Idea
 
-**What:** How this site shows code — Library (\`arche/\`) vs Lab script (\`chapters/...\`).
+This site splits code into the **library** (\`arche/\`) and the **lab script** (\`chapters/...\`). You learn by running and reading, not by writing Python on day one. Knowing where to look beats memorizing APIs.
 
-**Why:** You learn by running and reading, not by writing Python on day one. Knowing where to look beats memorizing APIs.
+On each chapter, open the **Code** card: **Library** is the module the lesson is about; **Lab script** is the file you run.
 
-**How:** On each chapter, open the **Code** card:
-
-1. **Library** — the module the lesson is about  
-2. **Lab script** — the file you run  
-
-In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \`if __name__\`.
+In a script, skim in order: docstring → \`import\` → \`def main\` → \`print\` → \`if __name__\`.
 
 ## Next
 
@@ -180,11 +165,9 @@ In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \
     estimatedMinutes: 3,
     markdown: `## Idea
 
-**What:** A one-page map of the five stages and when you need Hugging Face login.
+Here is the five-stage map and when Hugging Face login actually matters. Without it, Part 1 can feel like random bricks. Login is only for loading or aligning **official Llama**—not for teach-BPE or most shape labs.
 
-**Why:** Without the map, Part 1 feels like random bricks. Login only matters for official Llama load/align—not for teach-BPE or most shape labs.
-
-**How:** Follow Previous/Next; keep this picture in mind:
+Follow Previous/Next and keep this picture in mind:
 
 \`\`\`mermaid
 flowchart LR
