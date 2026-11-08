@@ -7,7 +7,7 @@ import 'ranui/theme-switch';
 import { chaptersFor, type Chapter } from './content';
 import type { PartId } from './content/types';
 import { mountVisualizer, type VisualizerKind } from './features/visualizers';
-import { mountWalkthrough } from './features/walkthrough';
+import { mountSource } from './features/source';
 import {
   LOCALES,
   localeFromUrlPath,
@@ -358,10 +358,37 @@ function renderHome(): void {
   });
 }
 
+function splitLessonMarkdown(md: string): { body: string; fix: string } {
+  const heading = md.match(/^##\s+(Fix|翻车)\s*$/m);
+  if (!heading || heading.index == null) {
+    const inline = md.match(/\n\*\*(?:Fix|翻车)[：:]\*\*\s*([^\n]+)/);
+    if (inline && inline.index != null) {
+      return {
+        body: `${md.slice(0, inline.index)}${md.slice(inline.index + inline[0].length)}`.trimEnd() + '\n',
+        fix: (inline[1] ?? '').trim(),
+      };
+    }
+    return { body: md, fix: '' };
+  }
+  const after = md.slice(heading.index + heading[0].length);
+  const next = after.match(/\n##\s+/);
+  if (next && next.index != null) {
+    return {
+      body: `${md.slice(0, heading.index)}${after.slice(next.index + 1)}`.trimEnd() + '\n',
+      fix: after.slice(0, next.index).trim(),
+    };
+  }
+  return {
+    body: md.slice(0, heading.index).trimEnd() + '\n',
+    fix: after.trim(),
+  };
+}
+
 function renderArticle(chapter: Chapter): void {
   const article = document.querySelector('#article') as HTMLElement;
   const done = readDone().has(chapter.id);
   const { prev, next } = neighborIds(chapter.id);
+  const { body: lessonBody, fix: fixMd } = splitLessonMarkdown(chapter.markdown);
   const scriptLine = chapter.script
     ? `${ui.companionPython}: <code>python ${chapter.script}</code> · `
     : '';
@@ -379,9 +406,14 @@ function renderArticle(chapter: Chapter): void {
     <r-card heading="${ui.lessonHeading}" description="ep${chapter.ep}">
       <div class="panel" id="md-host"></div>
     </r-card>
+    <div class="src-wrap" id="src-host" hidden></div>
     <div class="demo-wrap" id="demo-host" hidden></div>
-    <div class="wt-wrap" id="wt-host" hidden></div>
     <div class="math-wrap" id="math-host" hidden></div>
+    ${
+      fixMd
+        ? `<details class="fix-box"><summary>${ui.fixHeading}</summary><div class="panel" id="fix-host"></div></details>`
+        : ''
+    }
     <div class="chapter-nav">
       <r-button id="prev-chapter" type="text" ${prev ? '' : 'disabled'}>${ui.prevChapter}${
         prev ? `: ${prev.title}` : ''
@@ -398,8 +430,26 @@ function renderArticle(chapter: Chapter): void {
 
   const md = document.createElement('r-markdown');
   md.setAttribute('highlight', '');
-  (md as HTMLElement & { content: string }).content = chapter.markdown;
+  (md as HTMLElement & { content: string }).content = lessonBody;
   document.querySelector('#md-host')?.append(md);
+
+  if (fixMd) {
+    const fixEl = document.createElement('r-markdown');
+    fixEl.setAttribute('highlight', '');
+    (fixEl as HTMLElement & { content: string }).content = fixMd;
+    document.querySelector('#fix-host')?.append(fixEl);
+  }
+
+  const srcHost = document.querySelector('#src-host') as HTMLElement | null;
+  if (srcHost) {
+    mountSource(srcHost, chapter.id, chapter.script, locale.id, {
+      heading: ui.sourceHeading,
+      libraryTab: ui.sourceLibraryTab,
+      labTab: ui.sourceLabTab,
+      empty: ui.sourceEmpty,
+      github: ui.sourceGithub,
+    });
+  }
 
   const mathHost = document.querySelector('#math-host') as HTMLElement | null;
   if (mathHost && chapter.latex) {
@@ -411,9 +461,6 @@ function renderArticle(chapter: Chapter): void {
 
   const demoHost = document.querySelector('#demo-host') as HTMLElement | null;
   if (demoHost) mountDemo(chapter, demoHost);
-
-  const wtHost = document.querySelector('#wt-host') as HTMLElement | null;
-  if (wtHost) mountWalkthrough(wtHost, chapter.id, locale.id, ui.walkthroughHeading);
 
   document.querySelector('#mark-done')?.addEventListener('click', () => {
     markDone(chapter.id);

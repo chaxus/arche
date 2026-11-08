@@ -82,7 +82,9 @@ python chapters/00-start/ep00_check_setup.py
 
 Expect a final \`OK\` line. No \`git\`? Download the ZIP from GitHub instead.
 
-**Fix:** \`No module named torch\` → venv not active or pip step skipped. Network issues → retry / PyPI mirror.
+## Fix
+
+\`No module named torch\` → venv not active or pip step skipped. Network issues → retry / PyPI mirror.
 
 ## Next
 
@@ -130,15 +132,12 @@ python chapters/01-inference/ep01_overview.py   # optional smoke
     estimatedMinutes: 4,
     markdown: `## Idea
 
-Open \`chapters/00-start/ep00_check_setup.py\` and find:
+This page shows the lab script below. In any later chapter, use the **Code** card:
 
-1. Top docstring — how to run  
-2. \`import\` — tools  
-3. \`def main\` — steps  
-4. \`print\` — output  
-5. \`if __name__ == "__main__"\` — entry point  
+1. **Library** — the \`arche/\` module you are learning  
+2. **Lab script** — the \`chapters/...\` file you run  
 
-Reading + running is enough for now.
+In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \`if __name__\`.
 
 ## Next
 

@@ -424,15 +424,65 @@ r-theme-switch {
   color: var(--ran-color-bg, #fff);
 }
 
+.src-wrap,
 .wt-wrap {
   margin: 20px 0;
+}
+
+.src-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.src-tab {
+  appearance: none;
+  border: 1px solid var(--ran-color-border, #e5e5e5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.src-tab.is-active {
+  background: var(--ran-color-text, #111);
+  color: var(--ran-color-bg, #fff);
+  border-color: transparent;
+}
+
+.src-github {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.fix-box {
+  margin: 20px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--ran-color-border, #e5e5e5);
+  border-radius: 8px;
+  color: var(--ran-color-text-secondary, #666);
+  font-size: 14px;
+}
+
+.fix-box summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ran-color-text, #111);
+}
+
+.fix-box[open] summary {
+  margin-bottom: 8px;
 }
 
 .wt-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.45;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: min(70vh, 560px);
   margin: 8px 0 12px;
   padding: 10px 0;
   border-radius: 8px;

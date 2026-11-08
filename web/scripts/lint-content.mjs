@@ -20,6 +20,7 @@ const EN_ANY = [...EN_REQUIRED, 'Run', 'Fix'];
 
 const CN_REQUIRED = ['要点', '下一章'];
 const CN_ANY = [...CN_REQUIRED, '动手', '翻车'];
+// Fix / 翻车 are optional H2s rendered as a collapsed footer, not mid-lesson.
 
 function readMarkdownLiteral(source, fromIndex) {
   const marker = 'markdown: `';

@@ -82,7 +82,9 @@ python chapters/00-start/ep00_check_setup.py
 
 最后一行应是 \`OK\`。没有 git 就从 GitHub 下 ZIP。
 
-**翻车：** \`No module named torch\` → 没激活 venv 或没 pip。网络失败 → 重试 / PyPI 镜像。
+## 翻车
+
+\`No module named torch\` → 没激活 venv 或没 pip。网络失败 → 重试 / PyPI 镜像。
 
 ## 下一章
 
@@ -130,15 +132,12 @@ python chapters/01-inference/ep01_overview.py   # 可选
     estimatedMinutes: 4,
     markdown: `## 要点
 
-打开 \`chapters/00-start/ep00_check_setup.py\`，找到：
+本页下方会直接展示实验脚本。后面章节看 **代码** 卡片：
 
-1. 顶部说明 — 怎么跑  
-2. \`import\` — 借用工具  
-3. \`def main\` — 步骤  
-4. \`print\` — 输出  
-5. \`if __name__ == "__main__"\` — 入口  
+1. **库实现** — 正在学的 \`arche/\` 模块  
+2. **实验脚本** — 你要跑的 \`chapters/...\`  
 
-先会读、会跑就够。
+在脚本里认出：说明 → \`import\` → \`def main\` → \`print\` → \`if __name__\`。
 
 ## 下一章
 

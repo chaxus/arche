@@ -19,6 +19,12 @@ export type UiCopy = {
   demoTrainRun: string;
   demoVizHeading: string;
   walkthroughHeading: string;
+  sourceHeading: string;
+  sourceLibraryTab: string;
+  sourceLabTab: string;
+  sourceEmpty: string;
+  sourceGithub: string;
+  fixHeading: string;
   markDone: string;
   markedDone: string;
   prevChapter: string;
@@ -52,6 +58,12 @@ const EN: UiCopy = {
   demoTrainRun: 'Simulate steps',
   demoVizHeading: 'Interactive picture',
   walkthroughHeading: 'In the source',
+  sourceHeading: 'Code',
+  sourceLibraryTab: 'Library',
+  sourceLabTab: 'Lab script',
+  sourceEmpty: 'No source for this chapter.',
+  sourceGithub: 'Open on GitHub',
+  fixHeading: 'If something breaks',
   markDone: 'Mark as read',
   markedDone: 'Read',
   prevChapter: 'Previous',
@@ -91,6 +103,12 @@ const CN: UiCopy = {
   demoTrainRun: '模拟几步',
   demoVizHeading: '互动示意',
   walkthroughHeading: '源码对照',
+  sourceHeading: '代码',
+  sourceLibraryTab: '库实现',
+  sourceLabTab: '实验脚本',
+  sourceEmpty: '本章暂无源码。',
+  sourceGithub: '在 GitHub 打开',
+  fixHeading: '翻车了怎么办',
   markDone: '标记已读',
   markedDone: '已读',
   prevChapter: '上一章',
