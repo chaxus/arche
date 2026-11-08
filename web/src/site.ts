@@ -10,9 +10,9 @@ export const SITE = {
   authorUrl: 'https://chaxus.com/',
   github: 'https://github.com/chaxus/arche',
   descriptionEn:
-    'From zero toward frontier-ready: hand-write a Llama 3.2–style LLM, train or load weights, serve faster, then map MoE/MLA.',
+    'From zero toward frontier-ready—one path. Hand-write a Llama 3.2–style LLM (the running example), train weights, serve faster, then map MoE/MLA.',
   descriptionCn:
-    '从零对接前沿：亲手写出 Llama 3.2 风格大模型主干，训练或加载权重，服务加速，再摸 MoE/MLA 地图。',
+    '从零对接前沿——一条路。亲手写出 Llama 3.2 风格大模型主干（贯穿例子），训练写出权重，服务加速，再摸 MoE/MLA 地图。',
 } as const;
 
 export const HOME_ID = 'home';

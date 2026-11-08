@@ -40,7 +40,7 @@
 | **Mixtral** | top-2 专家 SwiGLU |
 | **DeepSeek-V3** | 大规模 MoE + 精细路由 |
 | **Qwen-MoE 等** | 各自 E/k 配方 |
-| **Llama 3.2 1B 标本** | dense——先懂 dense 再挂 MoE |
+| **Llama 3.2 1B 例子** | dense——先懂 dense 再挂 MoE |
 
 ### 6. 本课
 

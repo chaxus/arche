@@ -37,10 +37,10 @@ flowchart LR
 | **6. 冻结并版本化** | 写出 `tokenizer.json` / merges，打版本号 | 此后嵌入行数、检查点都按此 id 空间 |
 | **7. 再训嵌入与整网** | 词表定了才能定 `vocab_size`、建嵌入、开预训练 | **换表 ≈ 重做嵌入与大量训练** |
 
-本课提供两层：
+本课（同一条路）提供两层：
 
-- **教学**：`arche/teach_bpe.py` 在小语料上真训一张表（看生成过程）  
-- **标本**：官方 Llama 3.2 表（看业界成品长什么样、如何与权重配对）
+- **表怎么长出来**：`arche/teach_bpe.py` 在小语料上真训一张表（看生成过程）  
+- **Llama 例子的成品表**：官方 Llama 3.2 分词，与权重出厂一对
 
 ### 3. 怎么样的分词表算好
 
@@ -94,7 +94,7 @@ flowchart LR
 | --- | --- | --- |
 | **GPT-4 / 3.5** | tiktoken BPE `cl100k` ~100K | 切法库开源；表与模型绑定 |
 | **GPT-4o** | `o200k` ~200K | 换代扩表，多语言更省；**新表 ≠ 旧嵌入** |
-| **Llama 3 / 3.2** | 字节 BPE，128K+ | **本课标本**；官方 `tokenizer` 与权重出厂一对 |
+| **Llama 3 / 3.2** | 字节 BPE，128K+ | **本课例子**；官方 `tokenizer` 与权重出厂一对 |
 | **Qwen** | BPE ~150K 级 | 自训表；强调多语言与工具特殊符 |
 | **DeepSeek-V3** | 字节 BPE ~128K | 调预分词/语料做多语言压缩 |
 | **Kimi K2** | tiktoken 风 ~163K | 汉字更友好的正则 |
@@ -117,7 +117,7 @@ python chapters/01-inference/ep02_teach_bpe.py
 
 核心在 `arche/teach_bpe.py`：256 字节起 → 合并高频 pair → encode/decode → 打印 fertility。
 
-官方标本表：
+官方例子表：
 
 ```python
 from arche.tokenizer import load_tokenizer

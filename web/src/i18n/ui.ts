@@ -79,7 +79,7 @@ const EN: UiCopy = {
   homeNav: 'Home',
   homeTitle: 'See what an LLM is doing—by writing one',
   homeLede:
-    'From zero toward frontier-ready: build the trunk, train (or load) weights, serve faster, then MoE/MLA-style maps. Two paths: official specimen or train your own tables. Continue picks up where you left off.',
+    'From zero toward frontier-ready—one path. Hand-write the trunk, train weights, serve faster, then MoE/MLA maps. Llama 3.2 ~1B is the running example. Continue picks up where you left off.',
   continueLabel: 'Continue',
   continueStart: 'Start Part 0',
   homePartsHeading: 'Path',
@@ -125,7 +125,7 @@ const CN: UiCopy = {
   homeNav: '首页',
   homeTitle: '亲手写出一个大模型，看懂它在算什么',
   homeLede:
-    '从零对接前沿：写出主干 → 训练（或加载）权重 → 服务加速 → MoE/MLA 地图。两条路：官方标本，或自训分词/嵌入表。回访点「继续」。',
+    '从零对接前沿——一条路。写出主干 → 训练写出权重 → 服务加速 → MoE/MLA 地图。Llama 3.2 ~1B 是贯穿例子。回访点「继续」。',
   continueLabel: '继续',
   continueStart: '开始第 0 部分',
   homePartsHeading: '路径',

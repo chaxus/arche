@@ -1,8 +1,8 @@
 # arche
 
-> From zero toward frontier-ready: hand-write a Llama 3.2–style dense LLM, train or load weights, serve faster, then map MoE/MLA-style structures. Bilingual EN / 简体中文。By chaxus (https://chaxus.com/).
+> From zero toward frontier-ready—one path. Hand-write a Llama 3.2–style dense LLM (running example ~1B), train weights, serve faster, then map MoE/MLA-style structures. Bilingual EN / 简体中文。By chaxus (https://chaxus.com/).
 
-arche is a beginner curriculum plus companion Python labs. Site UI is Vite + ranui; the teaching trunk mirrors Llama 3.2 ~1B dense decoder pieces (tokenizer, embedding, RMSNorm, RoPE, GQA, SwiGLU, block stack, generate), then train (pretrain / SFT / DPO), serve (KV cache, batching, paged KV), and frontier maps (MoE, MLA).
+arche is a beginner curriculum plus companion Python labs. Site UI is Vite + ranui. One spine: grow tables → hand-write the Llama-style trunk → train → serve → frontier maps. Llama 3.2 ~1B is the continuous example (official tokenizer/weights = that example’s finished pair), not a second track.
 
 ## Docs
 

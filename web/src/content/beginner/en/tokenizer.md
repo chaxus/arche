@@ -37,10 +37,10 @@ Open decoders mostly use **byte-level BPE** (GPT/Llama family). From-scratch ord
 | **6. Freeze + version** | write `tokenizer.json` / merges | embedding rows & checkpoints lock to this id space |
 | **7. Then embed + pretrain** | set `vocab_size`, build embedding, train | **changing the table ≈ rebuild embeds + heavy retrain** |
 
-This course:
+This course (same path):
 
-- **Teaching:** `arche/teach_bpe.py` trains a tiny table so you see generation  
-- **Specimen:** official Llama 3.2 table for a production pairing
+- **How a table is grown:** `arche/teach_bpe.py` trains a tiny table so you see generation  
+- **The Llama example’s finished table:** official Llama 3.2 tokenizer paired with its weights
 
 ### 3. What counts as a good table
 
@@ -88,7 +88,7 @@ Most sit in **byte BPE / tiktoken-like** land; differences are corpus and regex,
 | --- | --- | --- |
 | **GPT-4 / 3.5** | tiktoken `cl100k` ~100K | open cut library; table bound to model |
 | **GPT-4o** | `o200k` ~200K | generation bump; **new table ≠ old embeds** |
-| **Llama 3 / 3.2** | byte BPE 128K+ | **course specimen**; factory-paired with weights |
+| **Llama 3 / 3.2** | byte BPE 128K+ | **course example**; factory-paired with weights |
 | **Qwen** | BPE ~150K-class | self-trained; multilingual + tool specials |
 | **DeepSeek-V3** | byte BPE ~128K | pretok/corpus for multilingual compression |
 | **Kimi K2** | tiktoken-like ~163K | Han-friendlier regex |

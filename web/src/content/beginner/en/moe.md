@@ -20,7 +20,7 @@ More experts/k ⇒ capacity/compute; balance loss fights collapse; replacing den
 
 ### 5. Industry · open models
 
-Mixtral top-2; DeepSeek-V3 large MoE; Qwen-MoE variants; Llama 3.2 1B specimen stays dense first.
+Mixtral top-2; DeepSeek-V3 large MoE; Qwen-MoE variants; Llama 3.2 1B example stays dense first.
 
 ### 6. This course
 

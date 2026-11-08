@@ -7,29 +7,29 @@ export const CHAPTERS_EN: Chapter[] = [
     id: 'overview',
     ep: '01',
     title: 'Overview',
-    summary: 'Why Llama 3.2 as the specimen, and what the full next-token path looks like.',
+    summary: 'One from-zero path with Llama 3.2 as the example; the full next-token spine.',
     script: 'chapters/01-inference/ep01_overview.py',
     partId: 'trunk',
     estimatedMinutes: 12,
     markdown: `## Idea
 
-This course trains **from zero toward frontier-ready**. Reading order: build the dense trunk → **train weights from zero** → serve faster → frontier structures (MoE/MLA). Wrong specimen ⇒ later “how industry does it” won’t match.
+This course is **one path from zero toward frontier-ready**. Reading order: build the dense trunk → **train weights from zero** → serve faster → frontier structures (MoE/MLA). **Llama 3.2 ~1B** is the running example—wrong example recipe ⇒ later “how industry does it” won’t match.
 
 ### 1. What it is for
 
-Specimen: **Llama 3.2-style** next-token stack—tokenize → embed → blocks×N → LM head (**dense decoder**). Later chapters hang here.
+You hand-write a **Llama 3.2-style** next-token stack—tokenize → embed → blocks×N → LM head (**dense decoder**). Later chapters hang on that same spine. The official Llama files are the example’s finished pair, not a second curriculum.
 
 ### 2. From zero: how you “generate” this path
 
 | Step | What you do |
 | --- | --- |
-| **1. Pick open, downloadable, small, production-like** | Here: Llama 3.2 ~1B |
-| **2. Freeze tokenizer; record V, D, depth, heads** | Config is the contract |
+| **1. Pick one open, small, production-like example** | Here: Llama 3.2 ~1B |
+| **2. Learn how its kind of tokenizer/embeds are made** | Teach-BPE + toy embed; record V, D, depth, heads |
 | **3. Hand-write the same bricks** | RMSNorm, RoPE, GQA, SwiGLU… |
-| **4. Random shapes first, then load the specimen or Part 2 self-train** | Graph → numbers |
-| **5. Generate + HF check → train → serve → frontier** | See the four sidebar parts |
+| **4. Random shapes first, then train (Part 2) and/or load the Llama example to check** | Graph → numbers |
+| **5. Generate + HF check → serve → frontier** | One sidebar path |
 
-### 3. What “good choice” means
+### 3. What “good example” means
 
 | Kind | Check |
 | --- | --- |
@@ -40,7 +40,7 @@ Specimen: **Llama 3.2-style** next-token stack—tokenize → embed → blocks×
 
 ### 4. Improve · whole-model impact
 
-Swap specimen (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ full retrain. We keep 1B and use primers for larger ideas.
+Swap the example (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ full retrain. We keep 1B and use primers for larger ideas.
 
 ### 5. Industry · open models
 
@@ -112,10 +112,10 @@ Open decoders mostly use **byte-level BPE** (GPT/Llama family). From-scratch ord
 | **6. Freeze + version** | write \`tokenizer.json\` / merges | embedding rows & checkpoints lock to this id space |
 | **7. Then embed + pretrain** | set \`vocab_size\`, build embedding, train | **changing the table ≈ rebuild embeds + heavy retrain** |
 
-This course:
+This course (same path):
 
-- **Teaching:** \`arche/teach_bpe.py\` trains a tiny table so you see generation  
-- **Specimen:** official Llama 3.2 table for a production pairing
+- **How a table is grown:** \`arche/teach_bpe.py\` trains a tiny table so you see generation  
+- **The Llama example’s finished table:** official Llama 3.2 tokenizer paired with its weights
 
 ### 3. What counts as a good table
 
@@ -163,7 +163,7 @@ Most sit in **byte BPE / tiktoken-like** land; differences are corpus and regex,
 | --- | --- | --- |
 | **GPT-4 / 3.5** | tiktoken \`cl100k\` ~100K | open cut library; table bound to model |
 | **GPT-4o** | \`o200k\` ~200K | generation bump; **new table ≠ old embeds** |
-| **Llama 3 / 3.2** | byte BPE 128K+ | **course specimen**; factory-paired with weights |
+| **Llama 3 / 3.2** | byte BPE 128K+ | **course example**; factory-paired with weights |
 | **Qwen** | BPE ~150K-class | self-trained; multilingual + tool specials |
 | **DeepSeek-V3** | byte BPE ~128K | pretok/corpus for multilingual compression |
 | **Kimi K2** | tiktoken-like ~163K | Han-friendlier regex |
@@ -299,7 +299,7 @@ From-zero order: freeze tokenizer → set \`V,D\` & tying → random embed + pre
 
 | Model / line | How embeddings are done | Notes |
 | --- | --- | --- |
-| **Llama 3 / 3.2** | lookup; small sizes often **tie** LM head; **no** absolute PE on embeds | **course specimen**; RoPE for position |
+| **Llama 3 / 3.2** | lookup; small sizes often **tie** LM head; **no** absolute PE on embeds | **course example**; RoPE for position |
 | **Qwen** | lookup + RoPE; V from their tokenizer | strict pairing |
 | **DeepSeek** | lookup; frontier focus on MLA/MoE etc. | multilingual tokenizer makes rows “worth more” |
 | **GPT line (public)** | larger V → larger embed; generation bumps rebuild embeds | \`o200k\` isn’t a light patch on \`cl100k\` embeds |
@@ -660,19 +660,18 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
-This chapter takes **path A (specimen)**: load an open checkpoint so the handwritten stack can speak now.  
-**Path B (write weights from zero)** is Part 2 pretrain / SFT·DPO—most floats are trained, not hand-filled. Bad loads waste the handwritten stack.
+Still one path from zero. This chapter loads the **Llama example’s** open checkpoint so your handwritten stack can speak now. Part 2 is where you feel how those floats get **written by training**—most numbers are trained, not hand-filled. Bad loads waste the handwritten stack.
 
 ### 1. What it is for
 
-Copy tensors via a key map. Random weights are a correct graph with nonsense outputs.
+Copy tensors via a key map. Random weights are a correct graph with nonsense outputs; Llama 3.2 weights make the same forward pass behave like a language model.
 
 ### 2. From zero: how you do it
 
-| Path | Steps |
+| Step on the same path | What you do |
 | --- | --- |
-| **A Load open (this chapter)** | license→download→key map→official tokenizer |
-| **B Self-train (Part 2)** | toy/real pretrain writes \`state_dict\`; record tokenizer version |
+| **Load the example (this chapter)** | license→download→key map→official tokenizer |
+| **Train later (Part 2)** | toy/real pretrain writes \`state_dict\`; record tokenizer version |
 | **Validate** | shapes/missing keys; **HF align** after generate compares short-prompt logits |
 
 ### 3. What “good” means
@@ -894,7 +893,7 @@ More experts/k ⇒ capacity/compute; balance loss fights collapse; replacing den
 
 ### 5. Industry · open models
 
-Mixtral top-2; DeepSeek-V3 large MoE; Qwen-MoE variants; Llama 3.2 1B specimen stays dense first.
+Mixtral top-2; DeepSeek-V3 large MoE; Qwen-MoE variants; Llama 3.2 1B example stays dense first.
 
 ### 6. This course
 

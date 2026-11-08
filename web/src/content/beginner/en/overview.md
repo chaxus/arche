@@ -1,22 +1,22 @@
 ## Idea
 
-This course trains **from zero toward frontier-ready**. Reading order: build the dense trunk → **train weights from zero** → serve faster → frontier structures (MoE/MLA). Wrong specimen ⇒ later “how industry does it” won’t match.
+This course is **one path from zero toward frontier-ready**. Reading order: build the dense trunk → **train weights from zero** → serve faster → frontier structures (MoE/MLA). **Llama 3.2 ~1B** is the running example—wrong example recipe ⇒ later “how industry does it” won’t match.
 
 ### 1. What it is for
 
-Specimen: **Llama 3.2-style** next-token stack—tokenize → embed → blocks×N → LM head (**dense decoder**). Later chapters hang here.
+You hand-write a **Llama 3.2-style** next-token stack—tokenize → embed → blocks×N → LM head (**dense decoder**). Later chapters hang on that same spine. The official Llama files are the example’s finished pair, not a second curriculum.
 
 ### 2. From zero: how you “generate” this path
 
 | Step | What you do |
 | --- | --- |
-| **1. Pick open, downloadable, small, production-like** | Here: Llama 3.2 ~1B |
-| **2. Freeze tokenizer; record V, D, depth, heads** | Config is the contract |
+| **1. Pick one open, small, production-like example** | Here: Llama 3.2 ~1B |
+| **2. Learn how its kind of tokenizer/embeds are made** | Teach-BPE + toy embed; record V, D, depth, heads |
 | **3. Hand-write the same bricks** | RMSNorm, RoPE, GQA, SwiGLU… |
-| **4. Random shapes first, then load the specimen or Part 2 self-train** | Graph → numbers |
-| **5. Generate + HF check → train → serve → frontier** | See the four sidebar parts |
+| **4. Random shapes first, then train (Part 2) and/or load the Llama example to check** | Graph → numbers |
+| **5. Generate + HF check → serve → frontier** | One sidebar path |
 
-### 3. What “good choice” means
+### 3. What “good example” means
 
 | Kind | Check |
 | --- | --- |
@@ -27,7 +27,7 @@ Specimen: **Llama 3.2-style** next-token stack—tokenize → embed → blocks×
 
 ### 4. Improve · whole-model impact
 
-Swap specimen (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ full retrain. We keep 1B and use primers for larger ideas.
+Swap the example (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ full retrain. We keep 1B and use primers for larger ideas.
 
 ### 5. Industry · open models
 

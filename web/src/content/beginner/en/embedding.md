@@ -79,7 +79,7 @@ From-zero order: freeze tokenizer → set `V,D` & tying → random embed + pretr
 
 | Model / line | How embeddings are done | Notes |
 | --- | --- | --- |
-| **Llama 3 / 3.2** | lookup; small sizes often **tie** LM head; **no** absolute PE on embeds | **course specimen**; RoPE for position |
+| **Llama 3 / 3.2** | lookup; small sizes often **tie** LM head; **no** absolute PE on embeds | **course example**; RoPE for position |
 | **Qwen** | lookup + RoPE; V from their tokenizer | strict pairing |
 | **DeepSeek** | lookup; frontier focus on MLA/MoE etc. | multilingual tokenizer makes rows “worth more” |
 | **GPT line (public)** | larger V → larger embed; generation bumps rebuild embeds | `o200k` isn’t a light patch on `cl100k` embeds |

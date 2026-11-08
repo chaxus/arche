@@ -1,18 +1,17 @@
 ## Idea
 
-This chapter takes **path A (specimen)**: load an open checkpoint so the handwritten stack can speak now.  
-**Path B (write weights from zero)** is Part 2 pretrain / SFT·DPO—most floats are trained, not hand-filled. Bad loads waste the handwritten stack.
+Still one path from zero. This chapter loads the **Llama example’s** open checkpoint so your handwritten stack can speak now. Part 2 is where you feel how those floats get **written by training**—most numbers are trained, not hand-filled. Bad loads waste the handwritten stack.
 
 ### 1. What it is for
 
-Copy tensors via a key map. Random weights are a correct graph with nonsense outputs.
+Copy tensors via a key map. Random weights are a correct graph with nonsense outputs; Llama 3.2 weights make the same forward pass behave like a language model.
 
 ### 2. From zero: how you do it
 
-| Path | Steps |
+| Step on the same path | What you do |
 | --- | --- |
-| **A Load open (this chapter)** | license→download→key map→official tokenizer |
-| **B Self-train (Part 2)** | toy/real pretrain writes `state_dict`; record tokenizer version |
+| **Load the example (this chapter)** | license→download→key map→official tokenizer |
+| **Train later (Part 2)** | toy/real pretrain writes `state_dict`; record tokenizer version |
 | **Validate** | shapes/missing keys; **HF align** after generate compares short-prompt logits |
 
 ### 3. What “good” means

@@ -2,18 +2,16 @@
 
 **ἀρχή** — origin, first principle.
 
-**From zero toward frontier-ready:** see what a chatbot computes—by writing one. Build the dense trunk, **train (or load) weights**, serve faster, then map MoE/MLA-style tips. Specimen: small **Llama 3.2** (~1B). Site: **[arche.chaxus.com](https://arche.chaxus.com)** (EN / 中文).
+**From zero toward frontier-ready—one path.** See what a chatbot computes by writing one: build the dense trunk, **train weights**, serve faster, then map MoE/MLA-style tips. **Llama 3.2 ~1B** is the running example (official tokenizer/weights = that example’s finished pair). Site: **[arche.chaxus.com](https://arche.chaxus.com)** (EN / 中文).
 
-从零对接前沿：亲手写出主干 → 训练（或加载）权重 → 服务加速 → 前沿结构地图。学习站：[arche.chaxus.com/cn/](https://arche.chaxus.com/cn/)。
+从零对接前沿——一条路：亲手写出主干 → 训练写出权重 → 服务加速 → 前沿结构地图。**Llama 3.2 ~1B** 是贯穿例子。学习站：[arche.chaxus.com/cn/](https://arche.chaxus.com/cn/)。
 
 | Plain path | What’s inside |
 | --- | --- |
-| **1 Build the dense trunk** | Tokenizer/embedding from scratch (or official pair) → RMSNorm, RoPE, GQA, SwiGLU, stack → load/generate → HF align |
+| **1 Build the dense trunk** | Grow tokenizer/embeds → RMSNorm, RoPE, GQA, SwiGLU, stack → generate → check against the Llama example |
 | **2 Train from zero** | Toy pretrain, SFT, DPO — how weights get written |
 | **3 Generate & serve faster** | KV cache, RoPE scaling, device/quant/chat, continuous batching, paged KV / CUDA Graph |
 | **4 Frontier structures** | MoE, MLA, frontier checkpoints, sharded loads |
-
-**Two paths:** (A) official Llama tokenizer + weights to verify the stack; (B) teach-BPE + toy embed/pretrain to feel from-zero generation. Interleave as you like.
 
 In-course = runnable principles + a map into tip papers and engines. Full production stacks (vLLM-class, huge trainers, multimodal) are the **next** climb—with that map, not from zero.
 
@@ -21,9 +19,9 @@ In-course = runnable principles + a map into tip papers and engines. Full produc
 
 - License: [Apache-2.0](LICENSE)
 
-## Why Llama 3.2
+## Why Llama 3.2 as the example
 
-Small enough to hold in your head (**~1B**), downloadable HF weights, and the same parts production dense models still use—then newer tricks (MoE / MLA / …) once the base path is yours.
+Small enough to hold in your head (**~1B**), downloadable HF weights, and the same parts production dense models still use. You still build from zero; Llama is the continuous reference—not a second track. Newer tricks (MoE / MLA / …) come after the base path is yours.
 
 ## Quick start
 

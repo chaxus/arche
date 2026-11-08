@@ -14,22 +14,17 @@ export const PART0_EN: Chapter[] = [
 
 **What you will learn:** treat the LLM as something you **train from zero toward frontier-ready**—how tokenizer/embedding tables are made, what “good” means, how to improve them and what that does to the whole model; hand-write the trunk until it runs; then speed, a bit of training, and a map of MoE/MLA-style tips. No jargon required up front.
 
-We use **Llama 3.2** ~1B as the specimen: production-like dense parts; official table+weights show a shipped pair; teaching scripts show the **from-scratch** work you do when you train your own.
+**One path, one example.** You build from zero; **Llama 3.2 ~1B** is the running example—same dense parts production models still use. Teaching labs show how tables and weights get written; the official Llama tokenizer + checkpoint is that example’s finished pair, used to check your handwritten stack and to hear a real model speak when you load it.
 
 **The full path (five stages):**
 
 | Stage | In plain words | Names you will meet later |
 | --- | --- | --- |
 | **0 Start** | Set up; learn to read a chapter and run one command | — |
-| **1 Build the dense trunk** | How tokenizer/embeds are made → hand-write RMSNorm, RoPE, GQA, SwiGLU… → load or later train → generate → HF check | dense decoder |
+| **1 Build the dense trunk** | Grow a tiny tokenizer/embeds → hand-write RMSNorm, RoPE, GQA, SwiGLU… → generate → compare with the Llama example (HF) | dense decoder |
 | **2 Train from zero** | Feel how pretrain / SFT / DPO write the weights | pretrain, SFT, DPO |
 | **3 Generate & serve faster** | KV cache, long context, device/quant, continuous batch, paging | KV, RoPE scaling, paged KV… |
 | **4 Frontier structures** | MoE, MLA, checkpoint map—touch the shape | MoE, MLA, shards |
-
-**Two paths (you can interleave):**
-
-- **Path A (specimen):** official Llama tokenizer + weights → verify the handwritten stack  
-- **Path B (from zero):** teach-BPE table → build embeds → Part 2 pretrain/align → then serving  
 
 **Afterward you can roughly:** run the labs; open similar open-source code and know which layer you are in; enter papers or repos like vLLM with a map. In-course = **runnable principles + a frontier map**. Full industrial engines, huge clusters, multimodal—are the next climb *with* that map, not from zero.
 
@@ -163,7 +158,7 @@ In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \
     id: 'start-map',
     ep: '00f',
     title: 'Map of the journey',
-    summary: 'Four from-zero stages + specimen/self-train paths; when HF login is needed.',
+    summary: 'One from-zero spine with Llama as the example; when HF login is needed.',
     script: '',
     partId: 'start',
     estimatedMinutes: 3,
@@ -177,16 +172,11 @@ flowchart LR
   p3 --> p4[4 Frontier structures]
 \`\`\`
 
-**Two paths:**
+**One path:** from zero → hand-write the trunk → train (feel how weights are written) → serve faster → frontier map.
 
-| Path | What you do | When |
-| --- | --- | --- |
-| **A Specimen** | Official tokenizer/weights + HF align | Match a shipped model |
-| **B From zero** | Teach BPE, toy embeds, toy pretrain/SFT | Feel how tables and weights are written |
-
-- **Goal:** write “how the next word appears” from zero → train weights → serve faster → frontier structure map.  
-- **Specimen:** Llama 3.2 ~1B.  
-- **HF login** only for path A; teach BPE and most shape labs need no login.
+- **Running example:** Llama 3.2 ~1B (config numbers, official tokenizer/weights as the finished pair of that example).  
+- **Teach BPE / toy train:** how tables and floats get made—not a second curriculum.  
+- **HF login** when you load or align against the official Llama files; shape labs and teach-BPE need no login.
 
 ## Next
 
