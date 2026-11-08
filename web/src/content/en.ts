@@ -7,6 +7,8 @@ export const CHAPTERS_EN: Chapter[] = [
     title: 'Overview',
     summary: 'Modern dense trunk — Llama 3.2 lineage, not GPT-2 archaeology.',
     script: 'chapters/01-inference/ep01_overview.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
     markdown: `## Why this path
 
 **arche** (ἀρχή) means *first principle*. We hand-write a **current** dense decoder:
@@ -36,6 +38,8 @@ flowchart LR
     title: 'Tokenizer',
     summary: 'Official Llama 3.2 BPE — text becomes token ids.',
     script: 'chapters/01-inference/ep02_tokenizer.py',
+    partId: 'trunk',
+    estimatedMinutes: 15,
     markdown: `## Role
 
 The model never sees characters. A tokenizer maps text ↔ integer ids in a fixed vocabulary (\`128256\` for Llama 3.2).
@@ -56,6 +60,8 @@ python chapters/01-inference/ep02_tokenizer.py
     title: 'Embedding',
     summary: 'Token ids → dense vectors. No absolute PE table.',
     script: 'chapters/01-inference/ep03_embedding.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
     markdown: `## Lookup, not position
 
 \`TokenEmbedding\` is a table of shape \`(vocab_size, embed_dim)\`.
@@ -72,6 +78,8 @@ Llama 3.2 1B/3B also **tie** the embedding weight with the LM head.
     title: 'RMSNorm',
     summary: 'Pre-norm without mean centering.',
     script: 'chapters/01-inference/ep04_rmsnorm.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
     markdown: `## Why RMSNorm
 
 Cheaper than LayerNorm (no mean subtraction), stable enough for modern LLMs, and the default pre-norm in Llama / Qwen dense stacks.
@@ -87,6 +95,8 @@ Applied **before** attention and **before** the MLP inside each block.
     title: 'RoPE',
     summary: 'Rotate Q/K so attention becomes relative in position.',
     script: 'chapters/01-inference/ep05_rope.py',
+    partId: 'trunk',
+    estimatedMinutes: 15,
     markdown: `## Rotary positions
 
 RoPE rotates pairs of dimensions in query/key vectors by an angle that depends on token position. Relative offsets fall out of the dot product — no absolute PE table required.
@@ -102,6 +112,8 @@ Llama 3.2 also uses a large \`rope_theta\` (\`500000\`) and a long-context **sca
     title: 'GQA attention',
     summary: 'Fewer KV heads than query heads, still causal.',
     script: 'chapters/01-inference/ep06_gqa.py',
+    partId: 'trunk',
+    estimatedMinutes: 18,
     markdown: `## Grouped-Query Attention
 
 Llama 3.2 1B: **32** query heads, **8** KV heads → each KV head is shared by 4 query heads.
@@ -117,6 +129,8 @@ Flow inside the module: project Q/K/V → RoPE(Q,K) → repeat KV → causal SDP
     title: 'SwiGLU',
     summary: 'gate × up, then down — three bias-free linears.',
     script: 'chapters/01-inference/ep07_swiglu.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
     markdown: `## Modern FFN
 
 \`\`\`
@@ -133,6 +147,8 @@ This replaces the older “one Linear → GELU → Linear” story as the defaul
     title: 'Transformer block',
     summary: 'Pre-norm residual sandwich you can stack.',
     script: 'chapters/01-inference/ep08_block.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
     markdown: `## One block
 
 \`\`\`
@@ -148,6 +164,8 @@ Llama 3.2 1B stacks this **16** times (3B: 28). Same shape in, same shape out �
     title: 'Stack + LM head',
     summary: 'embed → blocks → final RMSNorm → tied lm_head.',
     script: 'chapters/01-inference/ep09_stack.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
     markdown: `## Full forward
 
 \`\`\`
@@ -169,6 +187,8 @@ python chapters/01-inference/ep09_stack.py
     title: 'Load weights',
     summary: 'Map Hugging Face Llama 3.2 tensors into arche.Llama.',
     script: 'chapters/01-inference/ep10_load_weights.py',
+    partId: 'trunk',
+    estimatedMinutes: 20,
     markdown: `## Official weights, hand-written graph
 
 \`from_pretrained\` builds our modules, downloads HF weights, and copies tensors by a small key map (\`model.layers.*\` → \`layers.*\`).
@@ -187,6 +207,8 @@ python chapters/01-inference/ep10_load_weights.py
     title: 'Text generation',
     summary: 'Sample the next tokens with temperature and top-k.',
     script: 'chapters/01-inference/ep11_generate.py',
+    partId: 'trunk',
+    estimatedMinutes: 15,
     markdown: `## Decode loop
 
 Repeatedly take the last-step logits, optionally filter top-k, sample (or greedy), append, stop on EOS.
@@ -204,6 +226,8 @@ Capability now comes from the loaded 1B weights; the code path is still entirely
     title: 'KV cache',
     summary: 'Prefill once, then decode with cached keys and values.',
     script: 'chapters/01-inference/ep12_kv_cache.py',
+    partId: 'infer',
+    estimatedMinutes: 15,
     markdown: `## Why cache
 
 Without a cache, every new token re-runs attention over the whole prefix.
@@ -223,6 +247,8 @@ python chapters/01-inference/ep12_kv_cache.py
     title: 'RoPE scaling',
     summary: 'Llama 3.2 wavelength smoothing for long context.',
     script: 'chapters/01-inference/ep13_rope_scaling.py',
+    partId: 'infer',
+    estimatedMinutes: 15,
     markdown: `## Beyond the 8k window
 
 Llama 3.2 keeps \`rope_theta=500000\` and applies a **factor / low / high** schedule so long wavelengths stretch toward 128k context.
@@ -240,6 +266,8 @@ Short wavelengths stay put; long ones divide by \`scale_factor\`; the middle ban
     title: 'MoE',
     summary: 'Top-k routed SwiGLU experts — sparse capacity.',
     script: 'chapters/01-inference/ep14_moe.py',
+    partId: 'infer',
+    estimatedMinutes: 15,
     markdown: `## Mixture of Experts
 
 A linear router scores experts per token; only \`top_k\` run. Parameter count can be huge while per-token FLOPs stay near a dense MLP.
@@ -257,6 +285,8 @@ This is the sparse FFN idea behind Mixtral and DeepSeek-style frontier stacks.
     title: 'MLA',
     summary: 'Compress KV into a latent cache (DeepSeek-style).',
     script: 'chapters/01-inference/ep15_mla.py',
+    partId: 'infer',
+    estimatedMinutes: 18,
     markdown: `## Multi-head Latent Attention
 
 Instead of caching every head's K/V, MLA stores a low-rank latent (+ a small RoPE stream) and expands on the fly.
@@ -274,6 +304,8 @@ That is the decode-memory win DeepSeek popularized — same attention math, chea
     title: 'Device · INT8 · chat',
     summary: 'Pick CUDA/MPS/CPU, weight-only INT8, and chat templates.',
     script: 'chapters/01-inference/ep16_device_quant_chat.py',
+    partId: 'infer',
+    estimatedMinutes: 15,
     demo: 'chat',
     markdown: `## Inference engineering basics
 
@@ -294,6 +326,8 @@ HF logits alignment lives in \`tests/test_align_hf.py\` (skipped without gated w
     title: 'Continuous batching',
     summary: 'Schedule many short decodes in one stepping loop.',
     script: 'chapters/01-inference/ep17_continuous_batching.py',
+    partId: 'infer',
+    estimatedMinutes: 15,
     demo: 'batch',
     markdown: `## Teaching scheduler
 
@@ -312,6 +346,8 @@ python chapters/01-inference/ep17_continuous_batching.py
     title: 'Pretrain',
     summary: 'Tiny next-token AdamW loop on toy batches.',
     script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'train',
+    estimatedMinutes: 15,
     demo: 'train',
     markdown: `## From forward to learning
 
@@ -328,6 +364,8 @@ python chapters/02-training/ep18_pretrain.py
     title: 'SFT · DPO',
     summary: 'Mask the prompt for SFT; one preference step for DPO.',
     script: 'chapters/02-training/ep19_sft_dpo.py',
+    partId: 'train',
+    estimatedMinutes: 18,
     demo: 'train',
     markdown: `## Aligning after pretrain
 
@@ -344,6 +382,8 @@ python chapters/02-training/ep19_sft_dpo.py
     title: 'Frontier checkpoints',
     summary: 'MoE/MLA roundtrip + Mixtral-shaped expert key map.',
     script: 'chapters/02-training/ep20_frontier_ckpt.py',
+    partId: 'frontier',
+    estimatedMinutes: 15,
     markdown: `## Wiring the primers
 
 Save/load MoE and MLA modules with \`save_checkpoint\` / \`load_checkpoint\`. Map Mixtral \`w1/w2/w3\` expert keys into \`MoESwiGLU\`.
@@ -361,6 +401,8 @@ python chapters/02-training/ep20_frontier_ckpt.py
     title: 'HF logits alignment',
     summary: 'Compare arche vs Hugging Face Llama 3.2 on a short prompt.',
     script: 'chapters/01-inference/ep21_hf_align.py',
+    partId: 'frontier',
+    estimatedMinutes: 20,
     markdown: `## Prove the hand-written graph
 
 \`compare_logits_to_hf\` loads Meta's gated 1B weights into both stacks and checks argmax + max-abs drift.
@@ -380,6 +422,8 @@ python chapters/01-inference/ep21_hf_align.py
     title: 'Sharded MoE / MLA',
     summary: 'index.json + shard files into Mixtral MoE and DeepSeek MLA.',
     script: 'chapters/02-training/ep22_sharded_frontier.py',
+    partId: 'frontier',
+    estimatedMinutes: 15,
     markdown: `## Same shape as HF indexes
 
 Write synthetic Mixtral / DeepSeek shards, then reload into \`MoESwiGLU\` and \`MultiHeadLatentAttention\` with allclose checks.
@@ -395,6 +439,8 @@ python chapters/02-training/ep22_sharded_frontier.py
     title: 'Paged KV · CUDA graphs',
     summary: 'Block-table KV pool plus fixed-shape CUDA graph capture.',
     script: 'chapters/01-inference/ep23_paged_cuda_graph.py',
+    partId: 'frontier',
+    estimatedMinutes: 18,
     markdown: `## Toward production decode
 
 **Paged KV** stores tokens in fixed pages and gathers a contiguous cache for SDPA.

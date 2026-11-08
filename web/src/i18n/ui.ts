@@ -1,4 +1,5 @@
 import type { LocaleDef } from './locales';
+import type { PartId } from '../content/types';
 
 export type UiCopy = {
   brandTagline: string;
@@ -18,6 +19,10 @@ export type UiCopy = {
   demoTrainRun: string;
   markDone: string;
   markedDone: string;
+  prevChapter: string;
+  nextChapter: string;
+  minutesLabel: string;
+  partLabels: Record<PartId, string>;
 };
 
 const EN: UiCopy = {
@@ -38,6 +43,16 @@ const EN: UiCopy = {
   demoTrainRun: 'Simulate steps',
   markDone: 'Mark as read',
   markedDone: 'Read',
+  prevChapter: 'Previous',
+  nextChapter: 'Next',
+  minutesLabel: 'min',
+  partLabels: {
+    start: 'Part 0 — Start here',
+    trunk: 'Part 1 — The dense trunk',
+    infer: 'Part 2 — Faster inference',
+    train: 'Part 3 — Tiny training',
+    frontier: 'Part 4 — Frontier primers',
+  },
 };
 
 const CN: UiCopy = {
@@ -58,6 +73,16 @@ const CN: UiCopy = {
   demoTrainRun: '模拟几步',
   markDone: '标记已读',
   markedDone: '已读',
+  prevChapter: '上一章',
+  nextChapter: '下一章',
+  minutesLabel: '分钟',
+  partLabels: {
+    start: '第 0 部分 — 从这里开始',
+    trunk: '第 1 部分 — Dense 主干',
+    infer: '第 2 部分 — 更快推理',
+    train: '第 3 部分 — 小规模训练',
+    frontier: '第 4 部分 — 前沿引物',
+  },
 };
 
 export const uiFor = (locale: LocaleDef): UiCopy => (locale.id === 'cn' ? CN : EN);

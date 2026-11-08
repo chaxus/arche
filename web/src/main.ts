@@ -5,6 +5,7 @@ import 'ranui/math';
 import 'ranui/select';
 import 'ranui/theme-switch';
 import { chaptersFor, type Chapter } from './content';
+import type { PartId } from './content/types';
 import {
   LOCALES,
   localeFromUrlPath,
@@ -147,7 +148,15 @@ function renderNav(activeId: string): void {
   nav.append(progress);
 
   const doneIds = readDone();
+  let lastPart: PartId | null = null;
   for (const chapter of chapters) {
+    if (chapter.partId !== lastPart) {
+      lastPart = chapter.partId;
+      const header = document.createElement('div');
+      header.className = 'nav-part';
+      header.textContent = ui.partLabels[chapter.partId];
+      nav.append(header);
+    }
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'nav-link';
@@ -242,12 +251,28 @@ function mountDemo(chapter: Chapter, host: HTMLElement): void {
   host.querySelector('#demo-run')?.addEventListener('click', run);
 }
 
+function neighborIds(chapterId: string): { prev?: Chapter; next?: Chapter } {
+  const idx = chapters.findIndex((item) => item.id === chapterId);
+  if (idx < 0) return {};
+  return {
+    prev: idx > 0 ? chapters[idx - 1] : undefined,
+    next: idx < chapters.length - 1 ? chapters[idx + 1] : undefined,
+  };
+}
+
 function renderArticle(chapter: Chapter): void {
   const article = document.querySelector('#article') as HTMLElement;
   const done = readDone().has(chapter.id);
+  const { prev, next } = neighborIds(chapter.id);
+  const scriptLine = chapter.script
+    ? `${ui.companionPython}: <code>python ${chapter.script}</code> · `
+    : '';
   article.innerHTML = `
     <div class="article-head">
-      <h1>${chapter.title}</h1>
+      <div>
+        <p class="part-eyebrow">${ui.partLabels[chapter.partId]} · ${chapter.estimatedMinutes} ${ui.minutesLabel}</p>
+        <h1>${chapter.title}</h1>
+      </div>
       <r-button id="mark-done" type="${done ? 'text' : 'primary'}">${
         done ? ui.markedDone : ui.markDone
       }</r-button>
@@ -258,10 +283,16 @@ function renderArticle(chapter: Chapter): void {
     </r-card>
     <div class="demo-wrap" id="demo-host" hidden></div>
     <div class="math-wrap" id="math-host" hidden></div>
+    <div class="chapter-nav">
+      <r-button id="prev-chapter" type="text" ${prev ? '' : 'disabled'}>${ui.prevChapter}${
+        prev ? `: ${prev.title}` : ''
+      }</r-button>
+      <r-button id="next-chapter" type="primary" ${next ? '' : 'disabled'}>${ui.nextChapter}${
+        next ? `: ${next.title}` : ''
+      }</r-button>
+    </div>
     <p class="footer-note">
-      ${ui.companionPython}:
-      <code>python ${chapter.script}</code>
-      · ${ui.siteLabel}:
+      ${scriptLine}${ui.siteLabel}:
       <a href="https://arche.chaxus.com${prefixOf(locale) || '/'}">arche.chaxus.com${prefixOf(locale)}</a>
     </p>
   `;
@@ -286,6 +317,12 @@ function renderArticle(chapter: Chapter): void {
     markDone(chapter.id);
     renderNav(chapter.id);
     renderArticle(chapter);
+  });
+  document.querySelector('#prev-chapter')?.addEventListener('click', () => {
+    if (prev) selectChapter(prev.id);
+  });
+  document.querySelector('#next-chapter')?.addEventListener('click', () => {
+    if (next) selectChapter(next.id);
   });
 }
 

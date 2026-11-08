@@ -182,11 +182,38 @@ r-theme-switch {
   font-size: 12px;
 }
 
+.nav-part {
+  margin: 14px 10px 4px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ran-color-text-secondary, #666);
+}
+
+.nav-part:first-of-type {
+  margin-top: 4px;
+}
+
+.part-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--ran-color-text-secondary, #666);
+}
+
 .article-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.chapter-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  margin-top: 28px;
 }
 
 .article h1 {
