@@ -33,20 +33,17 @@ def main() -> None:
     print(f"  rope_scale_factor   = {cfg.rope_scale_factor:g}  (long-context; later chapter)")
     print(f"  max_seq_len        = {cfg.max_seq_len}")
     print()
-    print("What we will hand-write next:")
+    print("Curriculum:")
     for step in (
-        "tokenizer",
-        "embedding",
-        "RMSNorm",
-        "RoPE",
-        "GQA causal attention",
-        "SwiGLU MLP",
-        "block → stack → load weights → generate",
+        "tokenizer → embedding → RMSNorm → RoPE",
+        "GQA → SwiGLU → block → stack → weights → generate",
+        "KV cache → RoPE scaling → MoE → MLA",
     ):
         print(f"  - {step}")
     print()
     big = llama32_3b()
     print(f"Same lineage, larger sibling: {big.name} ({big.num_layers} layers, dim {big.embed_dim})")
+
 
 
 if __name__ == "__main__":

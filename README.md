@@ -2,9 +2,9 @@
 
 **ἀρχή** — origin, first principle.
 
-Hand-write a **modern dense** decoder (Llama 3.2 lineage) in PyTorch: RMSNorm, RoPE, SwiGLU, GQA. Load open weights. No GPT-2 archaeology.
+Hand-write a **modern dense** decoder (Llama 3.2 lineage) in PyTorch, then the frontier add-ons that matter next: **KV cache**, **RoPE scaling**, **MoE**, and **MLA**. Load open weights. No GPT-2 archaeology.
 
-- Architecture target: **Llama 3.2 1B** (same family as 3B)
+- Architecture target: **Llama 3.2 1B** (same family as 3B), plus MoE / MLA primers
 - Pedagogy: one runnable chapter per module
 - Learning site: **[arche.chaxus.com](https://arche.chaxus.com)** (ranui, EN / 中文)
 - License: [Apache-2.0](LICENSE)
@@ -16,11 +16,9 @@ GPT-2 is a fine teaching fossil. This repo starts on the **current trunk**:
 | Prefer (here) | Avoid as the main path |
 | --- | --- |
 | RMSNorm | LayerNorm-as-default story |
-| RoPE (+ long-context scaling later) | Absolute learned position embeds |
-| SwiGLU | GELU FFN as the “only” FFN |
-| GQA | Multi-head without KV grouping |
-
-Frontier MoE / MLA chapters are reserved for later — same repo, not a rewrite.
+| RoPE (+ long-context scaling) | Absolute learned position embeds |
+| SwiGLU / MoE | GELU FFN as the “only” FFN |
+| GQA / MLA | Multi-head without KV grouping or compression |
 
 ## Quick start
 
@@ -32,7 +30,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Run a chapter (each script is standalone):
+Run chapters (each script is standalone):
 
 ```bash
 python chapters/01-inference/ep01_overview.py
@@ -45,6 +43,8 @@ python chapters/01-inference/ep08_block.py
 python chapters/01-inference/ep09_stack.py
 python chapters/01-inference/ep12_kv_cache.py
 python chapters/01-inference/ep13_rope_scaling.py
+python chapters/01-inference/ep14_moe.py
+python chapters/01-inference/ep15_mla.py
 ```
 
 Tokenizer / weights / generation need the official Llama 3.2 artifacts (Hugging Face gated). After you accept the license:
@@ -55,7 +55,6 @@ python chapters/01-inference/ep02_tokenizer.py
 python chapters/01-inference/ep10_load_weights.py
 python chapters/01-inference/ep11_generate.py
 ```
-
 
 Mainland network tip:
 
@@ -98,9 +97,7 @@ cd web && npm run build
 npx wrangler pages deploy dist --project-name=arche --branch=main
 ```
 
-## Roadmap
-
-**Inference (modern dense)**
+## Curriculum
 
 | # | Topic | Script |
 | --- | --- | --- |
@@ -117,9 +114,10 @@ npx wrangler pages deploy dist --project-name=arche --branch=main
 | 11 | Text generation | [ep11](chapters/01-inference/ep11_generate.py) |
 | 12 | KV cache | [ep12](chapters/01-inference/ep12_kv_cache.py) |
 | 13 | RoPE long-context scaling | [ep13](chapters/01-inference/ep13_rope_scaling.py) |
-| — | MoE / MLA | outlined later |
+| 14 | MoE (top-k experts) | [ep14](chapters/01-inference/ep14_moe.py) |
+| 15 | MLA (latent KV) | [ep15](chapters/01-inference/ep15_mla.py) |
 
-Library code that chapters grow into lives under [`arche/`](arche/).
+Library code lives under [`arche/`](arche/).
 
 ## Tests
 
@@ -130,5 +128,6 @@ pytest -q
 ## References
 
 - Llama 3.2 model cards on Hugging Face (`meta-llama/Llama-3.2-1B`)
+- Mixtral / DeepSeek papers for MoE and MLA intuition
 - UI components from [ranui](https://github.com/chaxus/ran)
 - Pedagogy inspired by step-by-step “from scratch” tutorials; implementation and prose here are original

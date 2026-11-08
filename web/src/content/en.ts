@@ -221,4 +221,36 @@ python chapters/01-inference/ep13_rope_scaling.py
 Short wavelengths stay put; long ones divide by \`scale_factor\`; the middle band is smoothed — same idea as Hugging Face's llama3 RoPE.
 `,
   },
+  {
+    id: 'moe',
+    ep: '14',
+    title: 'MoE',
+    summary: 'Top-k routed SwiGLU experts — sparse capacity.',
+    markdown: `## Mixture of Experts
+
+A linear router scores experts per token; only \`top_k\` run. Parameter count can be huge while per-token FLOPs stay near a dense MLP.
+
+\`\`\`bash
+python chapters/01-inference/ep14_moe.py
+\`\`\`
+
+This is the sparse FFN idea behind Mixtral and DeepSeek-style frontier stacks.
+`,
+  },
+  {
+    id: 'mla',
+    ep: '15',
+    title: 'MLA',
+    summary: 'Compress KV into a latent cache (DeepSeek-style).',
+    markdown: `## Multi-head Latent Attention
+
+Instead of caching every head's K/V, MLA stores a low-rank latent (+ a small RoPE stream) and expands on the fly.
+
+\`\`\`bash
+python chapters/01-inference/ep15_mla.py
+\`\`\`
+
+That is the decode-memory win DeepSeek popularized — same attention math, cheaper cache.
+`,
+  },
 ];

@@ -221,4 +221,36 @@ python chapters/01-inference/ep13_rope_scaling.py
 短波长不动；长波长除以 \`scale_factor\`；中间带平滑——与 Hugging Face 的 llama3 RoPE 同一思路。
 `,
   },
+  {
+    id: 'moe',
+    ep: '14',
+    title: 'MoE',
+    summary: 'Top-k 路由的 SwiGLU 专家——稀疏容量。',
+    markdown: `## Mixture of Experts
+
+线性路由器给每个 token 打分；只跑 \`top_k\` 个专家。参数量可以很大，但每 token 算力仍接近稠密 MLP。
+
+\`\`\`bash
+python chapters/01-inference/ep14_moe.py
+\`\`\`
+
+这就是 Mixtral、DeepSeek 类前沿堆叠背后的稀疏 FFN 思路。
+`,
+  },
+  {
+    id: 'mla',
+    ep: '15',
+    title: 'MLA',
+    summary: '把 KV 压进 latent 缓存（DeepSeek 风格）。',
+    markdown: `## Multi-head Latent Attention
+
+不缓存每个 head 的 K/V，MLA 存低秩 latent（外加一小段 RoPE 流），用时再展开。
+
+\`\`\`bash
+python chapters/01-inference/ep15_mla.py
+\`\`\`
+
+这就是 DeepSeek 推广的解码显存优势——注意力数学还在，缓存更省。
+`,
+  },
 ];
