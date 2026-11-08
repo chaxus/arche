@@ -1,28 +1,32 @@
 ## Idea
 
+From-zero MoE/MLA must **speak checkpoint names/shapes** of open weights—or frontier structure stays on paper.
+
 ### 1. What it is for
 
-**Frontier checkpoint primer**: save/load MoE/MLA-style modules—round-trip a teaching checkpoint and map Mixtral-like `w1/w2/w3` names into our modules so shapes don’t silently break.
+Round-trip teaching ckpts; map Mixtral-like `w1/w2/w3` into our modules.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Running MoE/MLA forward isn’t enough; open weights arrive as foreign key names and shards. Can’t load ⇒ frontier structure stays on paper.
+Name map ↔ open names; save/load; fail loudly on missing keys.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-Mapping + round-trip for open MoE-style checkpoints—not a full trainer.
+Round-trip align; experts covered; hooks real hubs.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Round-trip `allclose` / shapes | No silent mis-load |
-| **Hard** | Name map covers experts | Missed map = random expert |
-| **Soft** | Hooks real open weights | Product engineering; shapes here |
+Bad maps ⇒ silent random experts; consistent naming cuts debt.
 
-### 5. What we do
+### 5. Industry · open models
 
-This episode’s primer script.
+HF shards + documented keys; Mixtral/DeepSeek naming; converters are standard.
+
+### 6. This course
+
+```bash
+python chapters/02-training/ep20_frontier_ckpt.py
+```
 
 ## Run
 

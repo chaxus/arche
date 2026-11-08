@@ -1,39 +1,32 @@
 ## Idea
 
+From-zero models must **ship to humans**: device, size, chat format—glue, not new layers.
+
 ### 1. What it is for
 
-Make the model **run and chat**: pick a device, shrink weights, format role messages with a chat template. Not new operators—required glue.
+Device fallback; teaching INT8 shrink; chat templates.
 
-1. **Device** — CUDA → MPS → CPU  
-2. **INT8 (teaching)** — smaller weights; dequant then compute  
-3. **Chat template** — roles → model string (HF template or text fallback)
+### 2. From zero: how you build it
 
-Try the page demo.
+Probe device → pick quant recipe (INT8 toy; GPTQ/AWQ/FP8 in prod) → **model’s own** template → wire with generate/KV.
 
-### 2. Why the LLM pipeline needs it
+### 3. What “good” means
 
-A correct trunk still fails users without a device, enough RAM, or the right message format. Device = can run; quant = can fit; template = “chat” vs raw completion.
+Fallback works; template paired; quant quality OK; clear roles.
 
-### 3. Where it comes from · how you build it
+### 4. Improve · whole-model impact
 
-| Topic | Approach | Production note |
-| --- | --- | --- |
-| Device | Probe backends; `.to(device)` | Same graph, different backends |
-| Quant | Teaching INT8; products use INT4/FP8/… | Accuracy vs speed |
-| Template | Model’s own chat template | **Don’t invent** formats |
+Harder quant ⇒ smaller/faster/riskier; wrong template ⇒ junk; multi-backend is engineering cost.
 
-### 4. Standards · what “good” means
+### 5. Industry · open models
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Fallback chain works | No CUDA shouldn’t hard-crash |
-| **Hard** | Template matches model | Wrong template → junk |
-| **Soft** | Quality after quant OK | Evals; teaching INT8 ≠ product |
-| **Soft** | Clear multi-turn roles | System/user/assistant boundaries |
+HF chat templates; vLLM/TGI load quant+template; Llama/Qwen ship official templates; llama.cpp/GGML quants.
 
-### 5. What labs ship · what we do
+### 6. This course
 
-Teaching helpers + script—not a full quant product.
+```bash
+python chapters/01-inference/ep16_device_quant_chat.py
+```
 
 ## Run
 

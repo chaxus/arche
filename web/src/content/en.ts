@@ -968,40 +968,33 @@ python chapters/01-inference/ep15_mla.py
     demo: 'chat',
     markdown: `## Idea
 
+From-zero models must **ship to humans**: device, size, chat format—glue, not new layers.
+
 ### 1. What it is for
 
-Make the model **run and chat**: pick a device, shrink weights, format role messages with a chat template. Not new operators—required glue.
+Device fallback; teaching INT8 shrink; chat templates.
 
-1. **Device** — CUDA → MPS → CPU  
-2. **INT8 (teaching)** — smaller weights; dequant then compute  
-3. **Chat template** — roles → model string (HF template or text fallback)
+### 2. From zero: how you build it
 
-Try the page demo.
+Probe device → pick quant recipe (INT8 toy; GPTQ/AWQ/FP8 in prod) → **model’s own** template → wire with generate/KV.
 
-### 2. Why the LLM pipeline needs it
+### 3. What “good” means
 
-A correct trunk still fails users without a device, enough RAM, or the right message format. Device = can run; quant = can fit; template = “chat” vs raw completion.
+Fallback works; template paired; quant quality OK; clear roles.
 
-### 3. Where it comes from · how you build it
+### 4. Improve · whole-model impact
 
-| Topic | Approach | Production note |
-| --- | --- | --- |
-| Device | Probe backends; \`.to(device)\` | Same graph, different backends |
-| Quant | Teaching INT8; products use INT4/FP8/… | Accuracy vs speed |
-| Template | Model’s own chat template | **Don’t invent** formats |
+Harder quant ⇒ smaller/faster/riskier; wrong template ⇒ junk; multi-backend is engineering cost.
 
-### 4. Standards · what “good” means
+### 5. Industry · open models
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Fallback chain works | No CUDA shouldn’t hard-crash |
-| **Hard** | Template matches model | Wrong template → junk |
-| **Soft** | Quality after quant OK | Evals; teaching INT8 ≠ product |
-| **Soft** | Clear multi-turn roles | System/user/assistant boundaries |
+HF chat templates; vLLM/TGI load quant+template; Llama/Qwen ship official templates; llama.cpp/GGML quants.
 
-### 5. What labs ship · what we do
+### 6. This course
 
-Teaching helpers + script—not a full quant product.
+\`\`\`bash
+python chapters/01-inference/ep16_device_quant_chat.py
+\`\`\`
 
 ## Run
 
@@ -1026,34 +1019,33 @@ python chapters/01-inference/ep16_device_quant_chat.py
     demo: 'batch',
     markdown: `## Idea
 
+From zero single-user loops → industry **multi-user shared stepping**: continuous batching is the serving schedule shape.
+
 ### 1. What it is for
 
-**Continuous batching (teaching)**: many short decode jobs share one step loop; finished jobs retire so new ones can enter—less “one loop per user, fast waits for slow.”
+Share a step among jobs; retire finished; admit new. Teaching ≠ full vLLM.
 
-Try the page demo. **Not** full paged / vLLM.
+### 2. From zero: how you build it
 
-### 2. Why the LLM pipeline needs it
+Active set → step only actives → retire; add paged KV later for production shape.
 
-Servers serve many users. One loop each → GPU idle when finish times differ. Continuous batching turns “who’s still active this step” into scheduling; real systems also need paged KV and fused kernels.
+### 3. What “good” means
 
-### 3. Where it comes from · how you build it
+Retire finished; no cross-talk; fuller GPU / steadier tail latency.
 
-| Layer | Role |
-| --- | --- |
-| **Scheduler** | Who’s active each step (this lesson) |
-| **Paging / kernels** | How memory/compute run (later primer) |
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Better schedule ⇒ more throughput on same hardware; coupled to KV layout, not weights.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Finished seqs retire | Don’t keep stepping them |
-| **Hard** | No cross-talk | Batched ≠ mixed semantics |
-| **Soft** | Fuller GPU, steadier latency | Serving metrics; shape only here |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+vLLM continuous batch + paged attention; TGI/TRT-LLM/SGLang same idea.
 
-Teaching schedule shape + this script.
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep17_continuous_batching.py
+\`\`\`
 
 ## Run
 
@@ -1078,36 +1070,33 @@ python chapters/01-inference/ep17_continuous_batching.py
     demo: 'pretrain',
     markdown: `## Idea
 
+From-zero core: **pretrain** writes embeddings and almost all trunk weights. Without it you only have a random shell.
+
 ### 1. What it is for
 
-**Pretraining** teaches next-token prediction on lots of text: logits → cross-entropy vs the next id → update weights (including the embedding table). This is where most trunk parameters are born.
+Next-token CE on huge text; backprop updates the net including embeds.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Random weights can’t speak. Learn statistics/structure on huge text first; then chat and preferences. Without pretrain, SFT/DPO have no real starting point.
+Frozen tokenizer + shell + data → AdamW next-id loss → long multi-GPU run → checkpoints. This lesson: toy steps + page playground.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Scale | Meaning |
-| --- | --- |
-| **This lab** | Toy AdamW: few steps, feel the API |
-| **Page playground** | Drag lr/steps; watch loss |
-| **Real pretrain** | Massive data, multi-GPU, long runs |
+Correct objective; grads hit params; loss/downstream/stability.
 
-Intuition: batch → predict next token → loss → \`optimizer.step()\`.
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Data mix dominates; scale laws; stability decides finishability; undertrain ⇒ weak embeds and deep layers.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Loss is next-id CE | Right objective |
-| **Hard** | Grads hit the right params | Including embeddings |
-| **Soft** | Loss trends down | Enough on the toy |
-| **Soft** | Real runs: data, stability, downstream | Not claimed here |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Llama/Qwen/DeepSeek: pretrain then align; Megatron/DeepSpeed/torchtitan-style stacks for from-zero training.
 
-\`arche/train/pretrain.py\` + page playground. Not internet-scale training.
+### 6. This course
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
 
 ## Run
 
@@ -1132,37 +1121,33 @@ python chapters/02-training/ep18_pretrain.py
     demo: 'train',
     markdown: `## Idea
 
+After from-zero pretrain you still **align**: SFT teaches following; DPO/RLHF-style methods push preferences.
+
 ### 1. What it is for
 
-Post-pretrain alignment APIs in this lesson:
+SFT mask-prompt loss on replies; DPO prefer chosen vs rejected against a reference.
 
-- **SFT**: prompt→answer demos; **mask the prompt**; loss only on reply tokens  
-- **DPO**: vs a frozen reference, prefer chosen over rejected (one teaching step)
+### 2. From zero: how you build it
 
-### 2. Why the LLM pipeline needs it
+Instruction/preference data → SFT from base ckpt → DPO/RLHF → eval regressions.
 
-Pretrain completes web text; it doesn’t automatically “be an assistant.” SFT teaches format/following; DPO/RLHF-style methods push toward preferences. Chat products need some of this.
+### 3. What “good” means
 
-### 3. Where it comes from · how you build it
+Correct masks/shapes; better following/safety; limited capability loss.
 
-| Method | Data | Goal |
-| --- | --- | --- |
-| SFT | instruction–reply pairs | Imitate replies |
-| DPO | chosen/rejected for a prompt | Preference (no explicit RM in this recipe) |
-| Broader map | RLHF / RLAIF / … | Many recipes; two APIs here |
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Data quality beats blind steps; over-align can dull the base; often paired with new specials/templates.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | SFT mask correct | No loss on the prompt |
-| **Hard** | DPO has reference + pairs | API shape |
-| **Soft** | Better instruction-following | Human/auto evals |
-| **Soft** | Don’t erase pretrain skill | Data/lr tradeoffs |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Llama/Qwen Instruct/Chat; Zephyr-style DPO; TRL-like tooling; labs use RLHF variants.
 
-\`arche/train/sft.py\` (and DPO) + this script.
+### 6. This course
+
+\`\`\`bash
+python chapters/02-training/ep19_sft_dpo.py
+\`\`\`
 
 ## Run
 
@@ -1186,29 +1171,33 @@ python chapters/02-training/ep19_sft_dpo.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
+From-zero MoE/MLA must **speak checkpoint names/shapes** of open weights—or frontier structure stays on paper.
+
 ### 1. What it is for
 
-**Frontier checkpoint primer**: save/load MoE/MLA-style modules—round-trip a teaching checkpoint and map Mixtral-like \`w1/w2/w3\` names into our modules so shapes don’t silently break.
+Round-trip teaching ckpts; map Mixtral-like \`w1/w2/w3\` into our modules.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Running MoE/MLA forward isn’t enough; open weights arrive as foreign key names and shards. Can’t load ⇒ frontier structure stays on paper.
+Name map ↔ open names; save/load; fail loudly on missing keys.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-Mapping + round-trip for open MoE-style checkpoints—not a full trainer.
+Round-trip align; experts covered; hooks real hubs.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Round-trip \`allclose\` / shapes | No silent mis-load |
-| **Hard** | Name map covers experts | Missed map = random expert |
-| **Soft** | Hooks real open weights | Product engineering; shapes here |
+Bad maps ⇒ silent random experts; consistent naming cuts debt.
 
-### 5. What we do
+### 5. Industry · open models
 
-This episode’s primer script.
+HF shards + documented keys; Mixtral/DeepSeek naming; converters are standard.
+
+### 6. This course
+
+\`\`\`bash
+python chapters/02-training/ep20_frontier_ckpt.py
+\`\`\`
 
 ## Run
 
@@ -1232,29 +1221,34 @@ python chapters/02-training/ep20_frontier_ckpt.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
+From-zero handwritten stack acceptance: **match authoritative HF logits** on a short prompt.
+
 ### 1. What it is for
 
-**HF align**: same short prompt through arche and official HF Llama 3.2; compare argmax and max abs logit diff—evidence the dense trunk and weight map are trustworthy.
+Same prompt through arche vs HF Llama 3.2; compare argmax / max abs diff.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Hand-written stacks can “run” with wrong layers. Matching a reference on short logits is hard proof. No weights → clean skip ≠ broken logic.
+Fixed seed/dtype; same weights; short seq; clean skip without weights.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-This script + CI synthetic map tests; license/login for real weights.
+Close enough with weights; explicit skip without; longer coverage later.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Logits close enough with weights | Map/formulas OK |
-| **Hard** | Skip clearly without weights | Don’t fake pass |
-| **Soft** | Longer seqs / more ops | Later; short prompt here |
+Fail ⇒ revisit maps/RoPE/norm. Pass before optimize/serve.
 
-### 5. What we do
+### 5. Industry · open models
 
-See Run; Fix if gated.
+Repro CI often gates on HF/official match; engines keep numeric regressions.
+
+### 6. This course
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep21_hf_align.py
+\`\`\`
 
 ## Run
 
@@ -1265,7 +1259,7 @@ python chapters/01-inference/ep21_hf_align.py
 
 ## Fix
 
-No weights / not logged in → skip or tip; not a logic failure.
+No weights/login → skip ≠ broken logic.
 
 ## Next
 
@@ -1283,29 +1277,33 @@ No weights / not logged in → skip or tip; not a logic failure.
     estimatedMinutes: 15,
     markdown: `## Idea
 
+From-zero at scale: weights are **index.json + shards**. Can’t assemble shards ⇒ can’t take open frontier weights.
+
 ### 1. What it is for
 
-Huge checkpoints often ship as \`index.json\` + many shards. This lesson uses **synthetic** index+shards (Mixtral-like MoE / DeepSeek-like MLA) to practice pack/unpack and \`allclose\` after load—no multi-tens-of-GB download.
+Synthetic pack/unpack + \`allclose\` without multi-tens-of-GB downloads.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Single files don’t scale. Can’t read shards ⇒ can’t use frontier open weights. Synthetic data trains **index + concat**, not download stamina.
+HF-style index; shard tensors; aggregate on load.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-Build synthetic shards → load via index → numeric check.
+Index matches shards; reload aligns; missing pieces fail clearly.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Index matches shards | Missing/wrong keys fail clearly |
-| **Hard** | Reload \`allclose\` | Concat correct |
-| **Soft** | Real hub formats | Product engineering |
+Shard policy affects download parallelism and peak RAM; bad concat ⇒ silent bad weights.
 
-### 5. What we do
+### 5. Industry · open models
 
-This episode’s script.
+HF Hub sharding standard; Llama/Qwen/DeepSeek/Mixtral; safetensors+index dominant.
+
+### 6. This course
+
+\`\`\`bash
+python chapters/02-training/ep22_sharded_frontier.py
+\`\`\`
 
 ## Run
 
@@ -1329,34 +1327,33 @@ python chapters/02-training/ep22_sharded_frontier.py
     estimatedMinutes: 18,
     markdown: `## Idea
 
+From-zero serving last mile: **paged KV** fights fragmentation; **CUDA Graph** cuts fixed-shape launch tax—a map toward vLLM-class engines.
+
 ### 1. What it is for
 
-Two serving primers:
+Block table + gather; optional CUDA Graph capture. Teaching ≠ drop-in vLLM.
 
-1. **Paged KV** — fixed-size blocks + block table + gather  
-2. **CUDA Graph** — capture fixed-shape work when CUDA is present  
+### 2. From zero: how you build it
 
-Teaching mechanisms—**not** a drop-in vLLM.
+Logical KV + continuous batch → block alloc/free → optional graph on decode.
 
-### 2. Why the LLM pipeline needs it
+### 3. What “good” means
 
-Toy loops are fine solo; production concurrency fragments VRAM and pays launch tax. Paging manages memory; graphs cut repeated fixed-shape launch overhead.
+Gather matches logical cache; in-bounds tables; less fragmentation/launch; higher throughput.
 
-### 3. Where it comes from · how you build it
+### 4. Improve · whole-model impact
 
-\`arche/paged_kv.py\` (and graph) shows block-table gather and optional CUDA Graph capture.
+Page size/prealloc change waste vs speed; graphs need stable shapes; doesn’t change weights—raises serving ceiling.
 
-### 4. Standards · what “good” means
+### 5. Industry · open models
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Gather matches logical cache | Paging must not change meaning |
-| **Hard** | Block table in bounds | Alloc/free correct |
-| **Soft** | Less fragmentation / fewer launches | Serving metrics; shape here |
+vLLM paged attention landmark; TRT-LLM/SGLang variants; pairs with Llama/Qwen/DeepSeek weights.
 
-### 5. What we do
+### 6. This course
 
-This primer script. Path complete—revisit weak chapters or run HF align with weights.
+\`\`\`bash
+python chapters/01-inference/ep23_paged_cuda_graph.py
+\`\`\`
 
 ## Run
 
@@ -1366,7 +1363,7 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## Next
 
-Path complete—revisit weak chapters, or run HF align when you have weights.
+Path complete—revisit weak chapters or run HF align.
 
 `,
   },

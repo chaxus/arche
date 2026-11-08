@@ -1,33 +1,32 @@
 ## Idea
 
+From-zero serving last mile: **paged KV** fights fragmentation; **CUDA Graph** cuts fixed-shape launch tax—a map toward vLLM-class engines.
+
 ### 1. What it is for
 
-Two serving primers:
+Block table + gather; optional CUDA Graph capture. Teaching ≠ drop-in vLLM.
 
-1. **Paged KV** — fixed-size blocks + block table + gather  
-2. **CUDA Graph** — capture fixed-shape work when CUDA is present  
+### 2. From zero: how you build it
 
-Teaching mechanisms—**not** a drop-in vLLM.
+Logical KV + continuous batch → block alloc/free → optional graph on decode.
 
-### 2. Why the LLM pipeline needs it
+### 3. What “good” means
 
-Toy loops are fine solo; production concurrency fragments VRAM and pays launch tax. Paging manages memory; graphs cut repeated fixed-shape launch overhead.
+Gather matches logical cache; in-bounds tables; less fragmentation/launch; higher throughput.
 
-### 3. Where it comes from · how you build it
+### 4. Improve · whole-model impact
 
-`arche/paged_kv.py` (and graph) shows block-table gather and optional CUDA Graph capture.
+Page size/prealloc change waste vs speed; graphs need stable shapes; doesn’t change weights—raises serving ceiling.
 
-### 4. Standards · what “good” means
+### 5. Industry · open models
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Gather matches logical cache | Paging must not change meaning |
-| **Hard** | Block table in bounds | Alloc/free correct |
-| **Soft** | Less fragmentation / fewer launches | Serving metrics; shape here |
+vLLM paged attention landmark; TRT-LLM/SGLang variants; pairs with Llama/Qwen/DeepSeek weights.
 
-### 5. What we do
+### 6. This course
 
-This primer script. Path complete—revisit weak chapters or run HF align with weights.
+```bash
+python chapters/01-inference/ep23_paged_cuda_graph.py
+```
 
 ## Run
 
@@ -37,4 +36,4 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## Next
 
-Path complete—revisit weak chapters, or run HF align when you have weights.
+Path complete—revisit weak chapters or run HF align.

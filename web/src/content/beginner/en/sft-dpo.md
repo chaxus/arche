@@ -1,36 +1,32 @@
 ## Idea
 
+After from-zero pretrain you still **align**: SFT teaches following; DPO/RLHF-style methods push preferences.
+
 ### 1. What it is for
 
-Post-pretrain alignment APIs in this lesson:
+SFT mask-prompt loss on replies; DPO prefer chosen vs rejected against a reference.
 
-- **SFT**: prompt→answer demos; **mask the prompt**; loss only on reply tokens  
-- **DPO**: vs a frozen reference, prefer chosen over rejected (one teaching step)
+### 2. From zero: how you build it
 
-### 2. Why the LLM pipeline needs it
+Instruction/preference data → SFT from base ckpt → DPO/RLHF → eval regressions.
 
-Pretrain completes web text; it doesn’t automatically “be an assistant.” SFT teaches format/following; DPO/RLHF-style methods push toward preferences. Chat products need some of this.
+### 3. What “good” means
 
-### 3. Where it comes from · how you build it
+Correct masks/shapes; better following/safety; limited capability loss.
 
-| Method | Data | Goal |
-| --- | --- | --- |
-| SFT | instruction–reply pairs | Imitate replies |
-| DPO | chosen/rejected for a prompt | Preference (no explicit RM in this recipe) |
-| Broader map | RLHF / RLAIF / … | Many recipes; two APIs here |
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Data quality beats blind steps; over-align can dull the base; often paired with new specials/templates.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | SFT mask correct | No loss on the prompt |
-| **Hard** | DPO has reference + pairs | API shape |
-| **Soft** | Better instruction-following | Human/auto evals |
-| **Soft** | Don’t erase pretrain skill | Data/lr tradeoffs |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Llama/Qwen Instruct/Chat; Zephyr-style DPO; TRL-like tooling; labs use RLHF variants.
 
-`arche/train/sft.py` (and DPO) + this script.
+### 6. This course
+
+```bash
+python chapters/02-training/ep19_sft_dpo.py
+```
 
 ## Run
 

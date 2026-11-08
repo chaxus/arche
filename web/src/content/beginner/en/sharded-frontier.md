@@ -1,28 +1,32 @@
 ## Idea
 
+From-zero at scale: weights are **index.json + shards**. Can’t assemble shards ⇒ can’t take open frontier weights.
+
 ### 1. What it is for
 
-Huge checkpoints often ship as `index.json` + many shards. This lesson uses **synthetic** index+shards (Mixtral-like MoE / DeepSeek-like MLA) to practice pack/unpack and `allclose` after load—no multi-tens-of-GB download.
+Synthetic pack/unpack + `allclose` without multi-tens-of-GB downloads.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Single files don’t scale. Can’t read shards ⇒ can’t use frontier open weights. Synthetic data trains **index + concat**, not download stamina.
+HF-style index; shard tensors; aggregate on load.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-Build synthetic shards → load via index → numeric check.
+Index matches shards; reload aligns; missing pieces fail clearly.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Index matches shards | Missing/wrong keys fail clearly |
-| **Hard** | Reload `allclose` | Concat correct |
-| **Soft** | Real hub formats | Product engineering |
+Shard policy affects download parallelism and peak RAM; bad concat ⇒ silent bad weights.
 
-### 5. What we do
+### 5. Industry · open models
 
-This episode’s script.
+HF Hub sharding standard; Llama/Qwen/DeepSeek/Mixtral; safetensors+index dominant.
+
+### 6. This course
+
+```bash
+python chapters/02-training/ep22_sharded_frontier.py
+```
 
 ## Run
 

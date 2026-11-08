@@ -1,35 +1,32 @@
 ## Idea
 
+From-zero core: **pretrain** writes embeddings and almost all trunk weights. Without it you only have a random shell.
+
 ### 1. What it is for
 
-**Pretraining** teaches next-token prediction on lots of text: logits → cross-entropy vs the next id → update weights (including the embedding table). This is where most trunk parameters are born.
+Next-token CE on huge text; backprop updates the net including embeds.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Random weights can’t speak. Learn statistics/structure on huge text first; then chat and preferences. Without pretrain, SFT/DPO have no real starting point.
+Frozen tokenizer + shell + data → AdamW next-id loss → long multi-GPU run → checkpoints. This lesson: toy steps + page playground.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Scale | Meaning |
-| --- | --- |
-| **This lab** | Toy AdamW: few steps, feel the API |
-| **Page playground** | Drag lr/steps; watch loss |
-| **Real pretrain** | Massive data, multi-GPU, long runs |
+Correct objective; grads hit params; loss/downstream/stability.
 
-Intuition: batch → predict next token → loss → `optimizer.step()`.
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Data mix dominates; scale laws; stability decides finishability; undertrain ⇒ weak embeds and deep layers.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Loss is next-id CE | Right objective |
-| **Hard** | Grads hit the right params | Including embeddings |
-| **Soft** | Loss trends down | Enough on the toy |
-| **Soft** | Real runs: data, stability, downstream | Not claimed here |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Llama/Qwen/DeepSeek: pretrain then align; Megatron/DeepSpeed/torchtitan-style stacks for from-zero training.
 
-`arche/train/pretrain.py` + page playground. Not internet-scale training.
+### 6. This course
+
+```bash
+python chapters/02-training/ep18_pretrain.py
+```
 
 ## Run
 
