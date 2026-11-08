@@ -44,4 +44,5 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## 下一章
 
-路径走完——回看薄弱章，或跑 HF 对齐。
+
+**MoE**（`?c=moe`）：进入前沿结构。

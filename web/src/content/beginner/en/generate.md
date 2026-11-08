@@ -36,4 +36,5 @@ python chapters/01-inference/ep11_generate.py
 
 ## Next
 
-**KV cache** (`?c=kv-cache`).
+
+**HF align** (`?c=hf-align`): verify the handwritten stack against HF.

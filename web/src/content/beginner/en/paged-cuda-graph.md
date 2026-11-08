@@ -36,4 +36,5 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## Next
 
-Path complete—revisit weak chapters or run HF align.
+
+**MoE** (`?c=moe`): frontier architectures.

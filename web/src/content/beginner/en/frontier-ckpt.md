@@ -36,4 +36,5 @@ python chapters/02-training/ep20_frontier_ckpt.py
 
 ## Next
 
-**HF align** (`?c=hf-align`).
+
+**Sharded MoE / MLA** (`?c=sharded-frontier`).

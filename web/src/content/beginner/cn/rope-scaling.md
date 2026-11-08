@@ -44,4 +44,5 @@ python chapters/01-inference/ep13_rope_scaling.py
 
 ## 下一章
 
-**MoE**（`?c=moe`）。
+
+**设备 · INT8 · 对话**（`?c=device-quant-chat`）。

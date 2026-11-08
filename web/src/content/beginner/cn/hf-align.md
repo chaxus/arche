@@ -45,4 +45,5 @@ python chapters/01-inference/ep21_hf_align.py
 
 ## 下一章
 
-**分片 MoE/MLA**（`?c=sharded-frontier`）。
+
+**预训练**（`?c=pretrain`）：从零写出权重（玩具 API）。

@@ -39,4 +39,5 @@ python chapters/02-training/ep20_frontier_ckpt.py
 
 ## 下一章
 
-**HF 对齐**（`?c=hf-align`）。
+
+**分片 MoE / MLA**（`?c=sharded-frontier`）。

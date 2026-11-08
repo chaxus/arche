@@ -36,4 +36,5 @@ python chapters/01-inference/ep13_rope_scaling.py
 
 ## Next
 
-**MoE** (`?c=moe`).
+
+**Device · INT8 · chat** (`?c=device-quant-chat`).

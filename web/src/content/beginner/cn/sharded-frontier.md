@@ -39,4 +39,5 @@ python chapters/02-training/ep22_sharded_frontier.py
 
 ## 下一章
 
-**Paged KV · CUDA Graph**（`?c=paged-cuda-graph`）。
+
+路径走完——可回看薄弱章，或有权重时再跑 HF 对齐。

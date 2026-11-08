@@ -42,4 +42,5 @@ No weights/login → skip ≠ broken logic.
 
 ## Next
 
-**Sharded MoE/MLA** (`?c=sharded-frontier`).
+
+**Pretrain** (`?c=pretrain`): write weights from zero (toy API).

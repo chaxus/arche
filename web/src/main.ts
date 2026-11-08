@@ -5,7 +5,7 @@ import 'ranui/math';
 import 'ranui/select';
 import 'ranui/theme-switch';
 import { chaptersFor, type Chapter } from './content';
-import type { PartId } from './content/types';
+import { chaptersInPartOrder, type PartId } from './content/types';
 import {
   mountEmbeddingPlayground,
   mountPretrainPlayground,
@@ -33,7 +33,7 @@ const app = root;
 
 let locale = localeFromUrlPath(location.pathname);
 let ui = uiFor(locale);
-let chapters = chaptersFor(locale);
+let chapters = chaptersInPartOrder(chaptersFor(locale));
 
 const params = new URLSearchParams(location.search);
 const rawC = params.get('c');

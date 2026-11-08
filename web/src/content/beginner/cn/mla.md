@@ -44,4 +44,5 @@ python chapters/01-inference/ep15_mla.py
 
 ## 下一章
 
-**设备 · INT8 · 对话**（`?c=device-quant-chat`）。
+
+**前沿检查点**（`?c=frontier-ckpt`）。

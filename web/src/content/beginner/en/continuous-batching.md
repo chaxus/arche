@@ -36,4 +36,5 @@ python chapters/01-inference/ep17_continuous_batching.py
 
 ## Next
 
-**Pretrain** (`?c=pretrain`).
+
+**Paged KV · CUDA Graph** (`?c=paged-cuda-graph`).

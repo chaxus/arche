@@ -49,4 +49,5 @@ python chapters/01-inference/ep11_generate.py
 
 ## 下一章
 
-**KV 缓存**（`?c=kv-cache`）。
+
+**HF logits 对齐**（`?c=hf-align`）：对照官方实现，验收手写栈。

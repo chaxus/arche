@@ -25,4 +25,17 @@ export type Chapter = {
   demo?: ChapterDemo;
 };
 
-export const PART_ORDER: PartId[] = ['start', 'trunk', 'infer', 'train', 'frontier'];
+/** Reading order: build → train from zero → serve → frontier architectures. */
+export const PART_ORDER: PartId[] = ['start', 'trunk', 'train', 'infer', 'frontier'];
+
+/** Stable sort: PART_ORDER first, then original list order within a part. */
+export function chaptersInPartOrder(chapters: Chapter[]): Chapter[] {
+  return chapters
+    .map((chapter, index) => ({ chapter, index }))
+    .sort((a, b) => {
+      const partDelta =
+        PART_ORDER.indexOf(a.chapter.partId) - PART_ORDER.indexOf(b.chapter.partId);
+      return partDelta !== 0 ? partDelta : a.index - b.index;
+    })
+    .map(({ chapter }) => chapter);
+}

@@ -36,4 +36,5 @@ python chapters/02-training/ep19_sft_dpo.py
 
 ## Next
 
-**Frontier checkpoints** (`?c=frontier-ckpt`).
+
+**KV cache** (`?c=kv-cache`): make decode affordable before serving.

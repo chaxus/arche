@@ -918,7 +918,8 @@ python chapters/01-inference/ep11_generate.py
 
 ## 下一章
 
-**KV 缓存**（\`?c=kv-cache\`）。
+
+**HF logits 对齐**（\`?c=hf-align\`）：对照官方实现，验收手写栈。
 
 `,
   },
@@ -1040,7 +1041,8 @@ python chapters/01-inference/ep13_rope_scaling.py
 
 ## 下一章
 
-**MoE**（\`?c=moe\`）。
+
+**设备 · INT8 · 对话**（\`?c=device-quant-chat\`）。
 
 `,
   },
@@ -1050,7 +1052,7 @@ python chapters/01-inference/ep13_rope_scaling.py
     title: 'MoE',
     summary: '很多专家；每个 token 只跑 top-k。',
     script: 'chapters/01-inference/ep14_moe.py',
-    partId: 'infer',
+    partId: 'frontier',
     estimatedMinutes: 15,
     markdown: `## 要点
 
@@ -1120,7 +1122,7 @@ python chapters/01-inference/ep14_moe.py
     title: 'MLA',
     summary: '缓存一小段 latent，而不是完整 K/V。',
     script: 'chapters/01-inference/ep15_mla.py',
-    partId: 'infer',
+    partId: 'frontier',
     estimatedMinutes: 18,
     markdown: `## 要点
 
@@ -1168,7 +1170,8 @@ python chapters/01-inference/ep15_mla.py
 
 ## 下一章
 
-**设备 · INT8 · 对话**（\`?c=device-quant-chat\`）。
+
+**前沿检查点**（\`?c=frontier-ckpt\`）。
 
 `,
   },
@@ -1287,7 +1290,8 @@ python chapters/01-inference/ep17_continuous_batching.py
 
 ## 下一章
 
-**预训练**（\`?c=pretrain\`）。
+
+**Paged KV · CUDA Graph**（\`?c=paged-cuda-graph\`）。
 
 `,
   },
@@ -1413,7 +1417,8 @@ python chapters/02-training/ep19_sft_dpo.py
 
 ## 下一章
 
-**前沿检查点**（\`?c=frontier-ckpt\`）。
+
+**KV 缓存**（\`?c=kv-cache\`）：生成要能服务，先把解码成本打下来。
 
 `,
   },
@@ -1466,7 +1471,8 @@ python chapters/02-training/ep20_frontier_ckpt.py
 
 ## 下一章
 
-**HF 对齐**（\`?c=hf-align\`）。
+
+**分片 MoE / MLA**（\`?c=sharded-frontier\`）。
 
 `,
   },
@@ -1476,7 +1482,7 @@ python chapters/02-training/ep20_frontier_ckpt.py
     title: 'HF logits 对齐',
     summary: '短 prompt 上对照 HF 的 logits。',
     script: 'chapters/01-inference/ep21_hf_align.py',
-    partId: 'frontier',
+    partId: 'trunk',
     estimatedMinutes: 20,
     markdown: `## 要点
 
@@ -1525,7 +1531,8 @@ python chapters/01-inference/ep21_hf_align.py
 
 ## 下一章
 
-**分片 MoE/MLA**（\`?c=sharded-frontier\`）。
+
+**预训练**（\`?c=pretrain\`）：从零写出权重（玩具 API）。
 
 `,
   },
@@ -1578,7 +1585,8 @@ python chapters/02-training/ep22_sharded_frontier.py
 
 ## 下一章
 
-**Paged KV · CUDA Graph**（\`?c=paged-cuda-graph\`）。
+
+路径走完——可回看薄弱章，或有权重时再跑 HF 对齐。
 
 `,
   },
@@ -1588,7 +1596,7 @@ python chapters/02-training/ep22_sharded_frontier.py
     title: 'Paged KV · CUDA Graph',
     summary: '块表 KV 池与固定 shape 的 CUDA graph。',
     script: 'chapters/01-inference/ep23_paged_cuda_graph.py',
-    partId: 'frontier',
+    partId: 'infer',
     estimatedMinutes: 18,
     markdown: `## 要点
 
@@ -1636,7 +1644,8 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## 下一章
 
-路径走完——回看薄弱章，或跑 HF 对齐。
+
+**MoE**（\`?c=moe\`）：进入前沿结构。
 
 `,
   },

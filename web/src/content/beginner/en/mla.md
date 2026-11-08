@@ -36,4 +36,5 @@ python chapters/01-inference/ep15_mla.py
 
 ## Next
 
-**Device · INT8 · chat** (`?c=device-quant-chat`).
+
+**Frontier checkpoints** (`?c=frontier-ckpt`).

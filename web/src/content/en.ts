@@ -752,7 +752,8 @@ python chapters/01-inference/ep11_generate.py
 
 ## Next
 
-**KV cache** (\`?c=kv-cache\`).
+
+**HF align** (\`?c=hf-align\`): verify the handwritten stack against HF.
 
 `,
   },
@@ -853,7 +854,8 @@ python chapters/01-inference/ep13_rope_scaling.py
 
 ## Next
 
-**MoE** (\`?c=moe\`).
+
+**Device · INT8 · chat** (\`?c=device-quant-chat\`).
 
 `,
   },
@@ -863,7 +865,7 @@ python chapters/01-inference/ep13_rope_scaling.py
     title: 'MoE',
     summary: 'Many experts; each token runs only top-k.',
     script: 'chapters/01-inference/ep14_moe.py',
-    partId: 'infer',
+    partId: 'frontier',
     estimatedMinutes: 15,
     markdown: `## Idea
 
@@ -913,7 +915,7 @@ python chapters/01-inference/ep14_moe.py
     title: 'MLA',
     summary: 'Cache a small latent instead of full K/V.',
     script: 'chapters/01-inference/ep15_mla.py',
-    partId: 'infer',
+    partId: 'frontier',
     estimatedMinutes: 18,
     markdown: `## Idea
 
@@ -953,7 +955,8 @@ python chapters/01-inference/ep15_mla.py
 
 ## Next
 
-**Device · INT8 · chat** (\`?c=device-quant-chat\`).
+
+**Frontier checkpoints** (\`?c=frontier-ckpt\`).
 
 `,
   },
@@ -1055,7 +1058,8 @@ python chapters/01-inference/ep17_continuous_batching.py
 
 ## Next
 
-**Pretrain** (\`?c=pretrain\`).
+
+**Paged KV · CUDA Graph** (\`?c=paged-cuda-graph\`).
 
 `,
   },
@@ -1157,7 +1161,8 @@ python chapters/02-training/ep19_sft_dpo.py
 
 ## Next
 
-**Frontier checkpoints** (\`?c=frontier-ckpt\`).
+
+**KV cache** (\`?c=kv-cache\`): make decode affordable before serving.
 
 `,
   },
@@ -1207,7 +1212,8 @@ python chapters/02-training/ep20_frontier_ckpt.py
 
 ## Next
 
-**HF align** (\`?c=hf-align\`).
+
+**Sharded MoE / MLA** (\`?c=sharded-frontier\`).
 
 `,
   },
@@ -1217,7 +1223,7 @@ python chapters/02-training/ep20_frontier_ckpt.py
     title: 'HF logits alignment',
     summary: 'Check our logits against Hugging Face on a short prompt.',
     script: 'chapters/01-inference/ep21_hf_align.py',
-    partId: 'frontier',
+    partId: 'trunk',
     estimatedMinutes: 20,
     markdown: `## Idea
 
@@ -1263,7 +1269,8 @@ No weights/login → skip ≠ broken logic.
 
 ## Next
 
-**Sharded MoE/MLA** (\`?c=sharded-frontier\`).
+
+**Pretrain** (\`?c=pretrain\`): write weights from zero (toy API).
 
 `,
   },
@@ -1313,7 +1320,8 @@ python chapters/02-training/ep22_sharded_frontier.py
 
 ## Next
 
-**Paged KV · CUDA Graph** (\`?c=paged-cuda-graph\`).
+
+Path complete—revisit weak chapters, or re-run HF align with weights.
 
 `,
   },
@@ -1323,7 +1331,7 @@ python chapters/02-training/ep22_sharded_frontier.py
     title: 'Paged KV · CUDA graphs',
     summary: 'Block-table KV pool and fixed-shape CUDA graphs.',
     script: 'chapters/01-inference/ep23_paged_cuda_graph.py',
-    partId: 'frontier',
+    partId: 'infer',
     estimatedMinutes: 18,
     markdown: `## Idea
 
@@ -1363,7 +1371,8 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 ## Next
 
-Path complete—revisit weak chapters or run HF align.
+
+**MoE** (\`?c=moe\`): frontier architectures.
 
 `,
   },

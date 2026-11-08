@@ -36,4 +36,5 @@ python chapters/02-training/ep22_sharded_frontier.py
 
 ## Next
 
-**Paged KV · CUDA Graph** (`?c=paged-cuda-graph`).
+
+Path complete—revisit weak chapters, or re-run HF align with weights.
