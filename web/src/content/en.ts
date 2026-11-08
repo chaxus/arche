@@ -198,66 +198,79 @@ Gated download—open when stuck:
     demo: 'embedding',
     markdown: `## Idea
 
-### 1. Why this step exists
+### 1. Stuck on that sentence? Split it
 
-After the last chapter, the sentence is already a list of ids, e.g. \`[3, 7, 11]\`.
+Ignore “weight file” and “vector” for a moment. One picture:
 
-Later layers need multiply-adds and attention. **Ids alone are not usable raw material**—\`3 + 7 = 10\` has nothing to do with what the sentence meant. The model needs rows of floats it can actually compute with.
+**A wall of lockers.**
 
-So the weight file holds a big table: one row per possible id, every row the same length. Embedding’s job is to copy the rows that match the ids you hold.
+- Many lockers, numbered \`0, 1, 2, 3…\`  
+- Each locker already holds a slip of paper with a few floats written on it  
+- You hold pickup codes: \`3, 7, 11\`  
+- You open locker 3 and take the slip; then 7; then 11  
 
-### 2. What embedding actually does
+**Embedding = open lockers by number and take the slips.**  
+No understanding the sentence—just “this number → that locker → take what’s inside.”
 
-Still with \`[3, 7, 11]\` (fake numbers, only to show the action):
+The wall of slips lives in the downloaded model file; people call those floats part of the **weights**. For now, treat them as **already printed locker contents**.
 
-| id | floats on that row |
+### 2. Walk it with numbers
+
+Suppose the wall has these lockers (fake numbers):
+
+| locker | slip inside |
 | --- | --- |
-| **3** | **0.55, -0.17, 0.09, 0.22** |
-| **7** | **0.03, 0.41, -0.28, 0.10** |
-| **11** | **-0.12, 0.08, 0.33, -0.05** |
+| 3 | \`0.55, -0.17, 0.09, 0.22\` |
+| 7 | \`0.03, 0.41, -0.28, 0.10\` |
+| 11 | \`-0.12, 0.08, 0.33, -0.05\` |
 
-See \`3\` → copy row 3; see \`7\` → copy row 7; see \`11\` → copy row 11. You get three rows of floats. No sentence understanding, no dictionary lookup—**the whole step is copy-by-id**.
+The tokenizer gave pickup codes \`[3, 7, 11]\`. After embedding you hold:
 
-The tiny table above this lesson is the same action: type \`3, 7, 11\` and the highlighted rows are what get copied.
+\`\`\`
+slip 1: 0.55, -0.17, 0.09, 0.22   ← from locker 3
+slip 2: 0.03, 0.41, -0.28, 0.10    ← from locker 7
+slip 3: -0.12, 0.08, 0.33, -0.05   ← from locker 11
+\`\`\`
 
-A few words people stumble on:
+**Before:** only three integers \`3, 7, 11\` (useless for real multiply-adds).  
+**After:** three slips of floats (later layers only compute on these).
 
-- **Vector**: just another name for “that row of floats”—nothing extra.  
-- **Fixed length**: every row is the same length. Teaching table: 4 floats; Llama 3.2 1B: **2048**. Same length lets later layers use one formula for every token.  
-- **Later layers only see these**: after embedding, they see neither the original text nor the ids \`3 / 7 / 11\`—only the float rows.
+The tiny table above this lesson is that wall: type \`3, 7, 11\`, highlighted rows are the lockers you open, and below are the slips you took.
 
-Think phone book or barcode: student id → that grade row; barcode → the price fields. Embedding is not a clever algorithm; it is this lookup.
+Why same-length slips? Later layers use one formula per token—teaching wall: 4 floats; Llama 3.2 1B: **2048**. “Vector” just means that slip.
 
 \`\`\`mermaid
 flowchart LR
-  ids["ids 3, 7, 11"] --> copy[copy rows by id]
-  table[table in weights] --> copy
-  copy --> nums[float rows go onward]
+  code["codes 3, 7, 11"] --> open[open by number]
+  wall[locker wall] --> open
+  open --> slips[slips go onward]
 \`\`\`
 
-### 3. How this ties to the tokenizer and weights
+### 3. Tokenizer and weights
 
-The tokenizer maps text ↔ id; the embedding maps id ↔ a row of floats. Those floats are part of the weights in the checkpoint.
+Tokenizer: text → pickup code (id).  
+Embedding: code → open locker, take slip.  
+Weights: the floats in the lockers; the whole wall sits in the model file.
 
-The two tables must stay paired. If training always used \`the\` → id \`65\`, row 65 was tuned for that; a foreign tokenizer that maps \`the\` → \`902\` still copies row 902 → garbage. That’s the pairing story from the tokenizer lesson.
+They must stay paired. If training always put \`the\` in locker 65, those floats were tuned for it; a foreign tokenizer that codes \`the\` as 902 still opens locker 902 → wrong slip.
 
-Fresh or demo tables look almost random—**not semantics yet**. Training slowly writes meaning into those numbers.
+Fresh / demo walls look random—**not semantics yet**. Training rewrites the slips over time.
 
 ### 4. Design choices you will hear
 
-Older stacks often add a second “position table” onto the copied rows. Llama-style dense decoders usually **skip that here** and leave “which place in the sequence” to **RoPE**. Small Llamas also often tie this embedding table to the final vocab-scoring layer to save parameters.
+Older stacks sometimes add a second “position wall.” Llama-style usually **skips that here** and leaves order to **RoPE**. Small Llamas often reuse this wall for final vocab scoring.
 
-This chapter only asks which token (which row); position comes a few chapters later.
+This chapter only asks which locker; position comes later.
 
 ### 5. What labs ship
 
-Llama 3.2 / Qwen-style: embedding is lookup, no absolute PE here, small models often tie the LM head. Vendors differ on row count, row length, and tying—**copy row by id** stays the same.
+Llama 3.2 / Qwen: embedding = open by id; no absolute PE here; small models often tie the LM head. Vendors differ on locker count and slip length—**open-by-id** stays.
 
 ### 6. What “good” means · what we do
 
-\`T\` ids in should become \`T\` rows of \`dim\` floats; row \`i\` must match tokenizer id \`i\`; if RoPE follows, don’t sneak a PE table back in here.
+\`T\` ids → \`T\` same-length slips; locker \`i\` must match tokenizer id \`i\`; if RoPE follows, don’t add a PE table here.
 
-\`TokenEmbedding\` in \`arche/\` uses a tiny fake vocab so you need no download. Real Llama is ~128K rows with the same action, just a bigger table.
+\`TokenEmbedding\` in \`arche/\`: tiny fake wall, no download. Real Llama ~128K lockers, same action.
 
 ## Run
 
@@ -265,11 +278,11 @@ Llama 3.2 / Qwen-style: embedding is lookup, no absolute PE here, small models o
 python chapters/01-inference/ep03_embedding.py
 \`\`\`
 
-Expect real vs demo vocab size, row length, and id/output shapes.
+Expect real vs demo locker count, slip length, and id/output shapes.
 
 ## Next
 
-**RMSNorm** (\`?c=rmsnorm\`): steady the scale of those float rows before the heavy layers.
+**RMSNorm** (\`?c=rmsnorm\`): steady the scale of those slips before heavy layers.
 
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',

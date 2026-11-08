@@ -49,13 +49,13 @@ const LABELS: Record<
     },
     embedding: {
       heading: 'Try it here',
-      hint: 'Type ids like 3, 7, 11. Embedding only copies those rows from the table—no “understanding”.',
-      lookup: 'Copy rows',
-      note: 'Tiny fake table (12 rows × 4 floats). Real Llama is huge; the action is still copy-by-id.',
+      hint: 'Think lockers: type pickup codes (ids). Highlighted rows = lockers you open. Below = slips you take out.',
+      lookup: 'Open lockers',
+      note: 'Toy wall: 12 lockers × 4 floats on each slip. Real Llama is huge; same action—open by number.',
       inputPh: '3, 7, 11',
-      table: 'The table (each id has one row)',
-      gathered: 'Copied rows (what later layers see)',
-      shape: 'How many rows you copied',
+      table: 'Locker wall (number → slip inside)',
+      gathered: 'Slips you took out',
+      shape: 'What changed',
     },
     pretrain: {
       heading: 'Try it here',
@@ -89,13 +89,13 @@ const LABELS: Record<
     },
     embedding: {
       heading: '在页面上试',
-      hint: '输入编号，例如 3, 7, 11。嵌入只会把表里对应的行抄出来——没有「理解句子」。',
-      lookup: '按编号抄行',
-      note: '教学假表（12 行 × 每行 4 个小数）。真 Llama 大很多；动作仍是按 id 抄行。',
+      hint: '把它想成快递柜：输入取件码（编号）。高亮 = 你会打开的格子；下面 = 取出的纸条。',
+      lookup: '按号开柜',
+      note: '玩具柜：12 格，每张纸条 4 个小数。真 Llama 大很多；动作一样——按号码取格。',
       inputPh: '3, 7, 11',
-      table: '那张表（每个 id 一行）',
-      gathered: '抄出来的行（后面层只看到这些小数）',
-      shape: '抄了几行',
+      table: '柜壁（格号 → 格子里的纸条）',
+      gathered: '你取出的纸条',
+      shape: '前后对比',
     },
     pretrain: {
       heading: '在页面上试',
@@ -368,14 +368,14 @@ export function mountEmbeddingPlayground(host: HTMLElement, locale: PlaygroundLo
     const T = ids.length;
     shapeEl.textContent =
       locale === 'cn'
-        ? `输入 ${T} 个编号 → 抄出 ${T} 行，每行 ${TEACH_EMB_DIM} 个小数`
-        : `${T} ids in → copied ${T} rows, ${TEACH_EMB_DIM} floats each`;
+        ? `之前：手里只有编号 [${ids.join(', ')}]\n之后：打开了 ${T} 个格，每张纸条 ${TEACH_EMB_DIM} 个小数`
+        : `Before: only ids [${ids.join(', ')}]\nAfter: opened ${T} lockers, ${TEACH_EMB_DIM} floats on each slip`;
     outEl.textContent = ids
       .map((id, t) => {
         const row = TEACH_EMB[id]!.map((v) => v.toFixed(2)).join(', ');
         return locale === 'cn'
-          ? `第 ${t + 1} 个 token（id ${id}）抄到：[${row}]`
-          : `token ${t + 1} (id ${id}) copied: [${row}]`;
+          ? `打开 ${id} 号格 → 取出纸条 ${t + 1}：[${row}]`
+          : `open locker ${id} → slip ${t + 1}: [${row}]`;
       })
       .join('\n');
   };
