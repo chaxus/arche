@@ -2,11 +2,11 @@
 
 **ἀρχή** — origin, first principle.
 
-Hand-write a **modern dense** decoder (Llama 3.2 lineage) in PyTorch, then the frontier add-ons that matter next: **KV cache**, **RoPE scaling**, **MoE**, and **MLA**. Load open weights. No GPT-2 archaeology.
+Hand-write a **modern dense** decoder (Llama 3.2 lineage) in PyTorch, then the frontier add-ons that matter next: **KV cache**, **RoPE scaling**, **MoE**, **MLA**, plus inference engineering and tiny **pretrain / SFT / DPO** loops. Load open weights. No GPT-2 archaeology.
 
 - Architecture target: **Llama 3.2 1B** (same family as 3B), plus MoE / MLA primers
 - Pedagogy: one runnable chapter per module
-- Learning site: **[arche.chaxus.com](https://arche.chaxus.com)** (ranui, EN / 中文)
+- Learning site: **[arche.chaxus.com](https://arche.chaxus.com)** (ranui, EN / 中文，chapter progress + demos)
 - License: [Apache-2.0](LICENSE)
 
 ## Why not GPT-2
@@ -45,6 +45,11 @@ python chapters/01-inference/ep12_kv_cache.py
 python chapters/01-inference/ep13_rope_scaling.py
 python chapters/01-inference/ep14_moe.py
 python chapters/01-inference/ep15_mla.py
+python chapters/01-inference/ep16_device_quant_chat.py
+python chapters/01-inference/ep17_continuous_batching.py
+python chapters/02-training/ep18_pretrain.py
+python chapters/02-training/ep19_sft_dpo.py
+python chapters/02-training/ep20_frontier_ckpt.py
 ```
 
 Tokenizer / weights / generation need the official Llama 3.2 artifacts (Hugging Face gated). After you accept the license:
@@ -54,6 +59,12 @@ huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 python chapters/01-inference/ep10_load_weights.py
 python chapters/01-inference/ep11_generate.py
+```
+
+Optional HF logits alignment (skipped in CI without weights):
+
+```bash
+ARCH_HF_ALIGN=1 pytest tests/test_align_hf.py -q
 ```
 
 Mainland network tip:
@@ -116,14 +127,21 @@ npx wrangler pages deploy dist --project-name=arche --branch=main
 | 13 | RoPE long-context scaling | [ep13](chapters/01-inference/ep13_rope_scaling.py) |
 | 14 | MoE (top-k experts) | [ep14](chapters/01-inference/ep14_moe.py) |
 | 15 | MLA (latent KV) | [ep15](chapters/01-inference/ep15_mla.py) |
+| 16 | Device · INT8 · chat template | [ep16](chapters/01-inference/ep16_device_quant_chat.py) |
+| 17 | Continuous batching (teaching) | [ep17](chapters/01-inference/ep17_continuous_batching.py) |
+| 18 | Pretrain toy loop | [ep18](chapters/02-training/ep18_pretrain.py) |
+| 19 | SFT · DPO | [ep19](chapters/02-training/ep19_sft_dpo.py) |
+| 20 | Frontier MoE/MLA checkpoints | [ep20](chapters/02-training/ep20_frontier_ckpt.py) |
 
 Library code lives under [`arche/`](arche/).
 
 ## Tests
 
 ```bash
-pytest -q
+pytest -q -m "not integration"
 ```
+
+CI runs the same gate on every push / PR (Python + learning-site build).
 
 ## References
 

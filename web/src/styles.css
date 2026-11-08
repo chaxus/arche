@@ -112,6 +112,37 @@ r-theme-switch {
   position: sticky;
   top: 12px;
   align-self: start;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+}
+
+.progress {
+  margin-bottom: 10px;
+  padding: 8px 10px 10px;
+  border-radius: 8px;
+  background: var(--ran-color-bg-muted, #f5f5f5);
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ran-color-text-secondary, #666);
+  margin-bottom: 6px;
+}
+
+.progress-track {
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ran-color-border, #e5e5e5) 80%, transparent);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ran-color-text, #111);
+  transition: width 160ms ease;
 }
 
 .nav-link {
@@ -143,11 +174,48 @@ r-theme-switch {
   margin-right: 6px;
 }
 
+.nav-done {
+  display: inline-block;
+  width: 0.9em;
+  margin-right: 4px;
+  color: var(--ran-color-text, #111);
+  font-size: 12px;
+}
+
+.article-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .article h1 {
   margin: 0 0 8px;
   font-size: 28px;
   letter-spacing: -0.03em;
   line-height: 1.2;
+}
+
+.demo-wrap {
+  margin: 20px 0;
+}
+
+.demo-hint {
+  margin: 0 0 12px;
+  color: var(--ran-color-text-secondary, #666);
+  font-size: 14px;
+}
+
+.demo-out {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--ran-color-bg-muted, #f5f5f5);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  min-height: 1.5em;
 }
 
 .lede {

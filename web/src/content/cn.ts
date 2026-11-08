@@ -6,6 +6,7 @@ export const CHAPTERS_CN: Chapter[] = [
     ep: '01',
     title: '总览',
     summary: '现代 dense 主干——Llama 3.2 谱系，不做 GPT-2 考古。',
+    script: 'chapters/01-inference/ep01_overview.py',
     markdown: `## 为什么走这条路
 
 **arche**（ἀρχή）意为「本原 / 第一原理」。我们手写的是**当下**的 dense 解码器：
@@ -34,6 +35,7 @@ flowchart LR
     ep: '02',
     title: '分词器',
     summary: '官方 Llama 3.2 BPE——文本变成 token id。',
+    script: 'chapters/01-inference/ep02_tokenizer.py',
     markdown: `## 作用
 
 模型从不直接看字符。分词器在固定词表（Llama 3.2 为 \`128256\`）上做文本 ↔ 整数 id。
@@ -53,6 +55,7 @@ python chapters/01-inference/ep02_tokenizer.py
     ep: '03',
     title: '嵌入层',
     summary: 'token id → 稠密向量。没有绝对位置表。',
+    script: 'chapters/01-inference/ep03_embedding.py',
     markdown: `## 查表，不是位置
 
 \`TokenEmbedding\` 是形状为 \`(vocab_size, embed_dim)\` 的查找表。
@@ -68,6 +71,7 @@ Llama 3.2 1B/3B 还会把嵌入权重与 LM head **绑在一起**（weight tying
     ep: '04',
     title: 'RMSNorm',
     summary: '不做均值中心化的 pre-norm。',
+    script: 'chapters/01-inference/ep04_rmsnorm.py',
     markdown: `## 为什么是 RMSNorm
 
 比 LayerNorm 更便宜（不做减均值），在现代 LLM 上足够稳，也是 Llama / Qwen dense 堆叠的默认 pre-norm。
@@ -82,6 +86,7 @@ Llama 3.2 1B/3B 还会把嵌入权重与 LM head **绑在一起**（weight tying
     ep: '05',
     title: 'RoPE',
     summary: '旋转 Q/K，让注意力带上相对位置。',
+    script: 'chapters/01-inference/ep05_rope.py',
     markdown: `## 旋转位置编码
 
 RoPE 按 token 位置给 query/key 的成对维度施加旋转角。相对偏移会从点积里自然出现——不需要绝对 PE 表。
@@ -96,6 +101,7 @@ Llama 3.2 还使用很大的 \`rope_theta\`（\`500000\`），以及长上下文
     ep: '06',
     title: 'GQA 注意力',
     summary: 'KV 头少于 query 头，仍然因果。',
+    script: 'chapters/01-inference/ep06_gqa.py',
     markdown: `## Grouped-Query Attention
 
 Llama 3.2 1B：**32** 个 query 头，**8** 个 KV 头 → 每个 KV 头被 4 个 query 头共享。
@@ -110,6 +116,7 @@ Llama 3.2 1B：**32** 个 query 头，**8** 个 KV 头 → 每个 KV 头被 4 �
     ep: '07',
     title: 'SwiGLU',
     summary: 'gate × up，再 down——三条无偏置线性层。',
+    script: 'chapters/01-inference/ep07_swiglu.py',
     markdown: `## 现代 FFN
 
 \`\`\`
@@ -125,6 +132,7 @@ down(silu(gate(x)) * up(x))
     ep: '08',
     title: 'Transformer 块',
     summary: '可堆叠的 pre-norm 残差三明治。',
+    script: 'chapters/01-inference/ep08_block.py',
     markdown: `## 一个 block
 
 \`\`\`
@@ -139,6 +147,7 @@ Llama 3.2 1B 堆 **16** 次（3B：28 次）。进出租同形状——所以深
     ep: '09',
     title: '堆叠 + LM head',
     summary: 'embed → blocks → 最终 RMSNorm → 绑定的 lm_head。',
+    script: 'chapters/01-inference/ep09_stack.py',
     markdown: `## 完整前向
 
 \`\`\`
@@ -159,6 +168,7 @@ python chapters/01-inference/ep09_stack.py
     ep: '10',
     title: '加载权重',
     summary: '把 Hugging Face Llama 3.2 张量映射进 arche.Llama。',
+    script: 'chapters/01-inference/ep10_load_weights.py',
     markdown: `## 官方权重，手写计算图
 
 \`from_pretrained\` 搭建我们的模块，下载 HF 权重，再按一小张 key 对照表拷贝张量（\`model.layers.*\` → \`layers.*\`）。
@@ -176,6 +186,7 @@ python chapters/01-inference/ep10_load_weights.py
     ep: '11',
     title: '文本生成',
     summary: '用 temperature 与 top-k 采样后续 token。',
+    script: 'chapters/01-inference/ep11_generate.py',
     markdown: `## 解码循环
 
 反复取最后一步 logits，可选 top-k，采样（或贪心），拼到序列上，遇 EOS 停。
@@ -192,6 +203,7 @@ python chapters/01-inference/ep11_generate.py
     ep: '12',
     title: 'KV 缓存',
     summary: '先 prefill 一次，再用缓存的 K/V 逐步解码。',
+    script: 'chapters/01-inference/ep12_kv_cache.py',
     markdown: `## 为什么要缓存
 
 没有 cache 时，每生成一个新 token 都要对整段前缀重算注意力。
@@ -210,6 +222,7 @@ python chapters/01-inference/ep12_kv_cache.py
     ep: '13',
     title: 'RoPE 缩放',
     summary: 'Llama 3.2 的波长平滑，面向长上下文。',
+    script: 'chapters/01-inference/ep13_rope_scaling.py',
     markdown: `## 超出 8k 窗口
 
 Llama 3.2 保留 \`rope_theta=500000\`，再用 **factor / low / high** 调度把长波长拉向 128k 上下文。
@@ -226,6 +239,7 @@ python chapters/01-inference/ep13_rope_scaling.py
     ep: '14',
     title: 'MoE',
     summary: 'Top-k 路由的 SwiGLU 专家——稀疏容量。',
+    script: 'chapters/01-inference/ep14_moe.py',
     markdown: `## Mixture of Experts
 
 线性路由器给每个 token 打分；只跑 \`top_k\` 个专家。参数量可以很大，但每 token 算力仍接近稠密 MLP。
@@ -242,6 +256,7 @@ python chapters/01-inference/ep14_moe.py
     ep: '15',
     title: 'MLA',
     summary: '把 KV 压进 latent 缓存（DeepSeek 风格）。',
+    script: 'chapters/01-inference/ep15_mla.py',
     markdown: `## Multi-head Latent Attention
 
 不缓存每个 head 的 K/V，MLA 存低秩 latent（外加一小段 RoPE 流），用时再展开。
@@ -251,6 +266,93 @@ python chapters/01-inference/ep15_mla.py
 \`\`\`
 
 这就是 DeepSeek 推广的解码显存优势——注意力数学还在，缓存更省。
+`,
+  },
+  {
+    id: 'device-quant-chat',
+    ep: '16',
+    title: '设备 · INT8 · 对话模板',
+    summary: '选择 CUDA/MPS/CPU、权重量化 INT8，以及 chat template。',
+    script: 'chapters/01-inference/ep16_device_quant_chat.py',
+    demo: 'chat',
+    markdown: `## 推理工程入门
+
+\`pick_device\` 优先 CUDA → MPS → CPU。\`quantize_llama_int8\` 把 Linear 换成按通道 int8 + scale（教学用，不是 bitsandbytes）。
+
+对话走 \`apply_chat_template\`——有 HF 模板就用官方的，否则回退到 role/content 纯文本。
+
+\`\`\`bash
+python chapters/01-inference/ep16_device_quant_chat.py
+\`\`\`
+
+与 HF logits 对齐见 \`tests/test_align_hf.py\`（无门禁权重时跳过；\`ARCH_HF_ALIGN=1\` 可强制跑）。
+`,
+  },
+  {
+    id: 'continuous-batching',
+    ep: '17',
+    title: '连续批处理',
+    summary: '在一个步进循环里调度多段短解码。',
+    script: 'chapters/01-inference/ep17_continuous_batching.py',
+    demo: 'batch',
+    markdown: `## 教学版调度器
+
+每步打包仍活跃的请求，采样下一 token，打到 EOS 或 \`max_new_tokens\` 就退役。
+
+这**不是** paged attention 或生产引擎——只讲清 continuous batching 的控制流形状。
+
+\`\`\`bash
+python chapters/01-inference/ep17_continuous_batching.py
+\`\`\`
+`,
+  },
+  {
+    id: 'pretrain',
+    ep: '18',
+    title: '预训练',
+    summary: '玩具 batch 上的 next-token AdamW 小循环。',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    demo: 'train',
+    markdown: `## 从前向到学习
+
+因果 LM 损失：用位置 \`0..T-1\` 预测 \`t+1\`。随机 id 上跑几步 AdamW，就能摸到训练 API。
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+`,
+  },
+  {
+    id: 'sft-dpo',
+    ep: '19',
+    title: 'SFT · DPO',
+    summary: 'SFT 掩掉 prompt；DPO 跑一步偏好更新。',
+    script: 'chapters/02-training/ep19_sft_dpo.py',
+    demo: 'train',
+    markdown: `## 预训练之后的对齐
+
+**SFT** 只监督回复段。**DPO** 用冻结的 reference，比较 chosen / rejected 的 log-prob 比（Rafailov 等）。
+
+\`\`\`bash
+python chapters/02-training/ep19_sft_dpo.py
+\`\`\`
+`,
+  },
+  {
+    id: 'frontier-ckpt',
+    ep: '20',
+    title: '前沿检查点',
+    summary: 'MoE/MLA 往返加载 + Mixtral 风格专家 key 映射。',
+    script: 'chapters/02-training/ep20_frontier_ckpt.py',
+    markdown: `## 把引物接上权重
+
+用 \`save_checkpoint\` / \`load_checkpoint\` 存取 MoE 与 MLA。把 Mixtral 的 \`w1/w2/w3\` expert key 映射进 \`MoESwiGLU\`。
+
+完整 DeepSeek/Mixtral 生产加载器还要分片布局与内核——本章先钉死教学接口。
+
+\`\`\`bash
+python chapters/02-training/ep20_frontier_ckpt.py
+\`\`\`
 `,
   },
 ];

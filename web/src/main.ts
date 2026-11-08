@@ -14,6 +14,8 @@ import {
 } from './i18n/locales';
 import { uiFor } from './i18n/ui';
 
+const PROGRESS_KEY = 'arche.chapter.done';
+
 const root = document.querySelector('#app');
 if (!root) {
   throw new Error('#app missing');
@@ -42,6 +44,34 @@ function themeSwitchAttrs(): string {
     return 'label="主题" label-system="系统" label-light="浅色" label-dark="深色"';
   }
   return 'label="Theme" label-system="System" label-light="Light" label-dark="Dark"';
+}
+
+function readDone(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PROGRESS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDone(done: Set<string>): void {
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify([...done]));
+}
+
+function markDone(id: string): void {
+  const done = readDone();
+  done.add(id);
+  writeDone(done);
+}
+
+function progressFraction(): { done: number; total: number } {
+  const done = readDone();
+  const total = chapters.length;
+  const count = chapters.filter((chapter) => done.has(chapter.id)).length;
+  return { done: count, total };
 }
 
 function wireLocaleSelect(): void {
@@ -101,11 +131,28 @@ function renderShell(): void {
 function renderNav(activeId: string): void {
   const nav = document.querySelector('#nav') as HTMLElement;
   nav.innerHTML = '';
+  const { done, total } = progressFraction();
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  const progress = document.createElement('div');
+  progress.className = 'progress';
+  progress.innerHTML = `
+    <div class="progress-label">
+      <span>${ui.progressLabel}</span>
+      <span>${done}/${total}</span>
+    </div>
+    <div class="progress-track" aria-hidden="true">
+      <div class="progress-fill" style="width:${pct}%"></div>
+    </div>
+  `;
+  nav.append(progress);
+
+  const doneIds = readDone();
   for (const chapter of chapters) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'nav-link';
-    btn.innerHTML = `<span class="nav-ep">${chapter.ep}</span>${chapter.title}`;
+    const tick = doneIds.has(chapter.id) ? '<span class="nav-done" aria-hidden="true">✓</span>' : '';
+    btn.innerHTML = `${tick}<span class="nav-ep">${chapter.ep}</span>${chapter.title}`;
     if (chapter.id === activeId) {
       btn.setAttribute('aria-current', 'page');
     }
@@ -114,18 +161,106 @@ function renderNav(activeId: string): void {
   }
 }
 
+function fallbackChatTemplate(messages: { role: string; content: string }[]): string {
+  const parts = messages.map((msg) => `${msg.role}: ${msg.content}`);
+  parts.push('assistant:');
+  return parts.join('\n');
+}
+
+function runChatDemo(host: HTMLElement): void {
+  const out = host.querySelector('.demo-out') as HTMLElement;
+  out.textContent = fallbackChatTemplate([
+    { role: 'system', content: 'You teach modern dense LLMs.' },
+    { role: 'user', content: 'Why RoPE instead of absolute PE?' },
+  ]);
+}
+
+function runBatchDemo(host: HTMLElement): void {
+  const out = host.querySelector('.demo-out') as HTMLElement;
+  type Job = { id: string; tokens: number[]; maxNew: number; generated: number };
+  const jobs: Job[] = [
+    { id: 'a', tokens: [1, 2, 3], maxNew: 2, generated: 0 },
+    { id: 'b', tokens: [7, 8], maxNew: 4, generated: 0 },
+    { id: 'c', tokens: [9], maxNew: 1, generated: 0 },
+  ];
+  const lines: string[] = [];
+  let step = 0;
+  while (jobs.some((job) => job.generated < job.maxNew)) {
+    step += 1;
+    const active = jobs.filter((job) => job.generated < job.maxNew);
+    for (const job of active) {
+      job.tokens.push(job.tokens[job.tokens.length - 1] ?? 0);
+      job.generated += 1;
+    }
+    lines.push(
+      `step ${step}: active=${active.map((j) => j.id).join(',')} → ${jobs
+        .map((j) => `${j.id}:[${j.tokens.join(',')}]`)
+        .join(' ')}`,
+    );
+  }
+  out.textContent = lines.join('\n');
+}
+
+function runTrainDemo(host: HTMLElement): void {
+  const out = host.querySelector('.demo-out') as HTMLElement;
+  let loss = 4.2;
+  const rows = ['pretrain'];
+  for (let i = 1; i <= 4; i += 1) {
+    loss *= 0.82;
+    rows.push(`  step ${i}: loss=${loss.toFixed(3)}`);
+  }
+  rows.push('SFT loss=1.84');
+  rows.push('DPO loss=0.693');
+  out.textContent = rows.join('\n');
+}
+
+function mountDemo(chapter: Chapter, host: HTMLElement): void {
+  if (!chapter.demo) return;
+  host.hidden = false;
+  const hints: Record<NonNullable<Chapter['demo']>, string> = {
+    chat: ui.demoChatHint,
+    batch: ui.demoBatchHint,
+    train: ui.demoTrainHint,
+  };
+  const labels: Record<NonNullable<Chapter['demo']>, string> = {
+    chat: ui.demoChatRun,
+    batch: ui.demoBatchRun,
+    train: ui.demoTrainRun,
+  };
+  host.innerHTML = `
+    <r-card heading="${ui.demoHeading}" description="ep${chapter.ep}">
+      <p class="demo-hint">${hints[chapter.demo]}</p>
+      <r-button type="primary" id="demo-run">${labels[chapter.demo]}</r-button>
+      <pre class="demo-out" aria-live="polite"></pre>
+    </r-card>
+  `;
+  const run = () => {
+    if (chapter.demo === 'chat') runChatDemo(host);
+    if (chapter.demo === 'batch') runBatchDemo(host);
+    if (chapter.demo === 'train') runTrainDemo(host);
+  };
+  host.querySelector('#demo-run')?.addEventListener('click', run);
+}
+
 function renderArticle(chapter: Chapter): void {
   const article = document.querySelector('#article') as HTMLElement;
+  const done = readDone().has(chapter.id);
   article.innerHTML = `
-    <h1>${chapter.title}</h1>
+    <div class="article-head">
+      <h1>${chapter.title}</h1>
+      <r-button id="mark-done" type="${done ? 'text' : 'primary'}">${
+        done ? ui.markedDone : ui.markDone
+      }</r-button>
+    </div>
     <p class="lede">${chapter.summary}</p>
     <r-card heading="${ui.lessonHeading}" description="ep${chapter.ep}">
       <div class="panel" id="md-host"></div>
     </r-card>
+    <div class="demo-wrap" id="demo-host" hidden></div>
     <div class="math-wrap" id="math-host" hidden></div>
     <p class="footer-note">
       ${ui.companionPython}:
-      <code>python chapters/01-inference/ep${chapter.ep}_*.py</code>
+      <code>python ${chapter.script}</code>
       · ${ui.siteLabel}:
       <a href="https://arche.chaxus.com${prefixOf(locale) || '/'}">arche.chaxus.com${prefixOf(locale)}</a>
     </p>
@@ -143,6 +278,15 @@ function renderArticle(chapter: Chapter): void {
     math.latex = chapter.latex;
     mathHost.append(math);
   }
+
+  const demoHost = document.querySelector('#demo-host') as HTMLElement | null;
+  if (demoHost) mountDemo(chapter, demoHost);
+
+  document.querySelector('#mark-done')?.addEventListener('click', () => {
+    markDone(chapter.id);
+    renderNav(chapter.id);
+    renderArticle(chapter);
+  });
 }
 
 function applyDocumentLang(): void {
