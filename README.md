@@ -43,6 +43,8 @@ python chapters/01-inference/ep06_gqa.py
 python chapters/01-inference/ep07_swiglu.py
 python chapters/01-inference/ep08_block.py
 python chapters/01-inference/ep09_stack.py
+python chapters/01-inference/ep12_kv_cache.py
+python chapters/01-inference/ep13_rope_scaling.py
 ```
 
 Tokenizer / weights / generation need the official Llama 3.2 artifacts (Hugging Face gated). After you accept the license:
@@ -53,6 +55,7 @@ python chapters/01-inference/ep02_tokenizer.py
 python chapters/01-inference/ep10_load_weights.py
 python chapters/01-inference/ep11_generate.py
 ```
+
 
 Mainland network tip:
 
@@ -112,7 +115,9 @@ npx wrangler pages deploy dist --project-name=arche --branch=main
 | 09 | Stack + LM head | [ep09](chapters/01-inference/ep09_stack.py) |
 | 10 | Load pretrained weights | [ep10](chapters/01-inference/ep10_load_weights.py) |
 | 11 | Text generation | [ep11](chapters/01-inference/ep11_generate.py) |
-| — | MoE / MLA / long-context / KV cache | outlined later |
+| 12 | KV cache | [ep12](chapters/01-inference/ep12_kv_cache.py) |
+| 13 | RoPE long-context scaling | [ep13](chapters/01-inference/ep13_rope_scaling.py) |
+| — | MoE / MLA | outlined later |
 
 Library code that chapters grow into lives under [`arche/`](arche/).
 

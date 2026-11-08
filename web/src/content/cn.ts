@@ -187,4 +187,38 @@ python chapters/01-inference/ep11_generate.py
 能力来自加载的 1B 权重；代码路径仍全部是我们自己的。
 `,
   },
+  {
+    id: 'kv-cache',
+    ep: '12',
+    title: 'KV 缓存',
+    summary: '先 prefill 一次，再用缓存的 K/V 逐步解码。',
+    markdown: `## 为什么要缓存
+
+没有 cache 时，每生成一个新 token 都要对整段前缀重算注意力。
+
+有了 cache：只投影新 token，把 K/V 追加进去，再对已存的过去做注意力。
+
+\`\`\`bash
+python chapters/01-inference/ep12_kv_cache.py
+\`\`\`
+
+\`generate(..., use_cache=True)\` 是默认行为。
+`,
+  },
+  {
+    id: 'rope-scaling',
+    ep: '13',
+    title: 'RoPE 缩放',
+    summary: 'Llama 3.2 的波长平滑，面向长上下文。',
+    markdown: `## 超出 8k 窗口
+
+Llama 3.2 保留 \`rope_theta=500000\`，再用 **factor / low / high** 调度把长波长拉向 128k 上下文。
+
+\`\`\`bash
+python chapters/01-inference/ep13_rope_scaling.py
+\`\`\`
+
+短波长不动；长波长除以 \`scale_factor\`；中间带平滑——与 Hugging Face 的 llama3 RoPE 同一思路。
+`,
+  },
 ];

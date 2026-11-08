@@ -187,4 +187,38 @@ python chapters/01-inference/ep11_generate.py
 Capability now comes from the loaded 1B weights; the code path is still entirely ours.
 `,
   },
+  {
+    id: 'kv-cache',
+    ep: '12',
+    title: 'KV cache',
+    summary: 'Prefill once, then decode with cached keys and values.',
+    markdown: `## Why cache
+
+Without a cache, every new token re-runs attention over the whole prefix.
+
+With a cache: project only the new token, append its K/V, attend against the stored past.
+
+\`\`\`bash
+python chapters/01-inference/ep12_kv_cache.py
+\`\`\`
+
+\`generate(..., use_cache=True)\` is the default.
+`,
+  },
+  {
+    id: 'rope-scaling',
+    ep: '13',
+    title: 'RoPE scaling',
+    summary: 'Llama 3.2 wavelength smoothing for long context.',
+    markdown: `## Beyond the 8k window
+
+Llama 3.2 keeps \`rope_theta=500000\` and applies a **factor / low / high** schedule so long wavelengths stretch toward 128k context.
+
+\`\`\`bash
+python chapters/01-inference/ep13_rope_scaling.py
+\`\`\`
+
+Short wavelengths stay put; long ones divide by \`scale_factor\`; the middle band is smoothed — same idea as Hugging Face's llama3 RoPE.
+`,
+  },
 ];
