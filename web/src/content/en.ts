@@ -241,38 +241,57 @@ Official table: license / login / mirror. Teaching BPE needs no network.
     id: 'embedding',
     ep: '03',
     title: 'Embedding',
-    summary: 'Ids are labels; embedding gathers a row of floats you can compute with.',
+    summary: 'Id → lookup a float row; why the net needs floats, not dictionary glosses.',
     script: 'chapters/01-inference/ep03_embedding.py',
     partId: 'trunk',
     estimatedMinutes: 12,
     demo: 'embedding',
     markdown: `## Idea
 
-After the tokenizer is frozen, the next from-scratch step is the **embedding table**: each id becomes a trainable float row. A bad table makes every later layer learn on noise; a mismatched tokenizer breaks the whole frontier pipeline.
+The tokenizer only emits **integer ids**. A neural net cannot “understand” the number \`42\`—it only adds/multiplies tensors. So there must be a step: **use the id to look up a row of floats** in a big table. That table is the **embedding**.
 
-### 1. What the embedding table is for
+### 1. How does an id become floats—and why bother?
 
-Matrix \`(V, D)\`: **row \`i\` = floats for id \`i\`** (\`V\` = vocab size, \`D\` = model dim).
+Think **locker wall**, not a dictionary gloss:
 
-| Role | Plain meaning |
+1. Tokenizer says: this text became ids \`7, 3, 7\`
+2. There are \`V\` lockers (vocab size); each holds exactly **\`D\` floats** (\`D=2048\` in Llama 3.2 1B)
+3. **Id → floats = open that locker and copy the row out** (\`gather\` / \`nn.Embedding\`)  
+   - id \`7\` → row 7’s \`D\` numbers  
+   - id \`3\` → row 3  
+   - the same id **always** hits the same row (random at init; training rewrites the numbers)
+
+Tiny fake example (\`D=3\`):
+
+| id | embedding row |
 | --- | --- |
-| **① Interface** | discrete ids → tensors you can multiply/add |
-| **② Learnable identity** | each token’s starting face; pretrain is the main author |
-| **③ Often tied LM head** | small models share gather-in / score-out |
+| 3 | \`0.2, -0.1, 0.5\` |
+| 7 | \`-0.3, 0.8, 0.1\` |
 
-Inference ≈ **gather** by id (try the page table). Not a dictionary gloss.
+Ids \`[7, 3, 7]\` → three rows: row 7, then row 3, then row 7 again. **No formula turns 7 into floats**—it is a lookup.
+
+**Why floats at all?**
+
+| With only ids | With embeddings |
+| --- | --- |
+| Ids are labels; you cannot really matmul them with weights | Attention / FFN **only eat float tensors** |
+| \`cat=3\` vs \`dog=9\` has no geometry | Training nudges rows so co-occurring tokens get useful starting faces |
+| Renumbering the tokenizer breaks everything | Row index must stay locked to tokenizer id |
+
+One line: **tokenizer numbers tokens; embedding gives each number a trainable vector the rest of the net can compute on.** Bad table ⇒ later layers train on noise; wrong pairing with the tokenizer ⇒ the pipeline is junk.
+
+The playground on this page is exactly “gather by id.”
 
 \`\`\`mermaid
 flowchart LR
-  tok[tokenizer frozen] --> shape["set V = vocab_size"]
-  shape --> init["random init V×D"]
-  init --> pretrain[pretrain updates rows]
-  pretrain --> ckpt[checkpoint]
+  ids[tokenizer ids] --> gather[lookup rows]
+  gather --> floats[T×D floats]
+  floats --> blocks[later layers eat floats only]
 \`\`\`
 
 ### 2. From zero: how you generate the table
 
-**Not** hand-filled, **not** another BPE. BPE assigns ids; embedding stores learnable floats.
+**Not** hand-filled glosses, **not** another BPE. BPE assigns ids; embedding stores the float rows—mostly **written by pretrain**.
 
 | Step | What you do | Note |
 | --- | --- | --- |
