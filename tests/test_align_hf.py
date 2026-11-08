@@ -11,47 +11,26 @@ import os
 import pytest
 import torch
 
-from arche.load_weights import DEFAULT_MODEL_ID, from_pretrained, load_hf_state_dict_into_llama
-from arche.model import Llama
+from arche.align_hf import compare_logits_to_hf, hf_weights_reachable
 from arche.config import Llama32Config
+from arche.load_weights import DEFAULT_MODEL_ID, load_hf_state_dict_into_llama
+from arche.model import Llama
 
 
-def _hf_available() -> bool:
+def _should_run_integration() -> bool:
     if os.environ.get("ARCH_HF_ALIGN") == "0":
         return False
-    try:
-        from huggingface_hub import hf_hub_download
-        from transformers import AutoConfig
-
-        AutoConfig.from_pretrained(DEFAULT_MODEL_ID)
-        # Probe a tiny config file rather than the full weights when possible.
-        hf_hub_download(DEFAULT_MODEL_ID, "config.json")
+    if hf_weights_reachable():
         return True
-    except Exception:
-        return os.environ.get("ARCH_HF_ALIGN") == "1"
+    return os.environ.get("ARCH_HF_ALIGN") == "1"
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not _hf_available(), reason="Llama 3.2 weights / HF auth not available")
+@pytest.mark.skipif(not _should_run_integration(), reason="Llama 3.2 weights / HF auth not available")
 def test_arche_matches_hf_greedy_logits_on_short_prompt():
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-
-    tok = AutoTokenizer.from_pretrained(DEFAULT_MODEL_ID)
-    hf = AutoModelForCausalLM.from_pretrained(
-        DEFAULT_MODEL_ID, torch_dtype=torch.float32, low_cpu_mem_usage=True
-    ).eval()
-    arche = from_pretrained(DEFAULT_MODEL_ID, device="cpu", dtype=torch.float32)
-
-    ids = torch.tensor([tok.encode("The cat sat")])
-    with torch.no_grad():
-        hf_logits = hf(ids).logits
-        arche_logits, _ = arche(ids)
-
-    # Allow small drift from RoPE buffer caps / float paths; shapes and argmax must agree.
-    assert arche_logits.shape == hf_logits.shape
-    assert torch.equal(arche_logits.argmax(dim=-1), hf_logits.argmax(dim=-1))
-    max_abs = (arche_logits.float() - hf_logits.float()).abs().max().item()
-    assert max_abs < 0.15, f"logits drifted too far: max_abs={max_abs}"
+    report = compare_logits_to_hf("The cat sat", model_id=DEFAULT_MODEL_ID, device="cpu")
+    assert report.argmax_match
+    assert report.max_abs < 0.15, f"logits drifted too far: max_abs={report.max_abs}"
 
 
 def test_mapped_fake_hf_state_is_bit_exact():
@@ -87,3 +66,7 @@ def test_mapped_fake_hf_state_is_bit_exact():
         a, _ = src(ids)
         b, _ = dst(ids)
     assert torch.equal(a, b)
+
+
+def test_hf_probe_helper_is_boolean():
+    assert isinstance(hf_weights_reachable(DEFAULT_MODEL_ID), bool)
