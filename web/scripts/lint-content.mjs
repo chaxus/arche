@@ -14,29 +14,12 @@ const strict = process.argv.includes('--strict-template');
 
 const PART_IDS = new Set(['start', 'trunk', 'infer', 'train', 'frontier']);
 
-const EN_REQUIRED = [
-  'In one sentence',
-  'Before you start',
-  'The idea (plain language)',
-  'In the code',
-  'Do this now',
-  'If something breaks',
-  "Don't worry about yet",
-  'Next',
-];
-const EN_ANY = [...EN_REQUIRED, 'Picture / formula'];
+// Lean template: Idea/要点 + Next/下一章 required; Run/动手 optional.
+const EN_REQUIRED = ['Idea', 'Next'];
+const EN_ANY = [...EN_REQUIRED, 'Run', 'Fix'];
 
-const CN_REQUIRED = [
-  '一句话',
-  '开始之前',
-  '用人话讲',
-  '对应代码',
-  '现在就做',
-  '如果翻车了',
-  '先别深挖',
-  '下一章',
-];
-const CN_ANY = [...CN_REQUIRED, '图或公式'];
+const CN_REQUIRED = ['要点', '下一章'];
+const CN_ANY = [...CN_REQUIRED, '动手', '翻车'];
 
 function readMarkdownLiteral(source, fromIndex) {
   const marker = 'markdown: `';

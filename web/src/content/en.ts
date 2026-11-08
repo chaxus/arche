@@ -11,52 +11,27 @@ export const CHAPTERS_EN: Chapter[] = [
     script: 'chapters/01-inference/ep01_overview.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## In one sentence
-You will see the big picture of a modern dense language model—and why this course does not start with GPT-2.
+    markdown: `## Idea
 
-## Before you start
-- Finish Part 0 (especially the journey map).
-- Time: about 12 minutes.
-- Optional: run the companion script after reading.
-
-## The idea (plain language)
-A **dense decoder** reads tokens from left to right and predicts the next one. Inside, the same kind of block repeats many times. Modern stacks prefer:
-
-- **RMSNorm** to stabilize numbers
-- **RoPE** to encode position by rotating vectors
-- **SwiGLU** as the feed-forward recipe
-- **GQA** so key/value memory stays smaller while decoding
-
-**Llama 3.2 lineage** means we follow that recipe (1B is the teaching target). Capability later comes from official weights; understanding comes from writing the forward pass.
+Hand-write a **Llama 3.2–style** dense decoder: RMSNorm, RoPE, SwiGLU, GQA. Target teaching size: **1B**.
 
 \`\`\`mermaid
 flowchart LR
   tok[Tokenizer] --> emb[Embedding]
-  emb --> stack[Block_x_N]
-  stack --> head[LM_head]
+  emb --> stack[Blocks]
+  stack --> head[LM head]
 \`\`\`
 
-## Picture / formula
-Keep the diagram above in mind. Formulas appear when a chapter needs them.
+## Run
 
-## In the code
-- Config helpers: \`arche/config.py\` (\`llama32_1b\`)
-- Companion: \`chapters/01-inference/ep01_overview.py\` prints sizes (layers, heads, dim)—not chat text.
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep01_overview.py
 \`\`\`
-You should see numbers for vocab size, layers, and heads.
 
-## If something breaks
-- \`No module named arche\` → activate \`.venv\` and run from the repo root.
-- Script not found → \`cd\` into the \`arche\` folder first.
-
-## Don't worry about yet
-Training giant models, serving millions of users, or every Llama variant.
+Prints config sizes (layers, heads, dim)—not chat.
 
 ## Next
+
 **Tokenizer** (\`?c=tokenizer\`).
 
 `,
@@ -69,38 +44,19 @@ Training giant models, serving millions of users, or every Llama variant.
     script: 'chapters/01-inference/ep02_tokenizer.py',
     partId: 'trunk',
     estimatedMinutes: 15,
-    markdown: `## In one sentence
-Text becomes integer **token ids** before the model can think in vectors.
+    markdown: `## Idea
 
-## Before you start
-- Overview done.
-- Time: ~15 minutes.
-- Official Llama 3.2 tokenizer is **gated** on Hugging Face—login only when you run this lab.
+Text → **token ids** via the official Llama 3.2 BPE vocab (\`128256\`). We don’t reinvent BPE; gated HF login is required to run the lab.
 
-## The idea (plain language)
-Models do not read letters the way humans do. A **tokenizer** chops text into tokens and maps each to an id in a fixed vocabulary (Llama 3.2: 128256 entries).
+## Run
 
-We use the **official** tokenizer. This course focuses on the neural trunk, not reinventing compression algorithms (BPE).
-
-## In the code
-- \`arche/tokenizer.py\`
-- Companion: \`chapters/01-inference/ep02_tokenizer.py\`
-
-## Do this now
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 \`\`\`
-Expect printed token ids for a sample string. If you skip login, continue reading—you can return later.
-
-## If something breaks
-- Gated 401/403 → accept the model license on Hugging Face, then login again.
-- Slow download → optional \`export HF_ENDPOINT=https://hf-mirror.com\` (mainland networks).
-
-## Don't worry about yet
-Training your own tokenizer or Unicode edge cases.
 
 ## Next
+
 **Embedding** (\`?c=embedding\`).
 
 `,
@@ -113,40 +69,18 @@ Training your own tokenizer or Unicode edge cases.
     script: 'chapters/01-inference/ep03_embedding.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## In one sentence
-Each token id becomes a learned list of numbers—a row in a big lookup table.
+    markdown: `## Idea
 
-## Before you start
-- Tokenizer concept clear (ids exist).
-- Time: ~12 minutes.
+\`TokenEmbedding\`: id → vector \`(vocab, dim)\`. No absolute position table here—**RoPE** adds position later. Llama 3.2 ties this weight with the LM head.
 
-## The idea (plain language)
-Think of a dictionary: token id → vector of length \`embed_dim\`. That table is **TokenEmbedding**.
+## Run
 
-Modern dense models usually **do not** add a separate absolute position table here. Position arrives later via **RoPE** on attention queries/keys.
-
-Llama 3.2 also **ties** embedding weights with the final LM head (same numbers reused).
-
-## Picture / formula
-$$X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}$$
-
-## In the code
-- \`arche/embedding.py\`
-- Companion: \`chapters/01-inference/ep03_embedding.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep03_embedding.py
 \`\`\`
-Look for output shapes like \`(batch, seq, embed_dim)\`.
-
-## If something breaks
-- Shape errors usually mean you edited the demo sizes—re-copy the script from git.
-
-## Don't worry about yet
-How embeddings are trained, or fancy token types (segment ids).
 
 ## Next
+
 **RMSNorm** (\`?c=rmsnorm\`).
 
 `,
@@ -160,36 +94,20 @@ How embeddings are trained, or fancy token types (segment ids).
     script: 'chapters/01-inference/ep04_rmsnorm.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## In one sentence
-RMSNorm keeps layer inputs well-scaled without the extra mean-centering of LayerNorm.
+    markdown: `## Idea
 
-## Before you start
-- Embedding done. Time: ~12 minutes.
+**RMSNorm** scales by root-mean-square (no mean subtract). Used **pre-norm**: before attention and before MLP.
 
-## The idea (plain language)
-Deep stacks multiply numbers again and again. Without normalization, values can explode or vanish.
-**RMSNorm** divides by a root-mean-square size, then scales with a learned gain. It skips subtracting the mean—cheaper, still stable enough for modern LLMs.
-Inside each block it runs **before** attention and **before** the MLP (pre-norm).
+$$\\mathrm{RMSNorm}(x)=x/\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}\\odot\\gamma$$
 
-## Picture / formula
-$$\\mathrm{RMSNorm}(x) = \\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}} \\odot \\gamma$$
+## Run
 
-## In the code
-- \`arche/norms.py\`
-- \`chapters/01-inference/ep04_rmsnorm.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep04_rmsnorm.py
 \`\`\`
 
-## If something breaks
-- NaNs in experiments usually mean epsilon or inputs were edited—restore the script.
-
-## Don't worry about yet
-Every LayerNorm variant in the literature.
-
 ## Next
+
 **RoPE** (\`?c=rope\`).
 
 `,
@@ -205,36 +123,19 @@ Every LayerNorm variant in the literature.
     partId: 'trunk',
     estimatedMinutes: 15,
     demo: 'rope',
-    markdown: `## In one sentence
-RoPE rotates query/key vectors so attention “knows” relative positions—no absolute position table required.
+    markdown: `## Idea
 
-## Before you start
-- RMSNorm done. Time: ~15 minutes.
+**RoPE** rotates Q/K by position angle so attention sees *relative* distance. Drag the interactive picture on this page.
 
-## The idea (plain language)
-Instead of adding a position vector, **RoPE** rotates pairs of dimensions by an angle that depends on token index. Relative distance falls out of the dot product.
-Llama 3.2 also uses a large \`rope_theta\` and later a long-context **scale**—that scale is its own chapter.
+## Run
 
-## Picture / formula
-$$q_m' = R_{\\Theta,m} q_m,\\quad k_n' = R_{\\Theta,n} k_n$$
-
-## In the code
-- \`arche/rope.py\`
-- \`chapters/01-inference/ep05_rope.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep05_rope.py
 \`\`\`
 
-## If something breaks
-- Odd head dimensions break pair rotation—use the script’s defaults.
-
-## Don't worry about yet
-Every RoPE paper variant; long-context scaling waits for ep13.
-
 ## Next
-**GQA attention** (\`?c=gqa\`).
+
+**GQA** (\`?c=gqa\`).
 
 `,
     latex:
@@ -249,33 +150,20 @@ Every RoPE paper variant; long-context scaling waits for ep13.
     partId: 'trunk',
     estimatedMinutes: 18,
     demo: 'gqa',
-    markdown: `## In one sentence
-Grouped-Query Attention shares key/value heads across several query heads to shrink decode-time memory.
+    markdown: `## Idea
 
-## Before you start
-- RoPE idea clear. Time: ~18 minutes.
+**GQA**: fewer KV heads than query heads (1B: 32 Q / 8 KV). Shrinks decode KV cache. See the interactive diagram.
 
-## The idea (plain language)
-Classic multi-head attention gives every query head its own K/V. That is accurate but the **KV cache** gets large while generating.
-**GQA** uses fewer KV heads; each KV head is shared by a group of query heads. Llama 3.2 1B: 32 query heads, 8 KV heads.
-Flow: project Q/K/V → RoPE(Q,K) → repeat KV → causal attention → output projection.
+Flow: project → RoPE → repeat KV → causal SDPA → out proj.
 
-## In the code
-- \`arche/attention.py\`
-- \`chapters/01-inference/ep06_gqa.py\`
+## Run
 
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep06_gqa.py
 \`\`\`
 
-## If something breaks
-- Assert \`num_heads % num_kv_heads == 0\`—groups must divide evenly.
-
-## Don't worry about yet
-FlashAttention kernels or MLA (comes later).
-
 ## Next
+
 **SwiGLU** (\`?c=swiglu\`).
 
 `,
@@ -288,37 +176,19 @@ FlashAttention kernels or MLA (comes later).
     script: 'chapters/01-inference/ep07_swiglu.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## In one sentence
-SwiGLU is the modern feed-forward block: gate × up, then down—three bias-free linears.
+    markdown: `## Idea
 
-## Before you start
-- GQA done. Time: ~12 minutes.
+Modern FFN: \`down(silu(gate(x)) * up(x))\` — three bias-free linears.
 
-## The idea (plain language)
-Old tutorials often show Linear → GELU → Linear. Llama-style models prefer:
-\`down(silu(gate(x)) * up(x))\`.
-The **gate** decides what to pass; **up** proposes values; **down** returns to model width.
+## Run
 
-## Picture / formula
-$$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
-
-## In the code
-- \`arche/mlp.py\`
-- \`chapters/01-inference/ep07_swiglu.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep07_swiglu.py
 \`\`\`
 
-## If something breaks
-- Shape mismatch → intermediate_dim must match the three linears in the demo.
-
-## Don't worry about yet
-MoE (many experts)—that is Part 2.
-
 ## Next
-**Transformer block** (\`?c=block\`).
+
+**Block** (\`?c=block\`).
 
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
@@ -331,34 +201,22 @@ MoE (many experts)—that is Part 2.
     script: 'chapters/01-inference/ep08_block.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## In one sentence
-One transformer block is a pre-norm residual sandwich you can stack.
+    markdown: `## Idea
 
-## Before you start
-- Attention + SwiGLU done. Time: ~12 minutes.
-
-## The idea (plain language)
 \`\`\`
 x → RMSNorm → Attn → +x → RMSNorm → SwiGLU → +x
 \`\`\`
-Same shape in, same shape out—so depth is a loop. Llama 3.2 1B stacks this 16 times (3B: 28).
 
-## In the code
-- \`arche/block.py\`
-- \`chapters/01-inference/ep08_block.py\`
+Same shape in/out → stack by looping (1B: 16×).
 
-## Do this now
+## Run
+
 \`\`\`bash
 python chapters/01-inference/ep08_block.py
 \`\`\`
 
-## If something breaks
-- Residual add requires matching shapes—don’t change only one branch in experiments.
-
-## Don't worry about yet
-Parallel attention/MLP layouts in some giant models.
-
 ## Next
+
 **Stack + LM head** (\`?c=stack\`).
 
 `,
@@ -371,33 +229,18 @@ Parallel attention/MLP layouts in some giant models.
     script: 'chapters/01-inference/ep09_stack.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## In one sentence
-Embed → N blocks → final RMSNorm → linear to vocabulary scores (often weight-tied).
+    markdown: `## Idea
 
-## Before you start
-- Block done. Time: ~12 minutes.
+\`ids → Embed → [Block×N] → RMSNorm → Linear(vocab)\`. Last scores = next-token logits. LM head tied to embeddings.
 
-## The idea (plain language)
-Glue the pieces:
-\`ids → Embedding → [Block × N] → RMSNorm → Linear(vocab)\`.
-The last linear’s scores are logits for the next token. Llama 3.2 ties \`lm_head\` to embeddings.
+## Run
 
-## In the code
-- \`arche/model.py\`
-- \`chapters/01-inference/ep09_stack.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep09_stack.py
 \`\`\`
 
-## If something breaks
-- Vocab size mismatches between embedding and head → use the provided config helpers.
-
-## Don't worry about yet
-Loading real Meta weights (next chapter) or sampling tricks.
-
 ## Next
+
 **Load weights** (\`?c=weights\`).
 
 `,
@@ -410,35 +253,20 @@ Loading real Meta weights (next chapter) or sampling tricks.
     script: 'chapters/01-inference/ep10_load_weights.py',
     partId: 'trunk',
     estimatedMinutes: 20,
-    markdown: `## In one sentence
-Map official Hugging Face Llama 3.2 tensors into the hand-written \`arche.Llama\` graph.
+    markdown: `## Idea
 
-## Before you start
-- Stack chapter done. Time: ~20 minutes.
-- Needs Hugging Face login + license acceptance (see Part 0 map).
+\`from_pretrained\` builds our graph and copies HF Llama 3.2 tensors via a key map. Needs gated HF login.
 
-## The idea (plain language)
-Your modules are empty until filled. \`from_pretrained\` builds our graph, downloads HF weights, and copies tensors with a small key map (\`model.layers.*\` → \`layers.*\`).
+## Run
 
-## In the code
-- \`arche/load_weights.py\`
-- \`chapters/01-inference/ep10_load_weights.py\`
-
-## Do this now
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep10_load_weights.py
 \`\`\`
 
-## If something breaks
-- Gated errors → accept license, re-login; try \`HF_ENDPOINT=https://hf-mirror.com\` if needed.
-- Out of disk/RAM → close other apps; 1B is the intended size.
-
-## Don't worry about yet
-Quantized serving formats or multi-GPU sharding.
-
 ## Next
-**Text generation** (\`?c=generate\`).
+
+**Generate** (\`?c=generate\`).
 
 `,
   },
@@ -450,33 +278,19 @@ Quantized serving formats or multi-GPU sharding.
     script: 'chapters/01-inference/ep11_generate.py',
     partId: 'trunk',
     estimatedMinutes: 15,
-    markdown: `## In one sentence
-Turn logits into tokens: sample (or greedily pick) the next id, append, repeat until stop.
+    markdown: `## Idea
 
-## Before you start
-- Weights chapter understood (even if download deferred). Time: ~15 minutes.
+Loop: take last logits → (optional temperature / top-k) → sample or greedy → append → stop on EOS/length.
 
-## The idea (plain language)
-Each step looks at the last position’s scores. Optional **temperature** sharpens/softens; **top-k** keeps only the best k options. Append the chosen id; stop on EOS or length limit.
+## Run
 
-## In the code
-- \`arche/generate.py\`
-- \`chapters/01-inference/ep11_generate.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep11_generate.py
 \`\`\`
-Without weights the tiny demo still shows the loop shape.
-
-## If something breaks
-- Empty/gibberish text with random weights is expected—real fluency needs loaded 1B weights.
-
-## Don't worry about yet
-KV cache speedups (next part) or chat templates (later).
 
 ## Next
-Part 2 begins: **KV cache** (\`?c=kv-cache\`).
+
+**KV cache** (\`?c=kv-cache\`).
 
 `,
   },
@@ -489,32 +303,18 @@ Part 2 begins: **KV cache** (\`?c=kv-cache\`).
     partId: 'infer',
     estimatedMinutes: 15,
     demo: 'kv',
-    markdown: `## In one sentence
-Prefill the prompt once, then decode new tokens while reusing stored keys and values.
+    markdown: `## Idea
 
-## Before you start
-- Generation chapter done. Time: ~15 minutes.
+Prefill prompt K/V once; each new token only appends. Use the interactive strip on this page.
 
-## The idea (plain language)
-Without a cache, every new token re-reads the whole prefix in attention—wasteful.
-With a **KV cache**: compute K/V for the prompt once, then for each new token only append its K/V and attend against the past.
+## Run
 
-## In the code
-- \`arche/cache.py\`, used by attention + \`generate(..., use_cache=True)\`
-- \`chapters/01-inference/ep12_kv_cache.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep12_kv_cache.py
 \`\`\`
 
-## If something breaks
-- Wrong \`start_pos\` after edits → restore the chapter script.
-
-## Don't worry about yet
-Paged KV (ep23) and production schedulers.
-
 ## Next
+
 **RoPE scaling** (\`?c=rope-scaling\`).
 
 `,
@@ -527,32 +327,18 @@ Paged KV (ep23) and production schedulers.
     script: 'chapters/01-inference/ep13_rope_scaling.py',
     partId: 'infer',
     estimatedMinutes: 15,
-    markdown: `## In one sentence
-Llama 3.2 stretches long wavelengths so context can grow far past the original window.
+    markdown: `## Idea
 
-## Before you start
-- RoPE + KV cache ideas clear. Time: ~15 minutes.
+Llama 3.2 long-context schedule: keep large \`rope_theta\`, stretch long wavelengths (factor / low / high).
 
-## The idea (plain language)
-A plain RoPE trained for shorter context misbehaves if you suddenly ask for 100k tokens.
-Llama 3.2 keeps a large \`rope_theta\` and applies a **factor / low / high** schedule: short wavelengths stay, long ones stretch, middle band smooths.
+## Run
 
-## In the code
-- Scaling lives in \`arche/rope.py\` / attention config
-- \`chapters/01-inference/ep13_rope_scaling.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep13_rope_scaling.py
 \`\`\`
 
-## If something breaks
-- Tiny demos may not show 128k—look at printed frequency changes instead.
-
-## Don't worry about yet
-YaRN vs NTK debates; we teach the Llama 3.2 schedule used here.
-
 ## Next
+
 **MoE** (\`?c=moe\`).
 
 `,
@@ -565,32 +351,18 @@ YaRN vs NTK debates; we teach the Llama 3.2 schedule used here.
     script: 'chapters/01-inference/ep14_moe.py',
     partId: 'infer',
     estimatedMinutes: 15,
-    markdown: `## In one sentence
-Mixture-of-Experts runs only the top-k expert MLPs per token—sparse compute, dense parameter count.
+    markdown: `## Idea
 
-## Before you start
-- SwiGLU understood. Time: ~15 minutes.
+Router picks **top-k** SwiGLU experts per token — many params, sparse compute (Mixtral-style idea).
 
-## The idea (plain language)
-A **router** scores experts; each token picks \`top_k\` and blends their outputs.
-You can store many experts while each token only pays for a few—ideas behind Mixtral-style stacks.
+## Run
 
-## In the code
-- \`arche/moe.py\`
-- \`chapters/01-inference/ep14_moe.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep14_moe.py
 \`\`\`
 
-## If something breaks
-- \`top_k > num_experts\` asserts—keep demo defaults.
-
-## Don't worry about yet
-Load-balancing losses and production expert parallelism.
-
 ## Next
+
 **MLA** (\`?c=mla\`).
 
 `,
@@ -603,32 +375,18 @@ Load-balancing losses and production expert parallelism.
     script: 'chapters/01-inference/ep15_mla.py',
     partId: 'infer',
     estimatedMinutes: 18,
-    markdown: `## In one sentence
-Multi-head Latent Attention compresses KV into a small latent cache (DeepSeek-style).
+    markdown: `## Idea
 
-## Before you start
-- KV cache intuition. Time: ~18 minutes.
+**MLA** caches a low-rank latent (+ small RoPE stream) instead of full per-head K/V — cheaper decode memory.
 
-## The idea (plain language)
-Instead of caching full per-head K/V, **MLA** stores a low-rank latent (+ a small RoPE stream) and expands when attending.
-Same attention idea, cheaper memory at decode.
+## Run
 
-## In the code
-- \`arche/mla.py\`
-- \`chapters/01-inference/ep15_mla.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep15_mla.py
 \`\`\`
 
-## If something breaks
-- Rank/head_dim mismatches → use the chapter’s constructor args.
-
-## Don't worry about yet
-Exact DeepSeek production kernels—key maps come in Part 4.
-
 ## Next
+
 **Device · INT8 · chat** (\`?c=device-quant-chat\`).
 
 `,
@@ -642,34 +400,18 @@ Exact DeepSeek production kernels—key maps come in Part 4.
     partId: 'infer',
     estimatedMinutes: 15,
     demo: 'chat',
-    markdown: `## In one sentence
-Pick a device, optionally store weights as INT8, and render chat turns with a template.
+    markdown: `## Idea
 
-## Before you start
-- Comfortable running scripts. Time: ~15 minutes.
+\`pick_device\` (CUDA→MPS→CPU), teaching INT8 weight-only linears, chat template (HF or plain fallback).
 
-## The idea (plain language)
-\`pick_device\` prefers CUDA → MPS → CPU.
-**INT8 weight-only** keeps weights small and dequantizes for compute (teaching grade, not bitsandbytes).
-**Chat templates** format role/content; HF template if present, else a plain fallback.
+## Run
 
-## In the code
-- \`arche/device.py\`, \`quantize.py\`, \`chat.py\`
-- \`chapters/01-inference/ep16_device_quant_chat.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep16_device_quant_chat.py
 \`\`\`
-Try the on-page demo too.
-
-## If something breaks
-- MPS/CUDA errors → force CPU: the helper accepts \`"cpu"\`.
-
-## Don't worry about yet
-GPTQ/AWQ production quant stacks.
 
 ## Next
+
 **Continuous batching** (\`?c=continuous-batching\`).
 
 `,
@@ -683,34 +425,19 @@ GPTQ/AWQ production quant stacks.
     partId: 'infer',
     estimatedMinutes: 15,
     demo: 'batch',
-    markdown: `## In one sentence
-A teaching scheduler steps many short decode jobs together until each finishes.
+    markdown: `## Idea
 
-## Before you start
-- Generation + KV ideas. Time: ~15 minutes.
+Teaching scheduler: step many short jobs together, retire when done. Not paged attention.
 
-## The idea (plain language)
-Production servers do not run one request after another only. They keep a pool of active sequences, step them together, and retire finished ones.
-Our version pads active rows each step—**not** paged attention, but the control-loop shape.
+## Run
 
-## In the code
-- \`arche/batching.py\`
-- \`chapters/01-inference/ep17_continuous_batching.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep17_continuous_batching.py
 \`\`\`
-Use the site demo to watch fake jobs share steps.
-
-## If something breaks
-- Empty outputs → ensure \`max_new_tokens >= 1\`.
-
-## Don't worry about yet
-CUDA graphs + paged fusion (ep23 sketches the pieces).
 
 ## Next
-Part 3: **Pretrain** (\`?c=pretrain\`).
+
+**Pretrain** (\`?c=pretrain\`).
 
 `,
   },
@@ -723,33 +450,18 @@ Part 3: **Pretrain** (\`?c=pretrain\`).
     partId: 'train',
     estimatedMinutes: 15,
     demo: 'train',
-    markdown: `## In one sentence
-A tiny AdamW loop teaches next-token prediction on toy batches.
+    markdown: `## Idea
 
-## Before you start
-- You can run scripts; Part 1 stack idea helps. Time: ~15 minutes.
+Toy AdamW loop: predict next token, cross-entropy, step. Feels the API—not internet-scale training.
 
-## The idea (plain language)
-**Pretraining** here means: show random token ids, ask the model to predict the next id, measure cross-entropy, take an optimizer step.
-We use toy sizes so you feel the API—not internet-scale training.
+## Run
 
-## In the code
-- \`arche/train/pretrain.py\`
-- \`chapters/02-training/ep18_pretrain.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/02-training/ep18_pretrain.py
 \`\`\`
-Watch loss print a short history.
-
-## If something breaks
-- Loss not decreasing on random data → try the test’s repeated-batch idea; demos may wiggle.
-
-## Don't worry about yet
-Data pipelines, distributed training, or learning-rate science.
 
 ## Next
+
 **SFT · DPO** (\`?c=sft-dpo\`).
 
 `,
@@ -763,32 +475,18 @@ Data pipelines, distributed training, or learning-rate science.
     partId: 'train',
     estimatedMinutes: 18,
     demo: 'train',
-    markdown: `## In one sentence
-SFT supervises only the answer span; DPO nudges preferred replies over rejected ones.
+    markdown: `## Idea
 
-## Before you start
-- Pretrain chapter. Time: ~18 minutes.
+**SFT** = loss on response tokens only. **DPO** = prefer chosen over rejected vs a frozen reference (one teaching step).
 
-## The idea (plain language)
-**SFT** masks the prompt tokens so loss focuses on the response.
-**DPO** compares chosen vs rejected sequences against a frozen reference model (Rafailov et al.)—one educational step is enough to see the API.
+## Run
 
-## In the code
-- \`arche/train/sft.py\`, \`arche/train/dpo.py\`
-- \`chapters/02-training/ep19_sft_dpo.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/02-training/ep19_sft_dpo.py
 \`\`\`
 
-## If something breaks
-- Prompt lengths longer than sequences → keep demo tensors.
-
-## Don't worry about yet
-Full RLHF stacks or preference data collection.
-
 ## Next
+
 **Frontier checkpoints** (\`?c=frontier-ckpt\`).
 
 `,
@@ -801,33 +499,19 @@ Full RLHF stacks or preference data collection.
     script: 'chapters/02-training/ep20_frontier_ckpt.py',
     partId: 'frontier',
     estimatedMinutes: 15,
-    markdown: `## In one sentence
-Save/load MoE and MLA modules and map Mixtral-style expert keys into arche.
+    markdown: `## Idea
 
-## Before you start
-- MoE + MLA primers. Time: ~15 minutes.
+Save/load MoE & MLA; map Mixtral \`w1/w2/w3\` expert keys into our modules.
 
-## The idea (plain language)
-Frontier pieces need checkpoints too. We round-trip state dicts and translate Mixtral \`w1/w2/w3\` names into our SwiGLU experts.
-Sharded indexes continue in the next chapter.
+## Run
 
-## In the code
-- \`arche/checkpoint.py\`, \`load_mixtral.py\`
-- \`chapters/02-training/ep20_frontier_ckpt.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/02-training/ep20_frontier_ckpt.py
 \`\`\`
 
-## If something breaks
-- Missing expert keys → ensure the synthetic HF-like dict includes gate + all experts.
-
-## Don't worry about yet
-Downloading full Mixtral 8x7B.
-
 ## Next
-**HF logits alignment** (\`?c=hf-align\`).
+
+**HF align** (\`?c=hf-align\`).
 
 `,
   },
@@ -839,37 +523,20 @@ Downloading full Mixtral 8x7B.
     script: 'chapters/01-inference/ep21_hf_align.py',
     partId: 'frontier',
     estimatedMinutes: 20,
-    markdown: `## In one sentence
-Prove the hand-written graph matches Hugging Face Llama 3.2 logits on a short prompt when weights are available.
+    markdown: `## Idea
 
-## Before you start
-- Weights + generate chapters. Time: ~20 minutes.
-- Needs gated weights / login.
+With gated weights: compare arche vs HF logits (argmax + max-abs). Offline → chapter exits cleanly; CI keeps synthetic mapper test.
 
-## The idea (plain language)
-Same weights + same math should agree on argmax and stay within a small max-abs drift.
-If weights are offline, the chapter exits cleanly; CI still checks synthetic bit-exact mapping.
+## Run
 
-## In the code
-- \`arche/align_hf.py\`
-- \`chapters/01-inference/ep21_hf_align.py\`
-- \`tests/test_align_hf.py\`
-
-## Do this now
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep21_hf_align.py
-# or: ARCH_HF_ALIGN=1 pytest tests/test_align_hf.py -q
 \`\`\`
 
-## If something breaks
-- Skipped/unreachable → finish HF setup; synthetic test still validates the mapper.
-
-## Don't worry about yet
-Bitwise identity across every kernel and dtype.
-
 ## Next
-**Sharded MoE / MLA** (\`?c=sharded-frontier\`).
+
+**Sharded MoE/MLA** (\`?c=sharded-frontier\`).
 
 `,
   },
@@ -881,31 +548,18 @@ Bitwise identity across every kernel and dtype.
     script: 'chapters/02-training/ep22_sharded_frontier.py',
     partId: 'frontier',
     estimatedMinutes: 15,
-    markdown: `## In one sentence
-Write \`index.json\` + shard files, then reload Mixtral-shaped MoE and DeepSeek-shaped MLA with allclose checks.
+    markdown: `## Idea
 
-## Before you start
-- Frontier checkpoint chapter. Time: ~15 minutes.
+Synthetic \`index.json\` + \`.pt\` shards → reload Mixtral-shaped MoE and DeepSeek-shaped MLA (allclose).
 
-## The idea (plain language)
-Real HF repos split tensors across files listed by an index. We practice the same shape with synthetic \`.pt\` shards—no multi-gig download required.
+## Run
 
-## In the code
-- \`arche/shards.py\`, \`load_mixtral.py\`, \`load_deepseek_mla.py\`
-- \`chapters/02-training/ep22_sharded_frontier.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/02-training/ep22_sharded_frontier.py
 \`\`\`
 
-## If something breaks
-- Temp directory permissions → run from a normal user workspace.
-
-## Don't worry about yet
-Safetensors mmap edge cases in every host.
-
 ## Next
+
 **Paged KV · CUDA graphs** (\`?c=paged-cuda-graph\`).
 
 `,
@@ -918,33 +572,19 @@ Safetensors mmap edge cases in every host.
     script: 'chapters/01-inference/ep23_paged_cuda_graph.py',
     partId: 'frontier',
     estimatedMinutes: 18,
-    markdown: `## In one sentence
-Store KV in fixed pages (block table) and capture a fixed-shape CUDA graph step when CUDA exists.
+    markdown: `## Idea
 
-## Before you start
-- Continuous batching + KV cache. Time: ~18 minutes.
+**Paged KV**: block table + gather. **CUDA graph**: capture fixed-shape compute when CUDA exists (decode stays eager until KV writes are in-place).
 
-## The idea (plain language)
-**Paged KV** allocates pages and gathers a contiguous cache for attention—vLLM-style teaching model.
-**CUDA graphs** capture fixed-shape module compute; Llama decode stays eager until KV writes are in-place (pages), which engines graph next.
+## Run
 
-## In the code
-- \`arche/paged_kv.py\`, \`cuda_graphs.py\`
-- \`chapters/01-inference/ep23_paged_cuda_graph.py\`
-
-## Do this now
 \`\`\`bash
 python chapters/01-inference/ep23_paged_cuda_graph.py
 \`\`\`
 
-## If something breaks
-- No CUDA → graph demo skips; paged KV still runs on CPU.
-
-## Don't worry about yet
-Shipping a full vLLM replacement—this course ends by naming the production pieces.
-
 ## Next
-You finished the path. Revisit weak chapters, or run real HF alignment if you have weights.
+
+Path complete — revisit weak chapters or run HF align with real weights.
 
 `,
   },
