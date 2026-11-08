@@ -1,84 +1,96 @@
 ## Idea
 
-### 1. Why embedding
+### 1. Follow one concrete example
 
-The last chapter left you with **token ids**, e.g. `[3, 7, 11]`.
+Suppose the tokenizer already gave three ids:
 
-Ids are only labels—“cabinet 3”, “cabinet 7”. The network multiplies and attends; it needs **lists of floats**, not cabinet numbers.
+`[3, 7, 11]`
 
-**Embedding** assigns every id a fixed-length list of numbers (a **vector**). From here on, the stack eats those vectors.
+At this point the computer only holds **three integers**.  
+You cannot “do attention” on them as language—adding `3 + 7 = 10` has nothing to do with meaning.
 
-One line: **tokenizer gives ids; embedding turns ids into rows you can compute with.**
+So the model keeps a **big table** in the weight file. It looks like this (fake numbers, for teaching):
 
-### 2. What it does (lookup)
+| id | floats stored on that row |
+| --- | --- |
+| … | … |
+| **3** | **0.55, -0.17, 0.09, 0.22** |
+| … | … |
+| **7** | **0.03, 0.41, -0.28, 0.10** |
+| … | … |
+| **11** | **-0.12, 0.08, 0.33, -0.05** |
+| … | … |
 
-Think of a spreadsheet:
+Embedding does **one** job:
 
-| id (row) | dim 0 | dim 1 | dim 2 | … |
-| --- | --- | --- | --- | --- |
-| 0 | 0.12 | -0.04 | 0.31 | … |
-| 1 | -0.22 | 0.08 | 0.01 | … |
-| 3 | **0.55** | **-0.17** | **0.09** | … |
-| 7 | **0.03** | **0.41** | **-0.28** | … |
-| … | … | … | … | … |
+1. See `3` → copy row 3  
+2. See `7` → copy row 7  
+3. See `11` → copy row 11  
 
-- **vocab size** rows (one per possible id)  
-- **dim** floats per row (2048 for Llama 3.2 1B)  
-- Forward pass is mostly **gather rows by id**—not “understanding” yet
+You now have three rows of floats. **No sentence understanding, no dictionary gloss—just copy rows by id.**
 
-Example: ids `[3, 7, 11]` → shape `(1, 3, dim)` = rows 3, 7, and 11 stacked.
+The tiny table above this lesson is the same action: type `3, 7, 11` and the highlighted rows are what get copied.
+
+### 2. What that abstract sentence was trying to say
+
+Unpack it; don’t swallow three jargon words at once:
+
+| Phrase | Plain meaning |
+| --- | --- |
+| “assign each id …” | The table has **one row per id**, written ahead of time (learned in training) |
+| “a fixed-length list of numbers” | Every row is the same length. Teaching table: 4 floats; real Llama 3.2 1B: **2048**. Same length ⇒ later layers can use one formula for every token |
+| “(a vector)” | Just a name for “that row of floats”—**no extra magic** |
+| “the rest of the model only eats these” | After embedding, later layers **never see text or the ids 3/7/11**; they only get those float rows and do multiply-add on them |
+
+So embedding is **not** a clever algorithm. It’s a **phone book**:  
+student id → copy that grade row; barcode → copy the price fields.  
+Those copied numbers are the raw material for everything after.
+
+One line: **embedding = look up the id, copy the row.**
 
 ```mermaid
 flowchart LR
-  ids["ids: 3, 7, 11"] --> pick[gather rows]
-  table[Embedding table] --> pick
-  pick --> out["three vectors → (1,3,dim)"]
+  ids["only ids 3, 7, 11"] --> copy[copy rows by id]
+  table[table in weights] --> copy
+  copy --> nums["float rows go onward"]
 ```
-
-Try the **tiny table** above the lesson (click ids, see which rows light up). The script below uses the same idea with a fake vocab so you need no download.
 
 ### 3. How this ties to the tokenizer and weights
 
 | Idea | Plain meaning |
 | --- | --- |
-| **Tokenizer table** | text ↔ id (previous chapter) |
-| **Embedding table** | id ↔ that row of floats |
-| **Weights** | those floats are learned and stored in the checkpoint |
+| **Tokenizer table** | text → id (previous chapter) |
+| **Embedding table** | id → which row of floats |
+| **Weights** | the floats themselves; part of the checkpoint |
 
-So **one tokenizer + matching embedding** must stay paired.  
-If training saw `the` → id `65`, row 65 became “the”. A foreign tokenizer that maps `the` → `902` still reads row 902 → garbage (the pairing story from the tokenizer lesson lands here).
+If training always mapped `the` → id `65`, row 65 was tuned for that.  
+A foreign tokenizer that maps `the` → `902` still copies row 902 → garbage. That’s the pairing story from the tokenizer lesson.
 
-Fresh or demo tables look almost random—**no semantics yet**. Meaning is trained later; embedding is only the first learnable map from symbols into geometry.
+Fresh / demo tables look random—**not semantics yet**. Training slowly pushes meaning into those numbers.
 
 ### 4. Design choices you will hear
 
 | Choice | Plain idea | Today |
 | --- | --- | --- |
-| Absolute PE added on embeds | Learn a vector per position; add it on | Older stacks; **not** the Llama-style main path |
-| **No PE here; RoPE later** | Position enters as rotations on Q/K | **Mainstream dense decoders** |
-| **Tied LM head** | Reuse the same matrix for id→vec and vec→vocab scores | Common on small Llamas |
+| Absolute PE on embeds | Also learn a row per position; add it on | Older stacks; **not** Llama-style main path |
+| **No PE here; RoPE later** | “Which place in the sequence” comes later | **Mainstream dense decoders** |
+| **Tied LM head** | Reuse the same table when scoring the vocab | Common on small Llamas |
 
-Easy mix-up: **position is not this chapter’s job**. The table says “which token”; “which place in the sequence” waits for **RoPE**.
+This chapter only asks “which token (which row)”; “which position” waits for **RoPE**.
 
 ### 5. What labs ship
 
-Llama 3.2 / Qwen-style dense:
-
-- Embedding = **lookup** (`nn.Embedding` or equivalent)  
-- **No** absolute PE added on the embed  
-- Small models often **tie** embed ↔ LM head  
-
-Vendors differ on vocab size, dim, tying; “id → take a row” is the same idea.
+Llama 3.2 / Qwen-style: embedding is lookup; no absolute PE here; small models often tie this table to the final scoring layer. Vendors differ on row count, row length, tying—**“copy row by id” stays**.
 
 ### 6. What “good” means · what we do
 
 | Check | Plain meaning |
 | --- | --- |
-| Shape | `(B, T)` ids → `(B, T, dim)` vectors |
-| Pairing | row `i` ↔ tokenizer id `i` |
-| Position | If the stack assumes RoPE, don’t sneak absolute PE back in here |
+| Shape | `T` ids in → `T` rows of `dim` floats out |
+| Pairing | row `i` must match tokenizer id `i` |
+| Position | If RoPE follows, don’t add a PE table here |
 
-`TokenEmbedding` in `arche/`. The lab uses a tiny fake vocab (e.g. 32 rows)—**no real weight download**; real Llama vocab is ~128K rows with the same logic. When you run the script, check id/output shapes and the note that position is RoPE’s job.
+`TokenEmbedding` in `arche/`: tiny fake vocab, no download; real models ~128K rows, same action.
 
 ## Run
 
@@ -86,8 +98,8 @@ Vendors differ on vocab size, dim, tying; “id → take a row” is the same id
 python chapters/01-inference/ep03_embedding.py
 ```
 
-Expect real vs demo vocab size, `embed_dim`, and id/output shapes.
+Expect real vs demo vocab size, row length, id/output shapes.
 
 ## Next
 
-**RMSNorm** (`?c=rmsnorm`): stabilize scales before the heavy layers.
+**RMSNorm** (`?c=rmsnorm`): steady the scale of those float rows before heavy layers.

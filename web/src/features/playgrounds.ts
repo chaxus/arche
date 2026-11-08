@@ -49,13 +49,13 @@ const LABELS: Record<
     },
     embedding: {
       heading: 'Try it here',
-      hint: 'Type token ids (comma-separated). Highlighted rows are what embedding gathers. Same idea as the lab—tiny fake table, not Llama weights.',
-      lookup: 'Look up',
-      note: 'Teaching table: vocab=12, dim=4, fixed random floats. Real Llama: ~128K rows × 2048 dims; forward is still “take those rows”.',
+      hint: 'Type ids like 3, 7, 11. Embedding only copies those rows from the table—no “understanding”.',
+      lookup: 'Copy rows',
+      note: 'Tiny fake table (12 rows × 4 floats). Real Llama is huge; the action is still copy-by-id.',
       inputPh: '3, 7, 11',
-      table: 'Embedding table',
-      gathered: 'Gathered vectors',
-      shape: 'Output shape',
+      table: 'The table (each id has one row)',
+      gathered: 'Copied rows (what later layers see)',
+      shape: 'How many rows you copied',
     },
     pretrain: {
       heading: 'Try it here',
@@ -89,13 +89,13 @@ const LABELS: Record<
     },
     embedding: {
       heading: '在页面上试',
-      hint: '输入 token id（逗号分隔）。高亮行就是嵌入会取出的行。和下方实验同一思路——教学假表，不是 Llama 权重。',
-      lookup: '查表',
-      note: '教学表：词表 12、维度 4、固定随机小数。真 Llama 约 12 万行 × 2048 维；前向仍是「按 id 取行」。',
+      hint: '输入编号，例如 3, 7, 11。嵌入只会把表里对应的行抄出来——没有「理解句子」。',
+      lookup: '按编号抄行',
+      note: '教学假表（12 行 × 每行 4 个小数）。真 Llama 大很多；动作仍是按 id 抄行。',
       inputPh: '3, 7, 11',
-      table: '嵌入表',
-      gathered: '取出的向量',
-      shape: '输出形状',
+      table: '那张表（每个 id 一行）',
+      gathered: '抄出来的行（后面层只看到这些小数）',
+      shape: '抄了几行',
     },
     pretrain: {
       heading: '在页面上试',
@@ -368,14 +368,14 @@ export function mountEmbeddingPlayground(host: HTMLElement, locale: PlaygroundLo
     const T = ids.length;
     shapeEl.textContent =
       locale === 'cn'
-        ? `ids (1, ${T})  →  向量 (1, ${T}, ${TEACH_EMB_DIM})`
-        : `ids (1, ${T})  →  vectors (1, ${T}, ${TEACH_EMB_DIM})`;
+        ? `输入 ${T} 个编号 → 抄出 ${T} 行，每行 ${TEACH_EMB_DIM} 个小数`
+        : `${T} ids in → copied ${T} rows, ${TEACH_EMB_DIM} floats each`;
     outEl.textContent = ids
       .map((id, t) => {
         const row = TEACH_EMB[id]!.map((v) => v.toFixed(2)).join(', ');
         return locale === 'cn'
-          ? `位置 ${t}: id ${id} → [${row}]`
-          : `pos ${t}: id ${id} → [${row}]`;
+          ? `第 ${t + 1} 个 token（id ${id}）抄到：[${row}]`
+          : `token ${t + 1} (id ${id}) copied: [${row}]`;
       })
       .join('\n');
   };
