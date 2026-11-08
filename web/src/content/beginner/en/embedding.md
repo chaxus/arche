@@ -2,102 +2,117 @@
 
 ### 1. What the embedding table is for
 
-The embedding table is a matrix of shape `(vocab_size, dim)`.  
-**Row `i` = the float row for token id `i`.**
-
-One hard job, plus two related roles:
+A matrix `(vocab_size, dim)`: **row `i` = the float row for token id `i`.**
 
 | Role | Plain meaning |
 | --- | --- |
-| **① Interface (required)** | Turn discrete ids into floats later layers can multiply/add. Without this, attention / MLP have no valid input |
-| **② Learnable identity** | Each id owns a row; training rewrites those floats so frequent / related tokens become useful |
-| **③ Often doubles as output scoring (optional)** | Small Llamas tie the same matrix to the LM head: gather in, score the vocab out |
+| **① Interface** | ids → floats later layers can multiply/add |
+| **② Learnable identity** | one row per id; training rewrites those floats |
+| **③ Often tied LM head** | small Llamas: gather in, score vocab out with the same matrix |
 
-It is **not** a dictionary gloss and **not** full-sentence understanding. At inference it is mostly: **gather row by id**.  
-(Locker intuition: number = id, slip = the row; try the table above this lesson.)
+At inference it’s mostly **gather by id** (try the table above). Not a dictionary gloss.
 
 ```mermaid
 flowchart LR
-  text[text] --> tok[tokenize → ids]
-  tok --> emb[embed: gather rows]
-  emb --> rest[later layers see only floats]
+  text[text] --> tok[tokenizer → ids]
+  tok --> emb[embedding gather]
+  emb --> rest[later layers]
 ```
 
 ### 2. Why the LLM pipeline needs it
 
-The stack is a chain of **tensor** ops (matmuls, norms, attention…).  
-Tokenization only yields integer ids. As category indices they are fine; as semantic numbers they are not—adding `id=3` and `id=7` has no linguistic meaning.
+Tokenization only yields integers; `3+7=10` has no linguistic meaning. The stack needs a learnable map from ids into tensor-land. Modern decoders use a lookup table: simple, trainable, one row per id.
 
-So you need a fixed, learnable translation:
+### 3. How the embedding table is generated
 
-- Input: id → float row (embedding)  
-- Middle: compute only on floats  
-- Output: scores over the vocab → new ids → tokenizer decodes to text  
-
-Without an embedding table you’d invent another “id → first-layer input” scheme; modern decoders almost always choose **lookup**: simple, trainable, one-to-one with the vocab.
-
-Vs the tokenizer table: tokenizer answers “text → ids”; embedding answers “ids → the computable world.” Both are required and must stay paired.
-
-### 3. Where the embedding table comes from
-
-**Not** hand-written floats per word, and **not** another BPE run.
+**Not** hand-written floats, and **not** another BPE pass. The tokenizer names ids; the embedding stores learnable floats for those ids.
 
 | Stage | What happens |
 | --- | --- |
-| **Spec** | rows = tokenizer vocab size; cols = model dim (hyperparameter, e.g. 2048) |
-| **Init** | allocate the table; fill with random floats (nearly meaningless) |
-| **Pretrain** | next-token loss; backprop **updates the embedding with the rest of the net** |
-| **Save** | write the checkpoint (`.safetensors`, etc.) beside attention, MLP, … |
-| **You use it** | download the official model → load the trained table; inference gathers only |
-| **Fine-tune (optional)** | keep updating floats, or append rows (new specials) and train more |
+| **1. Shape** | rows = vocab size; cols = model dim |
+| **2. Init** | `nn.Embedding`: random floats (nearly meaningless) |
+| **3. Pretrain** | next-token loss; backprop **updates rows that appear** (and other layers) |
+| **4. Save** | checkpoint beside attention, MLP, … |
+| **5. You use it** | load trained weights; inference gathers only |
+| **6. Fine-tune (optional)** | keep updating, or append rows for new specials |
 
-This lesson’s script builds a tiny **random toy table** so you see gather. Real Llama’s embedding lives in the official weights, factory-paired with its tokenizer.
+| | Tokenizer table | Embedding table |
+| --- | --- | --- |
+| How built | BPE-style merges on text | random init + **gradients** |
+| Artifact | `tokenizer.json`, etc. | `embed_tokens.weight` in the checkpoint |
+| At inference | encode/decode | gather by id |
 
-### 4. What standards exist? What counts as a “good” table?
+### 4. Code: build · gather · train one row
 
-Split **hard constraints** (must not break) from **quality** (shows up after training).
+Library (`arche/embedding.py`):
+
+```python
+class TokenEmbedding(nn.Module):
+    def __init__(self, vocab_size: int, embed_dim: int) -> None:
+        super().__init__()
+        self.weight = nn.Embedding(vocab_size, embed_dim)  # (V, D)
+
+    def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
+        return self.weight(token_ids)  # gather rows
+```
+
+“Generation” happens in training—one toy step (same idea as the chapter script):
+
+```python
+emb = TokenEmbedding(vocab_size=32, embed_dim=8)  # random init = create table
+ctx = torch.tensor([[3, 7, 11]])
+target = torch.tensor([5])
+h = emb(ctx)[:, -1, :]
+loss = F.cross_entropy(head(h), target)
+loss.backward()
+opt.step()  # row 11 (last context id) moves
+```
+
+Full demo (toy table, no download):
+
+```bash
+python chapters/01-inference/ep03_embedding.py
+```
+
+Expect table shape, gathered rows, mean |Δ| on a touched row after one SGD step, finite checks.
+
+Real Llama embedding lives in the official checkpoint (~`128256` × `2048` for 1B); must pair with the official tokenizer.
+
+### 5. What “good” means
 
 **Hard constraints**
 
 | Check | Plain meaning |
 | --- | --- |
-| **Shape** | rows = vocab; cols = `dim`; `T` ids → `T` rows |
-| **Tokenizer pairing** | row `i` always matches tokenizer id `i` |
-| **Usable numbers** | no NaN/Inf; scales don’t explode (RMSNorm etc. help) |
-| **Stack contract** | if the stack assumes RoPE, don’t sneak absolute PE onto embeds unless you change the whole stack |
+| **Shape** | `(V, D)`; `T` ids → `T` rows |
+| **Pairing** | row `i` ↔ tokenizer id `i` |
+| **Numbers** | no NaN/Inf; scales sane |
+| **Stack contract** | RoPE later; no sneaky absolute PE here |
 
-**“Good” — unlike the tokenizer table**
+**Quality (unlike tokenizers)**
 
-Tokenizers can be judged alone (fertility, parity, …).  
-Embedding floats are **learned with the whole net**; labs rarely publish a fertility-style score for “the embedding alone.” People usually look at:
+Fertility-style solo scores are rare. Embedding floats are trained with the whole net:
 
 | Signal | Plain meaning |
 | --- | --- |
-| **Downstream / pretrain metrics** | better LM loss / evals under the same architecture — the main judge |
-| **Dim budget** | too small → weak; too big → more params, hungrier for data. Set by architecture/compute, not “bigger is better” |
-| **Rare tokens** | seldom-updated rows may stay undertrained; worse with huge vocabs |
-| **Neighbor sanity (optional)** | nearest rows sometimes look like related pieces; a checkup, not the only score |
-| **Tying** | small models often benefit from tying to the LM head; larger ones sometimes untie |
+| **Pretrain / downstream** | loss and evals under the same architecture — main judge |
+| **Dim budget** | too small → weak; too big → data-hungry |
+| **Rare tokens** | idle rows barely update |
+| **Neighbor sanity** | optional checkup |
+| **Tying** | small models often tie the LM head |
 
-Bottom line:
+Valid = shape + pairing + stable train/infer. Good = the model scores well. Shipping: official embed + official tokenizer only.
 
-- **Valid**: right shape, paired tokenizer, stable train/infer.  
-- **Good**: the model scores well—embedding is one learnable part, **not a separate gold medal**.  
-- Shipping a model: use the official embedding + official tokenizer; don’t bolt on a “better” foreign table.
+### 6. What labs ship · what we do
 
-### 5. What labs ship · what we do
-
-Llama 3.2 / Qwen: lookup embed; position via RoPE; small models often tie the LM head.
-
-`TokenEmbedding` in `arche/`: toy table for gather; real Llama ~128K rows, same idea.
+Llama 3.2 / Qwen: lookup; RoPE for position; small models often tie the LM head.  
+This lesson: `TokenEmbedding` toy gather + one update; real table in the checkpoint.
 
 ## Run
 
 ```bash
 python chapters/01-inference/ep03_embedding.py
 ```
-
-Expect vocab size, dim, ids → output shape, and a note that position is not done here.
 
 ## Next
 
