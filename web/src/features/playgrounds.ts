@@ -17,7 +17,21 @@ type Labels = {
   lossTitle: string;
 };
 
-const LABELS: Record<PlaygroundLocale, { tokenizer: Labels; pretrain: Labels }> = {
+type EmbLabels = {
+  heading: string;
+  hint: string;
+  lookup: string;
+  note: string;
+  inputPh: string;
+  table: string;
+  gathered: string;
+  shape: string;
+};
+
+const LABELS: Record<
+  PlaygroundLocale,
+  { tokenizer: Labels; embedding: EmbLabels; pretrain: Labels }
+> = {
   en: {
     tokenizer: {
       heading: 'Try it here',
@@ -32,6 +46,16 @@ const LABELS: Record<PlaygroundLocale, { tokenizer: Labels; pretrain: Labels }> 
       steps: 'Steps',
       train: 'Train',
       lossTitle: 'Loss',
+    },
+    embedding: {
+      heading: 'Try it here',
+      hint: 'Type token ids (comma-separated). Highlighted rows are what embedding gathers. Same idea as the lab—tiny fake table, not Llama weights.',
+      lookup: 'Look up',
+      note: 'Teaching table: vocab=12, dim=4, fixed random floats. Real Llama: ~128K rows × 2048 dims; forward is still “take those rows”.',
+      inputPh: '3, 7, 11',
+      table: 'Embedding table',
+      gathered: 'Gathered vectors',
+      shape: 'Output shape',
     },
     pretrain: {
       heading: 'Try it here',
@@ -62,6 +86,16 @@ const LABELS: Record<PlaygroundLocale, { tokenizer: Labels; pretrain: Labels }> 
       steps: '步数',
       train: '训练',
       lossTitle: '损失',
+    },
+    embedding: {
+      heading: '在页面上试',
+      hint: '输入 token id（逗号分隔）。高亮行就是嵌入会取出的行。和下方实验同一思路——教学假表，不是 Llama 权重。',
+      lookup: '查表',
+      note: '教学表：词表 12、维度 4、固定随机小数。真 Llama 约 12 万行 × 2048 维；前向仍是「按 id 取行」。',
+      inputPh: '3, 7, 11',
+      table: '嵌入表',
+      gathered: '取出的向量',
+      shape: '输出形状',
     },
     pretrain: {
       heading: '在页面上试',
@@ -247,6 +281,109 @@ export function mountTokenizerPlayground(host: HTMLElement, locale: PlaygroundLo
   };
 
   host.querySelector('#pg-tok-run')?.addEventListener('click', paint);
+  paint();
+}
+
+/** Fixed tiny embedding table for teaching (vocab=12, dim=4). */
+const TEACH_EMB_VOCAB = 12;
+const TEACH_EMB_DIM = 4;
+const TEACH_EMB: number[][] = (() => {
+  let s = 42 >>> 0;
+  const rand = () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+  return Array.from({ length: TEACH_EMB_VOCAB }, () =>
+    Array.from({ length: TEACH_EMB_DIM }, () => Number((rand() * 2 - 1).toFixed(2))),
+  );
+})();
+
+function parseIds(raw: string, vocab: number): { ids: number[]; error?: string } {
+  const parts = raw
+    .split(/[,，\s]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return { ids: [], error: 'empty' };
+  const ids: number[] = [];
+  for (const p of parts) {
+    if (!/^\d+$/.test(p)) return { ids: [], error: p };
+    const n = Number(p);
+    if (n < 0 || n >= vocab) return { ids: [], error: String(n) };
+    ids.push(n);
+  }
+  return { ids };
+}
+
+export function mountEmbeddingPlayground(host: HTMLElement, locale: PlaygroundLocale): void {
+  const L = LABELS[locale].embedding;
+  host.hidden = false;
+  host.innerHTML = `
+    <r-card heading="${escapeHtml(L.heading)}" description="embedding">
+      <p class="demo-hint">${escapeHtml(L.hint)}</p>
+      <input class="pg-input pg-input-inline" id="pg-emb-in" type="text" spellcheck="false" value="${escapeHtml(L.inputPh)}" />
+      <div class="pg-actions">
+        <r-button type="primary" id="pg-emb-run">${escapeHtml(L.lookup)}</r-button>
+      </div>
+      <p class="pg-note">${escapeHtml(L.note)}</p>
+      <div class="pg-block"><strong>${escapeHtml(L.table)}</strong>
+        <div class="pg-emb-wrap"><table class="pg-emb-table" id="pg-emb-table"></table></div>
+      </div>
+      <div class="pg-block"><strong>${escapeHtml(L.shape)}</strong><pre class="demo-out" id="pg-emb-shape"></pre></div>
+      <div class="pg-block"><strong>${escapeHtml(L.gathered)}</strong><pre class="demo-out" id="pg-emb-out"></pre></div>
+    </r-card>
+  `;
+
+  const paint = () => {
+    const raw = (host.querySelector('#pg-emb-in') as HTMLInputElement).value;
+    const parsed = parseIds(raw, TEACH_EMB_VOCAB);
+    const active = new Set(parsed.ids);
+    const head =
+      `<tr><th>id</th>` +
+      Array.from({ length: TEACH_EMB_DIM }, (_, d) => `<th>d${d}</th>`).join('') +
+      `</tr>`;
+    const body = TEACH_EMB.map((row, i) => {
+      const cls = active.has(i) ? ' class="pg-emb-hit"' : '';
+      const cells = row.map((v) => `<td>${v.toFixed(2)}</td>`).join('');
+      return `<tr${cls}><th>${i}</th>${cells}</tr>`;
+    }).join('');
+    host.querySelector('#pg-emb-table')!.innerHTML = head + body;
+
+    const shapeEl = host.querySelector('#pg-emb-shape') as HTMLElement;
+    const outEl = host.querySelector('#pg-emb-out') as HTMLElement;
+    if (parsed.error === 'empty') {
+      shapeEl.textContent =
+        locale === 'cn' ? '请输入至少一个 id，例如 3, 7, 11' : 'Enter at least one id, e.g. 3, 7, 11';
+      outEl.textContent = '';
+      return;
+    }
+    if (parsed.error) {
+      shapeEl.textContent =
+        locale === 'cn'
+          ? `无效 id「${parsed.error}」——教学表只有 0…${TEACH_EMB_VOCAB - 1}`
+          : `Bad id "${parsed.error}" — teaching table only has 0…${TEACH_EMB_VOCAB - 1}`;
+      outEl.textContent = '';
+      return;
+    }
+    const ids = parsed.ids;
+    const T = ids.length;
+    shapeEl.textContent =
+      locale === 'cn'
+        ? `ids (1, ${T})  →  向量 (1, ${T}, ${TEACH_EMB_DIM})`
+        : `ids (1, ${T})  →  vectors (1, ${T}, ${TEACH_EMB_DIM})`;
+    outEl.textContent = ids
+      .map((id, t) => {
+        const row = TEACH_EMB[id]!.map((v) => v.toFixed(2)).join(', ');
+        return locale === 'cn'
+          ? `位置 ${t}: id ${id} → [${row}]`
+          : `pos ${t}: id ${id} → [${row}]`;
+      })
+      .join('\n');
+  };
+
+  host.querySelector('#pg-emb-run')?.addEventListener('click', paint);
+  host.querySelector('#pg-emb-in')?.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') paint();
+  });
   paint();
 }
 

@@ -280,6 +280,50 @@ r-theme-switch {
   border: 1px solid var(--ran-color-border, #e5e5e5);
 }
 
+.pg-input-inline {
+  width: 100%;
+  max-width: 28rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ran-color-border, #e5e5e5);
+  background: var(--ran-color-bg, #fff);
+  color: var(--ran-color-text, #111);
+  box-sizing: border-box;
+}
+
+.pg-emb-wrap {
+  overflow-x: auto;
+}
+
+.pg-emb-table {
+  border-collapse: collapse;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.pg-emb-table th,
+.pg-emb-table td {
+  border: 1px solid var(--ran-color-border, #e5e5e5);
+  padding: 4px 8px;
+  text-align: right;
+}
+
+.pg-emb-table th:first-child,
+.pg-emb-table td:first-child,
+.pg-emb-table tr th:first-child {
+  text-align: left;
+}
+
+.pg-emb-table tr.pg-emb-hit th,
+.pg-emb-table tr.pg-emb-hit td {
+  background: color-mix(in srgb, var(--ran-color-brand, #2563eb) 18%, transparent);
+  font-weight: 600;
+}
+
 .pg-controls {
   display: grid;
   gap: 10px;

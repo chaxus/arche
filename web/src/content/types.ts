@@ -6,6 +6,7 @@ export type ChapterDemo =
   | 'gqa'
   | 'kv'
   | 'tokenizer'
+  | 'embedding'
   | 'pretrain';
 
 export type PartId = 'start' | 'trunk' | 'infer' | 'train' | 'frontier';

@@ -7,6 +7,7 @@ import 'ranui/theme-switch';
 import { chaptersFor, type Chapter } from './content';
 import type { PartId } from './content/types';
 import {
+  mountEmbeddingPlayground,
   mountPretrainPlayground,
   mountTokenizerPlayground,
 } from './features/playgrounds';
@@ -256,6 +257,10 @@ function mountDemo(chapter: Chapter, host: HTMLElement): void {
   const loc = locale.id === 'cn' ? 'cn' : 'en';
   if (chapter.demo === 'tokenizer') {
     mountTokenizerPlayground(host, loc);
+    return;
+  }
+  if (chapter.demo === 'embedding') {
+    mountEmbeddingPlayground(host, loc);
     return;
   }
   if (chapter.demo === 'pretrain') {
