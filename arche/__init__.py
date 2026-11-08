@@ -8,6 +8,7 @@ from arche.embedding import TokenEmbedding
 from arche.generate import generate
 from arche.load_weights import DEFAULT_MODEL_ID, from_pretrained, try_from_pretrained
 from arche.mlp import SwiGLU
+from arche.mla import MLACache, MultiHeadLatentAttention
 from arche.moe import MoESwiGLU
 from arche.model import Llama
 from arche.norms import RMSNorm
@@ -17,6 +18,8 @@ __all__ = [
     "KVCache",
     "DEFAULT_MODEL_ID",
     "Llama",
+    "MLACache",
+    "MultiHeadLatentAttention",
     "Llama32Config",
     "MoESwiGLU",
     "RMSNorm",
