@@ -6,6 +6,10 @@ import 'ranui/select';
 import 'ranui/theme-switch';
 import { chaptersFor, type Chapter } from './content';
 import type { PartId } from './content/types';
+import {
+  mountPretrainPlayground,
+  mountTokenizerPlayground,
+} from './features/playgrounds';
 import { mountVisualizer, type VisualizerKind } from './features/visualizers';
 import { mountSource } from './features/source';
 import {
@@ -249,6 +253,15 @@ function runTrainDemo(host: HTMLElement): void {
 
 function mountDemo(chapter: Chapter, host: HTMLElement): void {
   if (!chapter.demo) return;
+  const loc = locale.id === 'cn' ? 'cn' : 'en';
+  if (chapter.demo === 'tokenizer') {
+    mountTokenizerPlayground(host, loc);
+    return;
+  }
+  if (chapter.demo === 'pretrain') {
+    mountPretrainPlayground(host, loc);
+    return;
+  }
   const vizKinds: VisualizerKind[] = ['rope', 'gqa', 'kv'];
   if (vizKinds.includes(chapter.demo as VisualizerKind)) {
     const card = document.createElement('div');
@@ -479,8 +492,8 @@ function applyDocumentLang(): void {
   document.documentElement.lang = locale.lang;
   document.title =
     locale.id === 'cn'
-      ? 'arche — 从第一性原理手写现代 dense'
-      : 'arche — modern dense from first principles';
+      ? 'arche — 从零开始，亲手写出大模型'
+      : 'arche — build an LLM by hand, from zero';
 }
 
 function selectHome(): void {

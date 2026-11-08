@@ -1,4 +1,12 @@
-export type ChapterDemo = 'chat' | 'batch' | 'train' | 'rope' | 'gqa' | 'kv';
+export type ChapterDemo =
+  | 'chat'
+  | 'batch'
+  | 'train'
+  | 'rope'
+  | 'gqa'
+  | 'kv'
+  | 'tokenizer'
+  | 'pretrain';
 
 export type PartId = 'start' | 'trunk' | 'infer' | 'train' | 'frontier';
 
