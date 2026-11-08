@@ -1,40 +1,41 @@
 ## Idea
 
+From-zero deep nets need scale control after embeddings—RMSNorm is the first “steady the ruler.”
+
 ### 1. What it is for
 
-**RMSNorm** rescales each token’s float row: compute RMS, divide by it, multiply by a learnable `γ`. Unlike LayerNorm, it **does not subtract the mean**.
+**RMSNorm**: divide by RMS, multiply learnable `γ`; **no mean subtract**. Llama-style **pre-norm** before attention and MLP.
 
-In Llama-style stacks it runs before attention and before the MLP (**pre-norm**).
+### 2. From zero: how you build it
 
-### 2. Why the LLM pipeline needs it
-
-Deep stacks blow up or vanish without scale control. Norm is the “re-zero the ruler” step before the next heavy op. Without it, attention/MLP are hard to stack stably.
-
-### 3. Where it comes from · how you build it
-
-| Stage | What happens |
+| Step | What you do |
 | --- | --- |
-| **Spec** | Normalize the last dim; `γ` length = model dim |
-| **Init** | `γ` often starts at 1 |
-| **Train** | Gradients update `γ` with the rest of the net |
-| **Infer** | Apply the formula; shape unchanged |
+| **1** | `RMSNorm(D)` at each entry that needs steadying |
+| **2** | init `γ` ≈ 1 |
+| **3** | wire pre-norm before Attention/MLP |
+| **4** | train with the net |
 
-$$\mathrm{RMSNorm}(x)=x/\sqrt{\mathrm{mean}(x^2)+\varepsilon}\odot\gamma$$
+### 3. What “good” means
 
-### 4. Standards · what “good” means
+| Kind | Check |
+| --- | --- |
+| **Hard** | same shape; `ε`; placement matches recipe |
+| **Soft** | with `γ=1`, RMS≈1; fewer NaNs |
+| **Soft** | full-model loss is the judge |
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Same shape in/out | Don’t change T or dim |
-| **Hard** | `ε` present | Avoid div-by-zero |
-| **Hard** | Agreed placement | This course: pre-norm |
-| **Soft** | With `γ=1`, per-token RMS ≈ 1 | Sanity that the formula is right |
-| **Soft** | Stabler training | Final judge is full-model loss |
+### 4. Improve · whole-model impact
 
-### 5. What labs ship · what we do
+LN→RMSN matches Llama/Qwen; pre- vs post-norm decides depth trainability; `γ`/lr couple to convergence.
 
-Llama 3.2 / Qwen dense: RMSNorm + pre-norm.  
-`RMSNorm` in `arche/norms.py`; lab prints shapes and per-token RMS.
+### 5. Industry · open models
+
+Llama 3/3.2 & Qwen: RMSNorm+pre-norm. GPT-2-era teaching stacks: LayerNorm often post-norm.
+
+### 6. This course
+
+```bash
+python chapters/01-inference/ep04_rmsnorm.py
+```
 
 ## Run
 
@@ -44,4 +45,4 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## Next
 
-**RoPE** (`?c=rope`): write position into Q/K.
+**RoPE** (`?c=rope`): write position into Q/K from zero.

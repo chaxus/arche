@@ -1,36 +1,32 @@
 ## Idea
 
+From-zero blocks: attention mixes positions; **SwiGLU FFN** transforms each position—modern dense default.
+
 ### 1. What it is for
 
-Attention mixes **across positions**; each position still needs its own nonlinear map—the **FFN / MLP**.  
-Llama-style **SwiGLU**: three bias-free linears (gate / up / down), gated product, project back.
+Gated SiLU FFN with three bias-free linears (gate/up/down).
 
-$$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
+### 2. From zero: how you build it
 
-### 2. Why the LLM pipeline needs it
+Pick `ffn_dim`, three mats, wire after second pre-norm; MoE experts are often SwiGLUs.
 
-Attention mostly “reads others.” The model also needs rich per-token transforms. SwiGLU is the common gated FFN in modern dense decoders (vs older GELU MLPs).
+### 3. What “good” means
 
-### 3. Where it comes from · how you build it
+In/out `D`; no bias (Llama contract); judge gains via full-model metrics.
 
-| Stage | What happens |
-| --- | --- |
-| **Spec** | Wider hidden (`ffn_dim`); three bias-free mats |
-| **Init / train** | With the rest of the net |
-| **Variant** | MoE experts are often SwiGLUs (later) |
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Wider FFN ⇒ capacity/cost; GELU→SwiGLU needs retrain; MoE multiplies experts.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | In/out `embed_dim` | Width only in the middle |
-| **Hard** | No bias (Llama contract) | Match weight layout |
-| **Soft** | Gains vs GELU MLP | Full-model metrics |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Llama/Qwen dense: SwiGLU. Mixtral-style MoE: SwiGLU experts. GPT-2 teaching: GELU MLP.
 
-Modern dense: SwiGLU or close gated cousins.  
-`SwiGLU` in `arche/mlp.py`.
+### 6. This course
+
+```bash
+python chapters/01-inference/ep07_swiglu.py
+```
 
 ## Run
 
@@ -40,4 +36,4 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## Next
 
-**Transformer block** (`?c=block`): the sandwich.
+**Transformer block** (`?c=block`).

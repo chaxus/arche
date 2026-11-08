@@ -13,36 +13,44 @@ export const CHAPTERS_EN: Chapter[] = [
     estimatedMinutes: 12,
     markdown: `## Idea
 
+This course trains **from zero toward frontier-ready**: pick a production-isomorphic specimen, hand-write blocks, then speed and train. Wrong specimen ⇒ later “how industry does it” won’t match.
+
 ### 1. What it is for
 
-This chapter picks the specimen: a **Llama 3.2-style** next-token stack—tokenize → embed → block stack → LM head—often called a **dense decoder**. Every later chapter hangs on this trunk.
+Specimen: **Llama 3.2-style** next-token stack—tokenize → embed → blocks×N → LM head (**dense decoder**). Later chapters hang here.
 
-From zero to frontier-ready: freeze the tokenizer, then size the embedding and pretrain—this specimen shows a shipped industry pair; the tokenizer/embedding chapters also cover **generating your own**.
+### 2. From zero: how you “generate” this path
 
-### 2. Why the course needs it
-
-You need one small, open, production-like model to hand-write end to end. Without a shared specimen, RMSNorm / RoPE / GQA won’t share one config.
-
-### 3. Where it comes from · how we chose
-
-| Factor | Llama 3.2 1B |
+| Step | What you do |
 | --- | --- |
-| Size | ~1B, laptop-reachable |
-| Open | Weights available with license |
-| Parts | RMSNorm, RoPE, SwiGLU, GQA—like many production dense stacks |
-| Path | Trunk → inference → tiny train → frontier primers |
+| **1. Pick open, downloadable, small, production-like** | Here: Llama 3.2 ~1B |
+| **2. Freeze tokenizer; record V, D, depth, heads** | Config is the contract |
+| **3. Hand-write the same bricks** | RMSNorm, RoPE, GQA, SwiGLU… |
+| **4. Random shapes first, then load/train weights** | Graph → numbers |
+| **5. Add serving & alignment** | KV, batching, SFT… |
 
-### 4. Standards · what “good choice” means
+### 3. What “good choice” means
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Config prints and is consistent | Vocab, depth, dim match docs |
-| **Soft** | Carries the whole course | Later chapters plug in |
-| **Soft** | Honest scope | Dense trunk + primers, not full vLLM / full pretrain |
+| Kind | Check |
+| --- | --- |
+| **Hard** | Config consistent; bricks match the claimed recipe |
+| **Hard** | Supports from-zero: tables trainable, net stackable, weights loadable |
+| **Soft** | Docs + obtainable weights |
+| **Soft** | Room for MoE/MLA primers |
 
-### 5. What we do
+### 4. Improve · whole-model impact
 
-Lab prints config sizes—not chat yet.
+Swap specimen (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ full retrain. We keep 1B and use primers for larger ideas.
+
+### 5. Industry · open models
+
+Llama / Qwen / DeepSeek ship config + checkpoint + tokenizer; engines like vLLM assume such checkpoints.
+
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep01_overview.py
+\`\`\`
 
 ## Run
 
@@ -52,7 +60,7 @@ python chapters/01-inference/ep01_overview.py
 
 ## Next
 
-**Tokenizer** (\`?c=tokenizer\`).
+**Tokenizer** (\`?c=tokenizer\`): generate the tokenizer table from zero.
 
 `,
   },
@@ -336,41 +344,42 @@ python chapters/01-inference/ep03_embedding.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
+From-zero deep nets need scale control after embeddings—RMSNorm is the first “steady the ruler.”
+
 ### 1. What it is for
 
-**RMSNorm** rescales each token’s float row: compute RMS, divide by it, multiply by a learnable \`γ\`. Unlike LayerNorm, it **does not subtract the mean**.
+**RMSNorm**: divide by RMS, multiply learnable \`γ\`; **no mean subtract**. Llama-style **pre-norm** before attention and MLP.
 
-In Llama-style stacks it runs before attention and before the MLP (**pre-norm**).
+### 2. From zero: how you build it
 
-### 2. Why the LLM pipeline needs it
-
-Deep stacks blow up or vanish without scale control. Norm is the “re-zero the ruler” step before the next heavy op. Without it, attention/MLP are hard to stack stably.
-
-### 3. Where it comes from · how you build it
-
-| Stage | What happens |
+| Step | What you do |
 | --- | --- |
-| **Spec** | Normalize the last dim; \`γ\` length = model dim |
-| **Init** | \`γ\` often starts at 1 |
-| **Train** | Gradients update \`γ\` with the rest of the net |
-| **Infer** | Apply the formula; shape unchanged |
+| **1** | \`RMSNorm(D)\` at each entry that needs steadying |
+| **2** | init \`γ\` ≈ 1 |
+| **3** | wire pre-norm before Attention/MLP |
+| **4** | train with the net |
 
-$$\\mathrm{RMSNorm}(x)=x/\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}\\odot\\gamma$$
+### 3. What “good” means
 
-### 4. Standards · what “good” means
+| Kind | Check |
+| --- | --- |
+| **Hard** | same shape; \`ε\`; placement matches recipe |
+| **Soft** | with \`γ=1\`, RMS≈1; fewer NaNs |
+| **Soft** | full-model loss is the judge |
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Same shape in/out | Don’t change T or dim |
-| **Hard** | \`ε\` present | Avoid div-by-zero |
-| **Hard** | Agreed placement | This course: pre-norm |
-| **Soft** | With \`γ=1\`, per-token RMS ≈ 1 | Sanity that the formula is right |
-| **Soft** | Stabler training | Final judge is full-model loss |
+### 4. Improve · whole-model impact
 
-### 5. What labs ship · what we do
+LN→RMSN matches Llama/Qwen; pre- vs post-norm decides depth trainability; \`γ\`/lr couple to convergence.
 
-Llama 3.2 / Qwen dense: RMSNorm + pre-norm.  
-\`RMSNorm\` in \`arche/norms.py\`; lab prints shapes and per-token RMS.
+### 5. Industry · open models
+
+Llama 3/3.2 & Qwen: RMSNorm+pre-norm. GPT-2-era teaching stacks: LayerNorm often post-norm.
+
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep04_rmsnorm.py
+\`\`\`
 
 ## Run
 
@@ -380,7 +389,7 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## Next
 
-**RoPE** (\`?c=rope\`): write position into Q/K.
+**RoPE** (\`?c=rope\`): write position into Q/K from zero.
 
 `,
     latex:
@@ -397,38 +406,33 @@ python chapters/01-inference/ep04_rmsnorm.py
     demo: 'rope',
     markdown: `## Idea
 
+From-zero decoders: embedding says “which token”; **RoPE** (or other PE) writes **position** into attention.
+
 ### 1. What it is for
 
-**RoPE** rotates Q and K by an angle from each **position**. Relative distance shows up in the attention dot product—no big PE table on embeddings.
+Rotate Q/K by position so relative distance enters the dot product—no absolute PE table on embeds.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Self-attention alone is order-blind. Language is not. Embedding answers “which token”; RoPE answers “which place.” Modern dense decoders write position into Q/K.
+Pick \`rope_theta\`, cache cos/sin, \`rotate_half\` + combine on Q/K; scale later for long context.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Stage | What happens |
-| --- | --- |
-| **Spec** | Choose \`rope_theta\`; cache cos/sin per position |
-| **Forward** | \`rotate_half\` on Q/K, combine with cos/sin |
-| **Train/infer** | Same rotation; longer context may need scaling (later chapter) |
+Shape unchanged; relative position affects scores; match checkpoint \`theta\`/scaling.
 
-Drag the page viz to see angles change with position.
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Theta/scaling ↔ long context; absolute PE→RoPE is modern default; don’t mix PE families with foreign weights.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Q/K shape unchanged | Phase only |
-| **Hard** | Relative position enters scores | Swap positions → scores change |
-| **Hard** | Match checkpoint contract | \`theta\` / scaling must match weights |
-| **Soft** | Stable inside train length | Full-model quality is the judge |
-| **Soft** | Extra-long context | See RoPE scaling chapter |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Llama/Qwen/DeepSeek: RoPE. Classic Transformer: sinusoidal. Some long-context lines: ALiBi/YaRN/NTK.
 
-Llama 3 / 3.2: RoPE + large \`rope_theta\`.  
-\`arche/rope.py\`; lab applies RoPE and checks shapes.
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep05_rope.py
+\`\`\`
 
 ## Run
 
@@ -438,7 +442,7 @@ python chapters/01-inference/ep05_rope.py
 
 ## Next
 
-**GQA** (\`?c=gqa\`): fewer KV heads.
+**GQA** (\`?c=gqa\`): choose head counts from zero to save KV cache.
 
 `,
     latex:
@@ -455,39 +459,33 @@ python chapters/01-inference/ep05_rope.py
     demo: 'gqa',
     markdown: `## Idea
 
+From-zero architecture: attention layout sets **decode VRAM** vs quality.
+
 ### 1. What it is for
 
-**GQA** lets groups of Q heads **share** fewer KV heads. Still causal (\`t\` sees only \`≤ t\`), but decode stores less K/V.
+**GQA**: more Q heads than KV heads; groups share KV; still causal.
 
-Flow: project → split heads → RoPE → expand KV → SDPA → out proj. See the page viz.
+### 2. From zero: how you build it
 
-### 2. Why the LLM pipeline needs it
+Choose divisible \`n_q\`/\`n_kv\`, broadcast KV, train; cache stores \`n_kv\`. Llama 3.2 1B: **32Q/8KV**.
 
-Full MHA: every Q head owns KV → **KV cache** grows fast. GQA trades a bit of flexibility for much smaller cache vs MHA; usually gentler than extreme MQA.
+### 3. What “good” means
 
-### 3. Where it comes from · how you build it
+Valid groups; causal; match weight heads; smaller cache than MHA without quality collapse.
 
-| Stage | What happens |
-| --- | --- |
-| **Spec** | Choose \`n_q\`, \`n_kv\` (divides evenly); \`n_rep = n_q / n_kv\` |
-| **Impl** | Broadcast/repeat KV per group, then attend |
-| **Train** | Learn projections with the net |
-| **Infer** | Same layout + cache for prefill/decode |
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+MHA richest/costliest; GQA default open midsize; MQA extreme; MLA further compression. Head-count change ⇒ retrain.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | \`n_q\` divisible by \`n_kv\` | Valid groups |
-| **Hard** | Causal mask correct | No future tokens |
-| **Hard** | Head counts match weights | Else shape/silent errors |
-| **Soft** | Cache clearly smaller than MHA | The point of GQA |
-| **Soft** | Quality doesn’t collapse vs MHA | Judge with evals/loss |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Llama 3/Qwen: GQA. DeepSeek-V3: MLA path. Classic GPT-2 teaching: MHA.
 
-Llama 3.2 1B: **32 Q / 8 KV**.  
-\`CausalSelfAttention\` in \`arche/attention.py\`; lab prints heads and shapes.
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep06_gqa.py
+\`\`\`
 
 ## Run
 
@@ -497,7 +495,7 @@ python chapters/01-inference/ep06_gqa.py
 
 ## Next
 
-**SwiGLU** (\`?c=swiglu\`): the feed-forward half.
+**SwiGLU** (\`?c=swiglu\`): wire the FFN from zero.
 
 `,
   },
@@ -511,37 +509,33 @@ python chapters/01-inference/ep06_gqa.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
+From-zero blocks: attention mixes positions; **SwiGLU FFN** transforms each position—modern dense default.
+
 ### 1. What it is for
 
-Attention mixes **across positions**; each position still needs its own nonlinear map—the **FFN / MLP**.  
-Llama-style **SwiGLU**: three bias-free linears (gate / up / down), gated product, project back.
+Gated SiLU FFN with three bias-free linears (gate/up/down).
 
-$$\\\\mathrm{FFN}(x)=W_d\\\\big(\\\\mathrm{SiLU}(W_g x)\\\\odot W_u x\\\\big)$$
+### 2. From zero: how you build it
 
-### 2. Why the LLM pipeline needs it
+Pick \`ffn_dim\`, three mats, wire after second pre-norm; MoE experts are often SwiGLUs.
 
-Attention mostly “reads others.” The model also needs rich per-token transforms. SwiGLU is the common gated FFN in modern dense decoders (vs older GELU MLPs).
+### 3. What “good” means
 
-### 3. Where it comes from · how you build it
+In/out \`D\`; no bias (Llama contract); judge gains via full-model metrics.
 
-| Stage | What happens |
-| --- | --- |
-| **Spec** | Wider hidden (\`ffn_dim\`); three bias-free mats |
-| **Init / train** | With the rest of the net |
-| **Variant** | MoE experts are often SwiGLUs (later) |
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Wider FFN ⇒ capacity/cost; GELU→SwiGLU needs retrain; MoE multiplies experts.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | In/out \`embed_dim\` | Width only in the middle |
-| **Hard** | No bias (Llama contract) | Match weight layout |
-| **Soft** | Gains vs GELU MLP | Full-model metrics |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Llama/Qwen dense: SwiGLU. Mixtral-style MoE: SwiGLU experts. GPT-2 teaching: GELU MLP.
 
-Modern dense: SwiGLU or close gated cousins.  
-\`SwiGLU\` in \`arche/mlp.py\`.
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep07_swiglu.py
+\`\`\`
 
 ## Run
 
@@ -551,7 +545,7 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## Next
 
-**Transformer block** (\`?c=block\`): the sandwich.
+**Transformer block** (\`?c=block\`).
 
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',

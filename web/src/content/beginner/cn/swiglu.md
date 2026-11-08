@@ -1,38 +1,50 @@
 ## 要点
 
+从零搭块：注意力混合位置；**FFN** 在每个位置做非线性——现代 dense 默认 SwiGLU。
+
 ### 1. 有什么作用
 
-注意力混合**各位置**的信息；每个位置还要各自做一次非线性变换——这就是 **FFN / MLP**。  
-Llama 风格用 **SwiGLU**：三条无偏置线性（gate / up / down），门控后相乘再投回原维度。
+$$\\mathrm{FFN}(x)=W_d(\\mathrm{SiLU}(W_g x)\\odot W_u x)$$
 
-$$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
+三条无 bias 线性：gate / up / down。
 
-### 2. 为什么大模型过程需要它
+### 2. 从零开始：怎么生成
 
-只有注意力，每个位置主要在「读别人」。模型还需要在**当前位置**上做丰富的特征变换（记忆事实、模式等常和 FFN 相关的讨论）。  
-SwiGLU 是今天 dense 解码器里常见的门控 FFN，替代老栈的 GELU MLP。
-
-### 3. 怎么来的 · 怎么做
-
-| 阶段 | 做什么 |
+| 步骤 | 做什么 |
 | --- | --- |
-| **定规格** | 隐层更宽（如 `ffn_dim`）；三套权重无 bias |
-| **初始化** | 随模型初始化 |
-| **训练** | 与整网一起更新 |
-| **变体** | MoE 里每个专家往往就是一个 SwiGLU（后面章） |
+| **1** | 定 `ffn_dim`（通常 > `D`） |
+| **2** | 建三套权重，无 bias |
+| **3** | 接在块内第二段（pre-norm 后） |
+| **4** | 整网训；MoE 时每个专家往往是一个 SwiGLU |
 
-### 4. 有什么标准 · 怎样算好
+### 3. 怎么样算好
 
-| 类型 | 标准 | 人话 |
-| --- | --- | --- |
-| **硬** | 进出 `embed_dim` | 中间可变宽，两头对齐 |
-| **硬** | 无 bias（Llama 约定） | 与权重布局一致 |
-| **软** | 相对 GELU MLP 的收益 | 看整模；不单独给 FFN 打「金奖」 |
+| 类型 | 标准 |
+| --- | --- |
+| **硬** | 进出 `D`；无 bias（Llama 契约）；形状与权重一致 |
+| **软** | 相对 GELU MLP 的收益看整模 |
 
-### 5. 业界实际 · 本课怎么做
+### 4. 如何改进 · 对整模影响
 
-现代 dense：SwiGLU 或近亲门控。  
-`arche/mlp.py` 的 `SwiGLU`。
+| 杠杆 | 影响 |
+| --- | --- |
+| 加宽 `ffn_dim` | 容量↑、算力↑ |
+| GELU MLP→SwiGLU | 与 Llama/Qwen 对齐；要重训 |
+| 改成 MoE 专家 | 参数总量↑、单 token 稀疏算 |
+
+### 5. 业界 · 开源
+
+| 系 | 做法 |
+| --- | --- |
+| **Llama / Qwen dense** | SwiGLU |
+| **Mixtral 等 MoE** | 专家为 SwiGLU 类 |
+| **GPT-2 风教学** | GELU MLP |
+
+### 6. 本课
+
+```bash
+python chapters/01-inference/ep07_swiglu.py
+```
 
 ## 动手
 
@@ -42,4 +54,4 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## 下一章
 
-**Transformer 块**（`?c=block`）：拼成三明治。
+**Transformer 块**（`?c=block`）。
