@@ -1,6 +1,10 @@
 ## Idea
 
-The tokenizer only emits **integer ids**. A neural net cannot “understand” the number `42`—it only adds/multiplies tensors. So there must be a step: **use the id to look up a row of floats** in a big table. That table is the **embedding**.
+**What:** The **embedding** — a `V×D` table; each token id **looks up** one row of `D` floats (`gather` / `nn.Embedding`).
+
+**Why:** Nets only add/multiply tensors. Ids are labels with no geometry; without float rows there is nothing for attention/FFN to eat. Pretrain **writes** those rows.
+
+**How:** Freeze tokenizer → set `V,D` (and tying) → random init → next-token train rewrites rows; or load official floats with the paired tokenizer.
 
 ### 1. How does an id become floats—and why bother?
 

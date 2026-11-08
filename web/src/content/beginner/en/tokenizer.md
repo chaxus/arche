@@ -1,8 +1,12 @@
 ## Idea
 
-This course aims to **build from zero toward frontier-ready**. The tokenizer table is not a disposable download—it is the first table you **choose or train** when you train a model; embeddings, pretraining, and inference cost all bind to it.
+**What:** The **tokenizer table** — cut rules + vocab (piece ↔ id) that turn text into integer ids and back.
 
-### 1. What the tokenizer table is for
+**Why:** First table you choose or train when building from zero. Embeddings, pretraining, and inference cost all bind to this id space; swap mid-flight ≈ rebuild embeds + heavy retrain.
+
+**How:** Corpus mix → pretokenizer → byte base → BPE merges → specials → freeze/version → then embed + pretrain. This course: tiny teach-BPE to *see* growth, plus Llama’s finished table for the example.
+
+### 1. What — cut and number
 
 Tokenizer table = **cut rules + vocab (piece ↔ id)**.
 

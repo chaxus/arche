@@ -12,23 +12,23 @@ export const PART0_EN: Chapter[] = [
     estimatedMinutes: 5,
     markdown: `## Idea
 
-**What you will learn:** treat the LLM as something you **train from zero toward frontier-ready**—how tokenizer/embedding tables are made, what “good” means, how to improve them and what that does to the whole model; hand-write the trunk until it runs; then speed, a bit of training, and a map of MoE/MLA-style tips. No jargon required up front.
+**What:** This course — **one path from zero toward frontier-ready**, with Llama 3.2 ~1B as the dense example.
 
-**One path, one example.** You build from zero on a **frontier dense recipe**: **Llama 3.2 ~1B**—the small open sibling of Meta’s Llama 3 line. Same architecture family used at larger scales: RMSNorm, RoPE, GQA, SwiGLU, byte BPE—what today’s open dense stacks (and many closed ones) still ship, not a GPT-2 classroom toy. We pick the **~1B** scale so those bricks stay teachable and downloadable; the **architecture** is the point. Official tokenizer + weights = that recipe’s finished pair for checking your stack.
+**Why:** Jargon-first tours leave you lost. You need a finishable spine: tables → next-token train → handwritten trunk → align → serve → MoE/MLA map.
 
-**The full path (five stages):**
+**How:** Read left-nav chapters; run each lab; mark-as-read is local-only. Repo: [github.com/chaxus/arche](https://github.com/chaxus/arche)
 
-| Stage | In plain words | Names you will meet later |
-| --- | --- | --- |
-| **0 Start** | Set up; learn to read a chapter and run one command | — |
-| **1 Tables + next-token train + dense bricks** | Tokenizer → embedding → **objective → data → optim → scale** → RMSNorm…stack → load/generate → HF check | dense decoder, pretrain |
-| **2 Align** | SFT / DPO after the base next-token skill | SFT, DPO |
-| **3 Generate & serve faster** | KV cache, long context, device/quant, continuous batch, paging | KV, RoPE scaling, paged KV… |
-| **4 Frontier structures** | MoE + MLA map (DeepSeek-V3-shaped open stack), checkpoints | MoE, MLA, shards |
+**Example:** Llama 3.2 ~1B = frontier dense bricks (RMSNorm, RoPE, GQA, SwiGLU, byte BPE) at a teachable scale. Official tokenizer + weights = finished pair for checks.
 
-**Afterward you can roughly:** run the labs; open similar open-source code and know which layer you are in; enter papers or repos like vLLM with a map. In-course = **runnable principles + a frontier map**. Full industrial engines, huge clusters, multimodal—are the next climb *with* that map, not from zero.
+| Stage | In plain words |
+| --- | --- |
+| **0 Start** | Setup; read a chapter; run one command |
+| **1 Tables + train + bricks** | Tokenizer → embedding → objective→data→optim→scale → RMSNorm…HF |
+| **2 Align** | SFT / DPO |
+| **3 Serve faster** | KV, long context, device/quant, continuous batch, paging |
+| **4 Frontier** | MoE + MLA map, checkpoints, shards |
 
-Site: left nav; Previous / Next; Mark as read is local-only. Repo: [github.com/chaxus/arche](https://github.com/chaxus/arche)
+In-course = **runnable principles + a frontier map**. Full engines / huge clusters / multimodal = next climb *with* that map.
 
 ## Next
 
@@ -45,15 +45,15 @@ Site: left nav; Previous / Next; Mark as read is local-only. Repo: [github.com/c
     estimatedMinutes: 5,
     markdown: `## Idea
 
-At **inference**, an LLM repeatedly guesses the **next little text chunk** from what it already wrote:
+**What:** An LLM at inference **guesses the next token**; at training it learns that guess by rewriting floats.
 
-1. Score every candidate in the vocabulary.
-2. Pick one (argmax or sample).
-3. Append it; repeat.
+**Why:** Chat UIs hide the loop. Weights are not magic files—they are the result of huge next-token practice (then optional align).
 
-At **training** (the important half), the dataset already knows the true next chunk. The model still scores every id; you measure the miss (**cross-entropy**), then **backprop** so embedding rows and later weights move. Huge text × many steps = how random floats become a language model. After embedding the spine splits that loop: [\`/pretrain/\`](/pretrain/) (objective) → data → optim → scale primer → then dense bricks.
+**How (inference):** score every vocab id → pick (argmax/sample) → append → repeat.
 
-Three names: **token** = chunk; **embedding** = float row for an id; **logits** = next-chunk scores.
+**How (training):** true next id is known → cross-entropy → backprop → embed rows and trunk weights move. After embedding: [\`/pretrain/\`](/pretrain/) → data → optim → scale → then dense bricks.
+
+Three names: **token** = chunk; **embedding** = float row; **logits** = next-id scores.
 
 \`\`\`mermaid
 flowchart LR
@@ -80,7 +80,11 @@ flowchart LR
     estimatedMinutes: 15,
     markdown: `## Idea
 
-Need Python ≥ 3.10 and a venv. No GPU required.
+**What:** A working Python env so every later lab can run.
+
+**Why:** Without a venv + deps, “run the chapter” fails before any model idea appears. No GPU required for the beginner path.
+
+**How:** Python ≥ 3.10 → venv → \`pip install -r requirements.txt\` → check script prints \`OK\`.
 
 ## Run
 
@@ -92,7 +96,7 @@ pip install -r requirements.txt
 python chapters/00-start/ep00_check_setup.py
 \`\`\`
 
-Expect a final \`OK\` line. No \`git\`? Download the ZIP from GitHub instead.
+No \`git\`? Download the ZIP from GitHub instead.
 
 ## Fix
 
@@ -112,6 +116,12 @@ Expect a final \`OK\` line. No \`git\`? Download the ZIP from GitHub instead.
     partId: 'start',
     estimatedMinutes: 5,
     markdown: `## Idea
+
+**What:** The few shell moves every lab assumes: where you are, list files, enter the repo, activate venv.
+
+**Why:** Most early failures are “wrong directory” or “venv off,” not bad math.
+
+**How:**
 
 | Goal | macOS / Linux | Windows |
 | --- | --- | --- |
@@ -144,10 +154,14 @@ python chapters/01-inference/ep01_overview.py   # optional smoke
     estimatedMinutes: 4,
     markdown: `## Idea
 
-This page shows the lab script below. In any later chapter, use the **Code** card:
+**What:** How this site shows code — Library (\`arche/\`) vs Lab script (\`chapters/...\`).
 
-1. **Library** — the \`arche/\` module you are learning  
-2. **Lab script** — the \`chapters/...\` file you run  
+**Why:** You learn by running and reading, not by writing Python on day one. Knowing where to look beats memorizing APIs.
+
+**How:** On each chapter, open the **Code** card:
+
+1. **Library** — the module the lesson is about  
+2. **Lab script** — the file you run  
 
 In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \`if __name__\`.
 
@@ -166,6 +180,12 @@ In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \
     estimatedMinutes: 3,
     markdown: `## Idea
 
+**What:** A one-page map of the five stages and when you need Hugging Face login.
+
+**Why:** Without the map, Part 1 feels like random bricks. Login only matters for official Llama load/align—not for teach-BPE or most shape labs.
+
+**How:** Follow Previous/Next; keep this picture in mind:
+
 \`\`\`mermaid
 flowchart LR
   p0[0 Setup] --> p1[1 Tables_train_bricks]
@@ -174,11 +194,11 @@ flowchart LR
   p3 --> p4[4 Frontier]
 \`\`\`
 
-**One path:** tokenizer → embedding → **next-token train** → dense bricks → load/check Llama → align → serve → frontier map.
+**One path:** tokenizer → embedding → **next-token train** (objective → data → optim → scale) → dense bricks → load/check Llama → align → serve → frontier map.
 
 - **Running example:** Llama 3.2 ~1B.  
-- **Core idea early:** next-token pretrain (objective → data → optim → scale) is how embedding rows and trunk weights get written.  
-- **HF login** when you load or align against official Llama files; teach-BPE and most shape labs need no login.
+- **Core idea early:** pretrain writes embedding rows and trunk weights.  
+- **HF login** for official Llama load / HF align only.
 
 ## Next
 

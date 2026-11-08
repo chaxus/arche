@@ -7,87 +7,96 @@ export const CHAPTERS_CN: Chapter[] = [
     id: 'overview',
     ep: '01',
     title: '总览',
-    summary: '为什么用 Llama 3.2 ~1B 当例子；一条从零的「猜下一个词」主线。',
+    summary: '课程地图：以 Llama 3.2 ~1B 贯穿，从建表到前沿。',
     script: 'chapters/01-inference/ep01_overview.py',
     partId: 'trunk',
     estimatedMinutes: 12,
     markdown: `## 要点
 
-本课是**一条从零到对接业界前沿**的路。阅读顺序：建表 → **猜词训练** → dense 积木 → 对齐 → 服务 → 前沿（MoE/MLA）。贯穿例子是 **Llama 3.2 ~1B**——例子配方错了，后面「业界怎么做」会对不上。
+**是什么（What）：** **课程地图**——一条从零对接前沿的路，以 **Llama 3.2 ~1B** 为贯穿稠密例子，并用打印出的配置钉死尺寸。
 
-### 1. 有什么作用
+**为什么（Why）：** 例子配方错了，后面「业界怎么做」会对不上。先要有一条脊柱（建表 → 猜词训练 → 积木 → 对齐 → 服务 → MoE/MLA），单块积木才有位置。
 
-你亲手写出 **Llama 3.2 风格** next-token 栈——分词 → 嵌入 → 块×N → LM head（**dense 解码器**）。后续章都挂在同一条主干上。官方 Llama 文件是这个例子的成品一对，不是第二条课。
+**怎么做（How）：** 钉死例子 → 长分词/嵌入 → next-token 训练（目标→数据→优化→规模）→ 手写 RMSNorm…stack → 加载/生成/HF 对齐 → SFT/DPO → 服务 → 前沿引物。
+
+### 1. What — 整条路
+
+| 阶段 | 人话 |
+| --- | --- |
+| **0 开场** | 环境；读一章；跑一条命令 |
+| **1 表 + 训练 + 积木** | 分词 → 嵌入 → **预训练×4** → RMSNorm…stack → 权重 → 生成 → HF |
+| **2 对齐** | SFT / DPO |
+| **3 服务加速** | KV、RoPE 缩放、设备/量化/对话、连续批、分页 |
+| **4 前沿** | MoE → MLA → ckpt → 分片 |
 
 \`\`\`mermaid
 flowchart LR
-  tok[分词表] --> emb[嵌入表]
-  emb --> stack[块堆叠]
-  stack --> head[LM head]
+  tok[分词] --> emb[嵌入]
+  emb --> train[预训练环]
+  train --> bricks[dense积木]
+  bricks --> align[SFT_DPO]
+  align --> serve[服务]
+  serve --> tip[MoE_MLA]
 \`\`\`
 
-### 2. 为什么用 Llama 3.2 ~1B 当例子
+你手写的是 **Llama 3.2 风格稠密解码器**。官方 Llama 文件是这份配方的成品一对——不是第二条课。
 
-**一句话：学当前前沿 dense 架构，用你能跑完的规模。**
+### 2. Why — 为什么是 Llama 3.2 ~1B
 
-Llama 3.2 是 Meta **Llama 3** 系列的开放小规格——与更大 Llama（以及 Qwen 一类 dense）同属一套配方：**RMSNorm + RoPE + GQA + SwiGLU + 字节级 BPE**。这是今天开源 dense 主干的主流积木，不是为课堂简化的玩具网。MoE / MLA、更大引擎放在后面，作为挂在这条主干上的引物。
+**前沿 dense 架构，可学完的规模。**
 
-| 为什么选它 | 人话 |
+与更大 Llama 3 / 多数 Qwen 类稠密同属：**RMSNorm + RoPE + GQA + SwiGLU + 字节 BPE**。~1B 让 V/D/层数/头可数、可下载。
+
+| 选择 | 含义 |
 | --- | --- |
-| **前沿同构的积木** | 模块名与契约，和当前开源 dense / 推理栈对得上 |
-| **同一家族、可学规模** | ~1B 让 V / D / 层数 / 头数可数、HF 可下——架构仍是 Llama 3，尺寸是为了学得完 |
-| **开放成品一对** | 官方分词 + 检查点，「手写 vs 业界」才是真对照 |
-| **先 dense** | 先拿下 dense 解码器，再摸 MoE/MLA；不从 GPT-2 博物馆起步 |
+| 前沿同构积木 | 名字对齐当前开源 dense / 推理栈 |
+| 可学规模 | 从零写得完 |
+| 开放成品一对 | 分词 + 检查点真对照 |
+| 先 dense | MoE/MLA 稍后当地图 |
 
-所以：**架构 = 当前前沿 dense；规模 = ~1B，好让从零写得完。** 不是「聊天最强」，也不是「在家训 70B」。
+不是「聊天最强」，也不是「在家训 70B」。
 
-### 3. DeepSeek 算什么架构（同一条路，后面的地图）
+### 3. Why — DeepSeek 放哪
 
-口语里的 **DeepSeek 前沿开源**（V2 / V3、以及以 V3 为底的 R1）**不是**「另一个 Llama dense」。一句话对照：
-
-| | **Llama 3.2（本课例子）** | **DeepSeek-V2 / V3 系** |
+| | **Llama 3.2（例子）** | **DeepSeek-V2/V3** |
 | --- | --- | --- |
-| 容量 | 每层 **Dense** FFN | **MoE**——多专家，每次 top-k 激活 |
-| 注意力 / KV | **GQA** | **MLA**——用 latent 压 KV |
-| 共同底色 | RMSNorm / RoPE / 现代解码器骨架 | 同属 Transformer 家族，升级点不同 |
-| 在本课位置 | 第 1–3 部分手写并跑通 | 第 4 部分引物：MoE → MLA → 检查点地图 |
+| 容量 | Dense FFN | **MoE** top-k |
+| KV | **GQA** | **MLA** latent |
+| 课内 | 第 1–3 部分 | 第 4 部分引物 |
 
-**读法：** Llama 教 dense 主干；DeepSeek 是这条家族上很重要的开源 **MoE + MLA** 分支。不第一天就从 DeepSeek 起手——先要有 dense 栈。
+同属 Transformer 家族，升级点不同。先 dense 主干。
 
-### 4. 从零开始：怎么「生成」这条路线
+### 4. How — 你会反复看到的配置
 
-| 步骤 | 做什么 |
+实验（[\`ep01_overview.py\`](https://github.com/chaxus/arche/blob/main/chapters/01-inference/ep01_overview.py)）打印 [\`llama32_1b()\`](https://github.com/chaxus/arche/blob/main/arche/config.py)：
+
+| 字段 | ~1B 含义 |
 | --- | --- |
-| **1. 钉死例子** | Llama 3.2 ~1B |
-| **2. 分词 + 嵌入** | 教学 BPE + 查表；记下 V、D、层数、头数 |
-| **3. 猜下一个词训练** | shift + 交叉熵 + 反传——**写出**嵌入与权重 |
-| **4. 手写积木** | RMSNorm、RoPE、GQA、SwiGLU… 再堆叠 |
-| **5. 加载 Llama / 生成 / HF → 对齐 → 服务 → 前沿** | 侧栏一条路 |
+| \`vocab_size\` | 128256 |
+| \`num_layers\` | 16 |
+| \`embed_dim\` | 2048 |
+| \`num_heads\` / \`num_kv_heads\` | 32 / 8（GQA） |
+| \`rope_theta\` | 500000 |
 
-### 5. 怎么样算选对了
+### 5. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 配置自洽；积木与声称的开源配方一致 |
-| **硬** | 能支撑「从零」叙事：表可训、网可叠、权可装 |
-| **软** | 社区文档全、权重可申请 |
-| **软** | 后续 MoE/MLA 引物有地方挂（DeepSeek 向地图） |
+| **硬** | 配置自洽；积木与声称配方一致 |
+| **硬** | 能支撑从零：表可训、网可叠、权可装 |
+| **软** | 文档与权重可得；MoE/MLA 引物有处挂 |
 
 ### 6. 如何改进 · 对整模影响
 
-换例子（如改 Qwen）→ 分词/嵌入/块配置全换，课程映射要重做。加深/加宽 → 全面重训。本课保持 1B 例子，用引物看更大模型。
+换例子（如 Qwen）⇒ 分词/嵌入/块全换。加宽加深 ⇒ 重训。本课钉 1B，更大想法用引物。
 
-### 7. 业界 · 开源怎么做
-
-Llama / Qwen 主推 dense（也有 MoE 变体）；**DeepSeek-V3** 是开源侧 **大 MoE + MLA** 的旗舰叙事。都以「公开配置 + 检查点 + 分词」发布；vLLM 等引擎假设你已有这类检查点。
-
-### 8. 本课
+### 7. 本课
 
 \`\`\`bash
 python chapters/01-inference/ep01_overview.py
 \`\`\`
 
-打印配置尺寸，还不是聊天。
+打印尺寸——还不是聊天。
 
 ## 动手
 
@@ -97,7 +106,7 @@ python chapters/01-inference/ep01_overview.py
 
 ## 下一章
 
-**分词器**（\`/cn/tokenizer/\`）：从零生成分词表。
+**分词器**（\`/cn/tokenizer/\`）：从零长出第一张表。
 
 `,
   },
@@ -112,9 +121,13 @@ python chapters/01-inference/ep01_overview.py
     demo: 'tokenizer',
     markdown: `## 要点
 
-本课路线是**从零搭到能对接业界前沿**：分词表不是「用现成的就完了」，而是你自己训模型时要**选定/训出**的第一张表；后面嵌入、预训练、推理成本都绑在它上面。
+**是什么（What）：** **分词表**——切分规则 + 词表（片段 ↔ id），把文字变成整数 id，再变回来。
 
-### 1. 分词表有什么作用
+**为什么（Why）：** 从零建模型时你要选定/训出的第一张表。嵌入、预训练、推理成本都绑在这套 id 空间；中途换表 ≈ 重建嵌入 + 大重训。
+
+**怎么做（How）：** 语料配比 → 预分词 → 字节底 → BPE 合并 → specials → 冻结/版本 → 再嵌入与预训练。本课：微型 teach-BPE 看「表怎么长」；Llama 成品表作例子。
+
+### 1. What — 切与编号
 
 分词表 = **切分规则 + 词表（片段 ↔ id）**。
 
@@ -274,7 +287,11 @@ python chapters/01-inference/ep02_tokenizer.py
     demo: 'embedding',
     markdown: `## 要点
 
-分词只给出**整数编号**（id）。神经网络不会「理解」\`42\` 这个号码——它只会加减乘矩阵。所以中间必须有一步：**用 id 去一张大表里取出一排小数**。这张表就叫**嵌入表（embedding）**。
+**是什么（What）：** **嵌入表**——\`V×D\` 大表；每个 token id **查出**一行 \`D\` 个小数（\`gather\` / \`nn.Embedding\`）。
+
+**为什么（Why）：** 网络只会加减乘张量。id 只是标签，没有几何；没有小数行，注意力/FFN 就没东西吃。预训练**写出**那些行。
+
+**怎么做（How）：** 冻结分词器 → 定 \`V,D\`（及是否绑定）→ 随机初始化 → next-token 训练改写行；或与配对分词器一起加载官方小数。
 
 ### 1. id 怎么变成小数？有什么用？
 

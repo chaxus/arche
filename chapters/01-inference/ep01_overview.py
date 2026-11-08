@@ -38,9 +38,9 @@ def main() -> None:
     print()
     print("Curriculum:")
     for step in (
-        "tokenizer → embedding → RMSNorm → RoPE",
-        "GQA → SwiGLU → block → stack → weights → generate",
-        "KV cache → RoPE scaling → MoE → MLA",
+        "tokenizer → embedding → pretrain (objective/data/optim/scale)",
+        "RMSNorm → RoPE → GQA → SwiGLU → block → stack → weights → generate → HF",
+        "SFT/DPO → KV → RoPE scaling → serve → MoE → MLA → shards",
     ):
         print(f"  - {step}")
     print()

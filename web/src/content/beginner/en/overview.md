@@ -1,71 +1,89 @@
 ## Idea
 
-This course is **one path from zero toward frontier-ready**. Reading order: tables → **next-token train** → dense bricks → align → serve → frontier (MoE/MLA). The running example is **Llama 3.2 ~1B**—wrong example recipe ⇒ later “how industry does it” won’t match.
+**What:** The **course map** — one path from zero toward frontier-ready, with **Llama 3.2 ~1B** as the running dense example and a printed config to nail sizes.
 
-### 1. What it is for
+**Why:** Wrong example recipe ⇒ later “how industry does it” won’t match. You need one spine (tables → next-token train → bricks → align → serve → MoE/MLA) before any single brick makes sense.
 
-You hand-write a **Llama 3.2-style** next-token stack—tokenize → embed → blocks×N → LM head (**dense decoder**). Later chapters hang on that same spine. The official Llama files are the example’s finished pair, not a second curriculum.
+**How:** Fix the example → grow tokenizer/embed → train next-token (objective→data→optim→scale) → hand-write RMSNorm…stack → load/generate/HF align → SFT/DPO → serve → frontier primers.
 
-### 2. Why Llama 3.2 ~1B as the example
+### 1. What — the path
 
-**Headline:** learn on a **frontier dense architecture**, at a size you can actually finish.
-
-Llama 3.2 is the small open release of Meta’s **Llama 3** line—the same recipe family used in larger Llama (and echoed across Qwen-class dense stacks): **RMSNorm + RoPE + GQA + SwiGLU + byte-level BPE**. That is today’s mainstream open dense trunk, not a simplified “course-only” net. MoE / MLA and bigger engines come later as primers on top of this trunk.
-
-| Why this pick | Plain meaning |
+| Stage | Plain words |
 | --- | --- |
-| **Frontier-shaped bricks** | Same module names and contracts you meet in current open dense models and serving stacks |
-| **One family, teachable scale** | ~1B keeps V / D / depth / heads countable and HF-downloadable—architecture stays Llama 3, size is for learning |
-| **Open finished pair** | Official tokenizer + checkpoint so handwritten vs industry is a real check |
-| **Dense first** | Master the dense decoder before MoE/MLA maps; don’t start on a museum GPT-2 |
+| **0 Start** | Setup; read a chapter; run one command |
+| **1 Tables + train + bricks** | Tokenizer → embedding → **pretrain×4** → RMSNorm…stack → weights → generate → HF |
+| **2 Align** | SFT / DPO |
+| **3 Serve faster** | KV, RoPE scaling, device/quant/chat, continuous batch, paging |
+| **4 Frontier** | MoE → MLA → ckpt → shards |
 
-So: **architecture = current frontier dense; scale = ~1B so from-zero is finishable.** Not “the smartest chatbot,” and not “train 70B at home.”
+```mermaid
+flowchart LR
+  tok[tokenizer] --> emb[embedding]
+  emb --> train[pretrain_loop]
+  train --> bricks[dense_bricks]
+  bricks --> align[SFT_DPO]
+  align --> serve[serve]
+  serve --> tip[MoE_MLA]
+```
 
-### 3. Where DeepSeek fits (same path, later map)
+You hand-write a **Llama 3.2-style dense decoder**. Official Llama files are that recipe’s finished pair—not a second curriculum.
 
-When people say **DeepSeek’s frontier open stack** (V2 / V3 / R1-on-V3), they usually mean **not** “another Llama dense.” Headline:
+### 2. Why — Llama 3.2 ~1B
 
-| | **Llama 3.2 (this course’s example)** | **DeepSeek-V2 / V3 line** |
+**Frontier dense architecture, teachable scale.**
+
+Same brick set as larger Llama 3 / many Qwen-class dense stacks: **RMSNorm + RoPE + GQA + SwiGLU + byte BPE**. ~1B keeps V/D/depth/heads countable and downloadable.
+
+| Pick | Meaning |
+| --- | --- |
+| Frontier-shaped bricks | Names match current open dense + serving code |
+| Teachable scale | Finishable from zero |
+| Open finished pair | Tokenizer + checkpoint for real checks |
+| Dense first | MoE/MLA later as maps |
+
+Not “smartest chatbot,” not “train 70B at home.”
+
+### 3. Why — where DeepSeek sits
+
+| | **Llama 3.2 (example)** | **DeepSeek-V2/V3** |
 | --- | --- | --- |
-| Capacity | **Dense** FFN every layer | **MoE** — many experts, top-k active |
-| Attention / KV | **GQA** | **MLA** — latent-compressed KV |
-| Shared DNA | RMSNorm / RoPE / modern decoder shape | Same Transformer family, different upgrades |
-| In this course | Parts 1–3 hand-write and run | Part 4 primers: MoE → MLA → checkpoint map |
+| Capacity | Dense FFN | **MoE** top-k experts |
+| KV | **GQA** | **MLA** latents |
+| In-course | Parts 1–3 | Part 4 primers |
 
-**Read it as:** Llama teaches the dense trunk; DeepSeek is a major open **MoE + MLA** branch on top of that family. We do not start from DeepSeek day one—you need the dense stack first.
+Same Transformer family; different upgrades. Dense trunk first.
 
-### 4. From zero: how you “generate” this path
+### 4. How — config you will keep seeing
 
-| Step | What you do |
+Lab ([`ep01_overview.py`](https://github.com/chaxus/arche/blob/main/chapters/01-inference/ep01_overview.py)) prints [`llama32_1b()`](https://github.com/chaxus/arche/blob/main/arche/config.py):
+
+| Field | ~1B idea |
 | --- | --- |
-| **1. Fix the example** | Llama 3.2 ~1B |
-| **2. Tokenizer + embedding** | Teach-BPE + lookup table; record V, D, depth, heads |
-| **3. Next-token train** | Shift + CE + backprop—**writes** embeds and weights |
-| **4. Hand-write the bricks** | RMSNorm, RoPE, GQA, SwiGLU… then stack |
-| **5. Load Llama / generate / HF → align → serve → frontier** | One sidebar path |
+| `vocab_size` | 128256 |
+| `num_layers` | 16 |
+| `embed_dim` | 2048 |
+| `num_heads` / `num_kv_heads` | 32 / 8 (GQA) |
+| `rope_theta` | 500000 |
 
-### 5. What “good example” means
+### 5. What “good” means
 
 | Kind | Check |
 | --- | --- |
-| **Hard** | Config consistent; bricks match the claimed recipe |
+| **Hard** | Config self-consistent; bricks match the claimed recipe |
 | **Hard** | Supports from-zero: tables trainable, net stackable, weights loadable |
-| **Soft** | Docs + obtainable weights |
-| **Soft** | Room for MoE/MLA primers (DeepSeek-shaped map) |
+| **Soft** | Docs + obtainable weights; room for MoE/MLA primers |
 
 ### 6. Improve · whole-model impact
 
-Swap the example (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ full retrain. We keep 1B and use primers for larger ideas.
+Swap example (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ retrain. This course keeps 1B and uses primers for larger ideas.
 
-### 7. Industry · open models
-
-Llama / Qwen ship dense (and some MoE variants); **DeepSeek-V3** is the open flagship of **large MoE + MLA**. All ship config + checkpoint + tokenizer; engines like vLLM assume such checkpoints.
-
-### 8. This course
+### 7. This course
 
 ```bash
 python chapters/01-inference/ep01_overview.py
 ```
+
+Prints sizes—not a chatbot yet.
 
 ## Run
 
@@ -75,4 +93,4 @@ python chapters/01-inference/ep01_overview.py
 
 ## Next
 
-**Tokenizer** (`/tokenizer/`): generate the tokenizer table from zero.
+**Tokenizer** (`/tokenizer/`): grow the first table from zero.
