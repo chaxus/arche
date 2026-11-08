@@ -203,6 +203,7 @@ python chapters/01-inference/ep04_rmsnorm.py
     script: 'chapters/01-inference/ep05_rope.py',
     partId: 'trunk',
     estimatedMinutes: 15,
+    demo: 'rope',
     markdown: `## 一句话
 RoPE 旋转 Q/K，让注意力带上相对位置——不需要绝对位置表。
 
@@ -246,6 +247,7 @@ python chapters/01-inference/ep05_rope.py
     script: 'chapters/01-inference/ep06_gqa.py',
     partId: 'trunk',
     estimatedMinutes: 18,
+    demo: 'gqa',
     markdown: `## 一句话
 GQA 让多个 query 头共享 KV 头，从而减小解码时的显存/内存。
 
@@ -483,6 +485,7 @@ KV cache（下一部分）与 chat template（更后）。
     script: 'chapters/01-inference/ep12_kv_cache.py',
     partId: 'infer',
     estimatedMinutes: 15,
+    demo: 'kv',
     markdown: `## 一句话
 先对 prompt 做一次 prefill，再解码时复用已存的 K/V。
 

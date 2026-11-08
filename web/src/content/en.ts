@@ -204,6 +204,7 @@ Every LayerNorm variant in the literature.
     script: 'chapters/01-inference/ep05_rope.py',
     partId: 'trunk',
     estimatedMinutes: 15,
+    demo: 'rope',
     markdown: `## In one sentence
 RoPE rotates query/key vectors so attention “knows” relative positions—no absolute position table required.
 
@@ -247,6 +248,7 @@ Every RoPE paper variant; long-context scaling waits for ep13.
     script: 'chapters/01-inference/ep06_gqa.py',
     partId: 'trunk',
     estimatedMinutes: 18,
+    demo: 'gqa',
     markdown: `## In one sentence
 Grouped-Query Attention shares key/value heads across several query heads to shrink decode-time memory.
 
@@ -486,6 +488,7 @@ Part 2 begins: **KV cache** (\`?c=kv-cache\`).
     script: 'chapters/01-inference/ep12_kv_cache.py',
     partId: 'infer',
     estimatedMinutes: 15,
+    demo: 'kv',
     markdown: `## In one sentence
 Prefill the prompt once, then decode new tokens while reusing stored keys and values.
 

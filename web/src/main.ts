@@ -6,6 +6,8 @@ import 'ranui/select';
 import 'ranui/theme-switch';
 import { chaptersFor, type Chapter } from './content';
 import type { PartId } from './content/types';
+import { mountVisualizer, type VisualizerKind } from './features/visualizers';
+import { mountWalkthrough } from './features/walkthrough';
 import {
   LOCALES,
   localeFromUrlPath,
@@ -16,6 +18,7 @@ import {
 import { uiFor } from './i18n/ui';
 
 const PROGRESS_KEY = 'arche.chapter.done';
+const HOME_ID = 'home';
 
 const root = document.querySelector('#app');
 if (!root) {
@@ -28,7 +31,9 @@ let ui = uiFor(locale);
 let chapters = chaptersFor(locale);
 
 const params = new URLSearchParams(location.search);
-let activeChapterId = params.get('c') ?? chapters[0]?.id ?? 'start-welcome';
+const rawC = params.get('c');
+let activeChapterId = rawC && rawC !== HOME_ID ? rawC : HOME_ID;
+let showingHome = activeChapterId === HOME_ID;
 
 function homeHref(target: LocaleDef = locale): string {
   return localeHref('/', target);
@@ -36,7 +41,7 @@ function homeHref(target: LocaleDef = locale): string {
 
 function chapterUrl(id: string, target: LocaleDef = locale): string {
   const url = new URL(homeHref(target), location.origin);
-  url.searchParams.set('c', id);
+  if (id !== HOME_ID) url.searchParams.set('c', id);
   return `${url.pathname}${url.search}`;
 }
 
@@ -75,6 +80,12 @@ function progressFraction(): { done: number; total: number } {
   return { done: count, total };
 }
 
+function continueTarget(): Chapter {
+  const done = readDone();
+  const next = chapters.find((chapter) => !done.has(chapter.id));
+  return next ?? chapters[0]!;
+}
+
 function wireLocaleSelect(): void {
   const select = document.querySelector('#locale-select') as
     | (HTMLElement & { value: string })
@@ -86,7 +97,8 @@ function wireLocaleSelect(): void {
     const nextId = detail?.value ?? select.value;
     const next = LOCALES.find((item) => item.id === nextId);
     if (!next || next.id === locale.id) return;
-    location.assign(chapterUrl(activeChapterId, next));
+    const target = showingHome ? HOME_ID : activeChapterId;
+    location.assign(chapterUrl(target, next));
   });
 }
 
@@ -99,7 +111,7 @@ function renderShell(): void {
     <div class="shell">
       <header class="topbar">
         <div class="brand">
-          <a href="${homeHref()}">arche</a>
+          <a href="${chapterUrl(HOME_ID)}" id="brand-home">arche</a>
           <span>${ui.brandTagline}</span>
         </div>
         <div class="topbar-actions">
@@ -126,6 +138,10 @@ function renderShell(): void {
   document.querySelector('#repo-link')?.addEventListener('click', () => {
     window.open('https://github.com/chaxus/arche', '_blank', 'noopener,noreferrer');
   });
+  document.querySelector('#brand-home')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    selectHome();
+  });
   wireLocaleSelect();
 }
 
@@ -147,6 +163,14 @@ function renderNav(activeId: string): void {
   `;
   nav.append(progress);
 
+  const homeBtn = document.createElement('button');
+  homeBtn.type = 'button';
+  homeBtn.className = 'nav-link';
+  homeBtn.textContent = ui.homeNav;
+  if (showingHome) homeBtn.setAttribute('aria-current', 'page');
+  homeBtn.addEventListener('click', () => selectHome());
+  nav.append(homeBtn);
+
   const doneIds = readDone();
   let lastPart: PartId | null = null;
   for (const chapter of chapters) {
@@ -162,7 +186,7 @@ function renderNav(activeId: string): void {
     btn.className = 'nav-link';
     const tick = doneIds.has(chapter.id) ? '<span class="nav-done" aria-hidden="true">✓</span>' : '';
     btn.innerHTML = `${tick}<span class="nav-ep">${chapter.ep}</span>${chapter.title}`;
-    if (chapter.id === activeId) {
+    if (!showingHome && chapter.id === activeId) {
       btn.setAttribute('aria-current', 'page');
     }
     btn.addEventListener('click', () => selectChapter(chapter.id));
@@ -225,13 +249,26 @@ function runTrainDemo(host: HTMLElement): void {
 
 function mountDemo(chapter: Chapter, host: HTMLElement): void {
   if (!chapter.demo) return;
+  const vizKinds: VisualizerKind[] = ['rope', 'gqa', 'kv'];
+  if (vizKinds.includes(chapter.demo as VisualizerKind)) {
+    const card = document.createElement('div');
+    card.innerHTML = `<r-card heading="${ui.demoVizHeading}" description="ep${chapter.ep}"></r-card>`;
+    const inner = document.createElement('div');
+    inner.className = 'viz-card-body';
+    card.querySelector('r-card')?.append(inner);
+    host.hidden = false;
+    host.replaceChildren(card);
+    mountVisualizer(inner, chapter.demo as VisualizerKind, locale.id);
+    return;
+  }
+
   host.hidden = false;
-  const hints: Record<NonNullable<Chapter['demo']>, string> = {
+  const hints: Record<string, string> = {
     chat: ui.demoChatHint,
     batch: ui.demoBatchHint,
     train: ui.demoTrainHint,
   };
-  const labels: Record<NonNullable<Chapter['demo']>, string> = {
+  const labels: Record<string, string> = {
     chat: ui.demoChatRun,
     batch: ui.demoBatchRun,
     train: ui.demoTrainRun,
@@ -260,6 +297,67 @@ function neighborIds(chapterId: string): { prev?: Chapter; next?: Chapter } {
   };
 }
 
+function renderHome(): void {
+  const article = document.querySelector('#article') as HTMLElement;
+  const target = continueTarget();
+  const done = readDone();
+  const { done: doneCount, total } = progressFraction();
+  const hasProgress = doneCount > 0;
+  const continueText = hasProgress
+    ? `${ui.continueLabel}: ${target.title}`
+    : ui.continueStart;
+
+  const partBlocks: string[] = [];
+  let current: PartId | null = null;
+  let buffer: Chapter[] = [];
+  const flush = () => {
+    if (!current || buffer.length === 0) return;
+    const read = buffer.filter((c) => done.has(c.id)).length;
+    const mins = buffer.reduce((sum, c) => sum + c.estimatedMinutes, 0);
+    partBlocks.push(`
+      <div class="home-part">
+        <div class="home-part-head">
+          <strong>${ui.partLabels[current]}</strong>
+          <span>${read}/${buffer.length} ${ui.homeDoneLabel} · ~${mins} ${ui.minutesLabel}</span>
+        </div>
+        <button type="button" class="home-part-go" data-id="${buffer[0]!.id}">${buffer[0]!.title}</button>
+      </div>
+    `);
+  };
+  for (const chapter of chapters) {
+    if (chapter.partId !== current) {
+      flush();
+      current = chapter.partId;
+      buffer = [chapter];
+    } else {
+      buffer.push(chapter);
+    }
+  }
+  flush();
+
+  article.innerHTML = `
+    <p class="part-eyebrow">${ui.homeNav}</p>
+    <h1>${ui.homeTitle}</h1>
+    <p class="lede">${ui.homeLede}</p>
+    <div class="home-continue">
+      <r-button type="primary" id="continue-btn">${continueText}</r-button>
+      <span class="home-progress-meta">${doneCount}/${total}</span>
+    </div>
+    <h2 class="home-parts-title">${ui.homePartsHeading}</h2>
+    <div class="home-parts">${partBlocks.join('')}</div>
+  `;
+
+  document.querySelector('#continue-btn')?.addEventListener('click', () => {
+    selectChapter(target.id);
+  });
+  article.querySelectorAll('.home-part-go').forEach((node) => {
+    node.addEventListener('click', () => {
+      const id = (node as HTMLElement).dataset.id;
+      if (id) selectChapter(id);
+    });
+  });
+}
+
 function renderArticle(chapter: Chapter): void {
   const article = document.querySelector('#article') as HTMLElement;
   const done = readDone().has(chapter.id);
@@ -282,6 +380,7 @@ function renderArticle(chapter: Chapter): void {
       <div class="panel" id="md-host"></div>
     </r-card>
     <div class="demo-wrap" id="demo-host" hidden></div>
+    <div class="wt-wrap" id="wt-host" hidden></div>
     <div class="math-wrap" id="math-host" hidden></div>
     <div class="chapter-nav">
       <r-button id="prev-chapter" type="text" ${prev ? '' : 'disabled'}>${ui.prevChapter}${
@@ -313,6 +412,9 @@ function renderArticle(chapter: Chapter): void {
   const demoHost = document.querySelector('#demo-host') as HTMLElement | null;
   if (demoHost) mountDemo(chapter, demoHost);
 
+  const wtHost = document.querySelector('#wt-host') as HTMLElement | null;
+  if (wtHost) mountWalkthrough(wtHost, chapter.id, locale.id, ui.walkthroughHeading);
+
   document.querySelector('#mark-done')?.addEventListener('click', () => {
     markDone(chapter.id);
     renderNav(chapter.id);
@@ -334,9 +436,25 @@ function applyDocumentLang(): void {
       : 'arche — modern dense from first principles';
 }
 
+function selectHome(): void {
+  showingHome = true;
+  activeChapterId = HOME_ID;
+  const url = new URL(chapterUrl(HOME_ID), location.origin);
+  history.replaceState(null, '', `${url.pathname}${url.search}`);
+  params.delete('c');
+  renderNav(HOME_ID);
+  renderHome();
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+
 function selectChapter(id: string): void {
+  if (id === HOME_ID) {
+    selectHome();
+    return;
+  }
   const chapter = chapters.find((item) => item.id === id) ?? chapters[0];
   if (!chapter) return;
+  showingHome = false;
   activeChapterId = chapter.id;
   const url = new URL(chapterUrl(chapter.id), location.origin);
   history.replaceState(null, '', `${url.pathname}${url.search}`);
@@ -348,4 +466,8 @@ function selectChapter(id: string): void {
 
 applyDocumentLang();
 renderShell();
-selectChapter(activeChapterId);
+if (showingHome || !chapters.some((c) => c.id === activeChapterId)) {
+  selectHome();
+} else {
+  selectChapter(activeChapterId);
+}

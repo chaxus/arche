@@ -17,12 +17,21 @@ export type UiCopy = {
   demoBatchRun: string;
   demoTrainHint: string;
   demoTrainRun: string;
+  demoVizHeading: string;
+  walkthroughHeading: string;
   markDone: string;
   markedDone: string;
   prevChapter: string;
   nextChapter: string;
   minutesLabel: string;
   partLabels: Record<PartId, string>;
+  homeNav: string;
+  homeTitle: string;
+  homeLede: string;
+  continueLabel: string;
+  continueStart: string;
+  homePartsHeading: string;
+  homeDoneLabel: string;
 };
 
 const EN: UiCopy = {
@@ -41,6 +50,8 @@ const EN: UiCopy = {
   demoBatchRun: 'Run scheduler',
   demoTrainHint: 'Toy pretrain then SFT/DPO: loss numbers are illustrative, not a real training run.',
   demoTrainRun: 'Simulate steps',
+  demoVizHeading: 'Interactive picture',
+  walkthroughHeading: 'In the source',
   markDone: 'Mark as read',
   markedDone: 'Read',
   prevChapter: 'Previous',
@@ -53,6 +64,14 @@ const EN: UiCopy = {
     train: 'Part 3 — Tiny training',
     frontier: 'Part 4 — Frontier primers',
   },
+  homeNav: 'Home',
+  homeTitle: 'Learn a modern dense LLM by writing it',
+  homeLede:
+    'Absolute beginners start in Part 0. Returners jump back with Continue. No quizzes — read, run, and use the pictures.',
+  continueLabel: 'Continue',
+  continueStart: 'Start Part 0',
+  homePartsHeading: 'Path',
+  homeDoneLabel: 'read',
 };
 
 const CN: UiCopy = {
@@ -71,6 +90,8 @@ const CN: UiCopy = {
   demoBatchRun: '跑调度器',
   demoTrainHint: '玩具 pretrain → SFT/DPO：数字仅示意，不是真实训练。',
   demoTrainRun: '模拟几步',
+  demoVizHeading: '互动示意',
+  walkthroughHeading: '源码对照',
   markDone: '标记已读',
   markedDone: '已读',
   prevChapter: '上一章',
@@ -83,6 +104,13 @@ const CN: UiCopy = {
     train: '第 3 部分 — 小规模训练',
     frontier: '第 4 部分 — 前沿引物',
   },
+  homeNav: '首页',
+  homeTitle: '用手写学会现代 dense 大模型',
+  homeLede: '零基础从第 0 部分开始；回访点「继续」。没有章末测验——读、跑、看图即可。',
+  continueLabel: '继续',
+  continueStart: '开始第 0 部分',
+  homePartsHeading: '路径',
+  homeDoneLabel: '已读',
 };
 
 export const uiFor = (locale: LocaleDef): UiCopy => (locale.id === 'cn' ? CN : EN);

@@ -4,7 +4,7 @@
 
 Hand-write a **modern dense** decoder (Llama 3.2 lineage) in PyTorch, then the frontier add-ons that matter next: **KV cache**, **RoPE scaling**, **MoE**, **MLA**, plus inference engineering and tiny **pretrain / SFT / DPO** loops. Load open weights. No GPT-2 archaeology.
 
-**New to programming?** Start on the learning site at **Part 0 — Start here** (no Python assumed): [arche.chaxus.com](https://arche.chaxus.com) → first nav section, or `?c=start-welcome`. Then run `python chapters/00-start/ep00_check_setup.py`.
+**New to programming?** Open [arche.chaxus.com](https://arche.chaxus.com) (home → **Continue** / Part 0). No Python assumed. Interactive pictures cover RoPE / GQA / KV cache; then run `python chapters/00-start/ep00_check_setup.py`.
 
 - Architecture target: **Llama 3.2 1B** (same family as 3B), plus MoE / MLA primers
 - Pedagogy: Part 0 onboarding + one runnable chapter per module (EN / 中文)
