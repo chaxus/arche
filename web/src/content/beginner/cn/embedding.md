@@ -1,6 +1,15 @@
 ## 要点
 
-`TokenEmbedding`：id → 向量 `(vocab, dim)`。这里不加绝对位置表——位置靠后面的 **RoPE**。Llama 3.2 与 LM head 绑权。
+token id 还只是整数。模型要能做乘法，需要每个 id 对应一串数字——**向量**。
+
+**嵌入（embedding）**就是一张查找表，形状 `(词表大小, 维度)`：第 `i` 行是 id `i` 的向量。前向一次 = 按 id 把行取出来。这里还不「理解」语义，只是符号到几何的第一层可学习映射。
+
+Llama 3.2 风格里两点要记住：
+
+- **不加**单独的绝对位置向量表；**位置后面用 RoPE** 加在 Q/K 上。
+- 这张表常常和最后的 LM head **绑权**（同一套权重：id→向量，向量→词表分数）。
+
+实验用很小的假词表，免下载权重；形状和真模型一样：`(batch, seq) → (batch, seq, dim)`。
 
 ## 动手
 
@@ -8,6 +17,8 @@
 python chapters/01-inference/ep03_embedding.py
 ```
 
+预期：打印 ids / 输出形状，并提醒位置交给 RoPE。
+
 ## 下一章
 
-**RMSNorm**（`?c=rmsnorm`）。
+**RMSNorm**（`?c=rmsnorm`）：进重层前先稳住向量尺度。
