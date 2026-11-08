@@ -720,13 +720,35 @@ Part 3: **Pretrain** (\`?c=pretrain\`).
     partId: 'train',
     estimatedMinutes: 15,
     demo: 'train',
-    markdown: `## From forward to learning
+    markdown: `## In one sentence
+A tiny AdamW loop teaches next-token prediction on toy batches.
 
-Causal LM loss: predict token \`t+1\` from positions \`0..T-1\`. A few AdamW steps on random ids are enough to feel the training API.
+## Before you start
+- You can run scripts; Part 1 stack idea helps. Time: ~15 minutes.
 
+## The idea (plain language)
+**Pretraining** here means: show random token ids, ask the model to predict the next id, measure cross-entropy, take an optimizer step.
+We use toy sizes so you feel the API—not internet-scale training.
+
+## In the code
+- \`arche/train/pretrain.py\`
+- \`chapters/02-training/ep18_pretrain.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/02-training/ep18_pretrain.py
 \`\`\`
+Watch loss print a short history.
+
+## If something breaks
+- Loss not decreasing on random data → try the test’s repeated-batch idea; demos may wiggle.
+
+## Don't worry about yet
+Data pipelines, distributed training, or learning-rate science.
+
+## Next
+**SFT · DPO** (\`?c=sft-dpo\`).
+
 `,
   },
   {
@@ -738,13 +760,34 @@ python chapters/02-training/ep18_pretrain.py
     partId: 'train',
     estimatedMinutes: 18,
     demo: 'train',
-    markdown: `## Aligning after pretrain
+    markdown: `## In one sentence
+SFT supervises only the answer span; DPO nudges preferred replies over rejected ones.
 
-**SFT** supervises only the response span. **DPO** compares chosen vs rejected log-prob ratios against a frozen reference (Rafailov et al.).
+## Before you start
+- Pretrain chapter. Time: ~18 minutes.
 
+## The idea (plain language)
+**SFT** masks the prompt tokens so loss focuses on the response.
+**DPO** compares chosen vs rejected sequences against a frozen reference model (Rafailov et al.)—one educational step is enough to see the API.
+
+## In the code
+- \`arche/train/sft.py\`, \`arche/train/dpo.py\`
+- \`chapters/02-training/ep19_sft_dpo.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/02-training/ep19_sft_dpo.py
 \`\`\`
+
+## If something breaks
+- Prompt lengths longer than sequences → keep demo tensors.
+
+## Don't worry about yet
+Full RLHF stacks or preference data collection.
+
+## Next
+**Frontier checkpoints** (\`?c=frontier-ckpt\`).
+
 `,
   },
   {
@@ -755,15 +798,34 @@ python chapters/02-training/ep19_sft_dpo.py
     script: 'chapters/02-training/ep20_frontier_ckpt.py',
     partId: 'frontier',
     estimatedMinutes: 15,
-    markdown: `## Wiring the primers
+    markdown: `## In one sentence
+Save/load MoE and MLA modules and map Mixtral-style expert keys into arche.
 
-Save/load MoE and MLA modules with \`save_checkpoint\` / \`load_checkpoint\`. Map Mixtral \`w1/w2/w3\` expert keys into \`MoESwiGLU\`.
+## Before you start
+- MoE + MLA primers. Time: ~15 minutes.
 
-Sharded Mixtral / DeepSeek layouts continue in ep22.
+## The idea (plain language)
+Frontier pieces need checkpoints too. We round-trip state dicts and translate Mixtral \`w1/w2/w3\` names into our SwiGLU experts.
+Sharded indexes continue in the next chapter.
 
+## In the code
+- \`arche/checkpoint.py\`, \`load_mixtral.py\`
+- \`chapters/02-training/ep20_frontier_ckpt.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/02-training/ep20_frontier_ckpt.py
 \`\`\`
+
+## If something breaks
+- Missing expert keys → ensure the synthetic HF-like dict includes gate + all experts.
+
+## Don't worry about yet
+Downloading full Mixtral 8x7B.
+
+## Next
+**HF logits alignment** (\`?c=hf-align\`).
+
 `,
   },
   {
@@ -774,17 +836,38 @@ python chapters/02-training/ep20_frontier_ckpt.py
     script: 'chapters/01-inference/ep21_hf_align.py',
     partId: 'frontier',
     estimatedMinutes: 20,
-    markdown: `## Prove the hand-written graph
+    markdown: `## In one sentence
+Prove the hand-written graph matches Hugging Face Llama 3.2 logits on a short prompt when weights are available.
 
-\`compare_logits_to_hf\` loads Meta's gated 1B weights into both stacks and checks argmax + max-abs drift.
+## Before you start
+- Weights + generate chapters. Time: ~20 minutes.
+- Needs gated weights / login.
 
-Without login / cache the chapter exits cleanly; CI keeps the synthetic bit-exact mapping test.
+## The idea (plain language)
+Same weights + same math should agree on argmax and stay within a small max-abs drift.
+If weights are offline, the chapter exits cleanly; CI still checks synthetic bit-exact mapping.
 
+## In the code
+- \`arche/align_hf.py\`
+- \`chapters/01-inference/ep21_hf_align.py\`
+- \`tests/test_align_hf.py\`
+
+## Do this now
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep21_hf_align.py
 # or: ARCH_HF_ALIGN=1 pytest tests/test_align_hf.py -q
 \`\`\`
+
+## If something breaks
+- Skipped/unreachable → finish HF setup; synthetic test still validates the mapper.
+
+## Don't worry about yet
+Bitwise identity across every kernel and dtype.
+
+## Next
+**Sharded MoE / MLA** (\`?c=sharded-frontier\`).
+
 `,
   },
   {
@@ -795,13 +878,33 @@ python chapters/01-inference/ep21_hf_align.py
     script: 'chapters/02-training/ep22_sharded_frontier.py',
     partId: 'frontier',
     estimatedMinutes: 15,
-    markdown: `## Same shape as HF indexes
+    markdown: `## In one sentence
+Write \`index.json\` + shard files, then reload Mixtral-shaped MoE and DeepSeek-shaped MLA with allclose checks.
 
-Write synthetic Mixtral / DeepSeek shards, then reload into \`MoESwiGLU\` and \`MultiHeadLatentAttention\` with allclose checks.
+## Before you start
+- Frontier checkpoint chapter. Time: ~15 minutes.
 
+## The idea (plain language)
+Real HF repos split tensors across files listed by an index. We practice the same shape with synthetic \`.pt\` shards—no multi-gig download required.
+
+## In the code
+- \`arche/shards.py\`, \`load_mixtral.py\`, \`load_deepseek_mla.py\`
+- \`chapters/02-training/ep22_sharded_frontier.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/02-training/ep22_sharded_frontier.py
 \`\`\`
+
+## If something breaks
+- Temp directory permissions → run from a normal user workspace.
+
+## Don't worry about yet
+Safetensors mmap edge cases in every host.
+
+## Next
+**Paged KV · CUDA graphs** (\`?c=paged-cuda-graph\`).
+
 `,
   },
   {
@@ -812,15 +915,34 @@ python chapters/02-training/ep22_sharded_frontier.py
     script: 'chapters/01-inference/ep23_paged_cuda_graph.py',
     partId: 'frontier',
     estimatedMinutes: 18,
-    markdown: `## Toward production decode
+    markdown: `## In one sentence
+Store KV in fixed pages (block table) and capture a fixed-shape CUDA graph step when CUDA exists.
 
-**Paged KV** stores tokens in fixed pages and gathers a contiguous cache for SDPA.
+## Before you start
+- Continuous batching + KV cache. Time: ~18 minutes.
 
-**CUDA graphs** capture a fixed-shape module step; Llama decode stays eager until KV writes are in-place (pages), which is what engines graph next.
+## The idea (plain language)
+**Paged KV** allocates pages and gathers a contiguous cache for attention—vLLM-style teaching model.
+**CUDA graphs** capture fixed-shape module compute; Llama decode stays eager until KV writes are in-place (pages), which engines graph next.
 
+## In the code
+- \`arche/paged_kv.py\`, \`cuda_graphs.py\`
+- \`chapters/01-inference/ep23_paged_cuda_graph.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep23_paged_cuda_graph.py
 \`\`\`
+
+## If something breaks
+- No CUDA → graph demo skips; paged KV still runs on CPU.
+
+## Don't worry about yet
+Shipping a full vLLM replacement—this course ends by naming the production pieces.
+
+## Next
+You finished the path. Revisit weak chapters, or run real HF alignment if you have weights.
+
 `,
   },
 ];

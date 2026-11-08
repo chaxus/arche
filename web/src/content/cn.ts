@@ -716,13 +716,34 @@ CUDA graph 与 paged 融合（ep23）。
     partId: 'train',
     estimatedMinutes: 15,
     demo: 'train',
-    markdown: `## 从前向到学习
+    markdown: `## 一句话
+用很小的 AdamW 循环，在玩具 batch 上做 next-token 预测。
 
-因果 LM 损失：用位置 \`0..T-1\` 预测 \`t+1\`。随机 id 上跑几步 AdamW，就能摸到训练 API。
+## 开始之前
+- 会跑脚本；有第 1 部分堆叠概念更好。约 15 分钟。
 
+## 用人话讲
+这里的**预训练**：给随机 token id，让模型预测下一个，算交叉熵，再优化一步。
+尺寸故意很小——体会 API，不是训练全网。
+
+## 对应代码
+- \`arche/train/pretrain.py\`
+- \`chapters/02-training/ep18_pretrain.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/02-training/ep18_pretrain.py
 \`\`\`
+
+## 如果翻车了
+- 损失乱跳：玩具数据会抖；测试里用重复 batch 更稳。
+
+## 先别深挖
+数据管线、分布式、学习率玄学。
+
+## 下一章
+**SFT · DPO**（\`?c=sft-dpo\`）。
+
 `,
   },
   {
@@ -734,13 +755,34 @@ python chapters/02-training/ep18_pretrain.py
     partId: 'train',
     estimatedMinutes: 18,
     demo: 'train',
-    markdown: `## 预训练之后的对齐
+    markdown: `## 一句话
+SFT 只监督回答段；DPO 让模型更偏好「更好」的回复。
 
-**SFT** 只监督回复段。**DPO** 用冻结的 reference，比较 chosen / rejected 的 log-prob 比（Rafailov 等）。
+## 开始之前
+- 预训练章。约 18 分钟。
 
+## 用人话讲
+**SFT** 掩掉 prompt，损失盯着回复。
+**DPO** 在冻结 reference 下比较 chosen / rejected（Rafailov 等）——一步教学更新即可。
+
+## 对应代码
+- \`arche/train/sft.py\`、\`dpo.py\`
+- \`chapters/02-training/ep19_sft_dpo.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/02-training/ep19_sft_dpo.py
 \`\`\`
+
+## 如果翻车了
+- prompt 长度超过序列：保持 demo 张量。
+
+## 先别深挖
+完整 RLHF 与偏好数据工程。
+
+## 下一章
+**前沿检查点**（\`?c=frontier-ckpt\`）。
+
 `,
   },
   {
@@ -751,15 +793,34 @@ python chapters/02-training/ep19_sft_dpo.py
     script: 'chapters/02-training/ep20_frontier_ckpt.py',
     partId: 'frontier',
     estimatedMinutes: 15,
-    markdown: `## 把引物接上权重
+    markdown: `## 一句话
+存取 MoE/MLA，并把 Mixtral 风格专家 key 映射进 arche。
 
-用 \`save_checkpoint\` / \`load_checkpoint\` 存取 MoE 与 MLA。把 Mixtral 的 \`w1/w2/w3\` expert key 映射进 \`MoESwiGLU\`。
+## 开始之前
+- MoE + MLA。约 15 分钟。
 
-分片版 Mixtral / DeepSeek 布局见 ep22。
+## 用人话讲
+前沿零件也要会存盘。我们做 state dict 往返，并把 Mixtral 的 \`w1/w2/w3\` 翻成我们的专家名。
+分片 index 下一章继续。
 
+## 对应代码
+- \`arche/checkpoint.py\`、\`load_mixtral.py\`
+- \`chapters/02-training/ep20_frontier_ckpt.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/02-training/ep20_frontier_ckpt.py
 \`\`\`
+
+## 如果翻车了
+- 缺专家 key：合成 dict 要含 gate 与全部专家。
+
+## 先别深挖
+下载完整 Mixtral 8x7B。
+
+## 下一章
+**HF logits 对齐**（\`?c=hf-align\`）。
+
 `,
   },
   {
@@ -770,17 +831,36 @@ python chapters/02-training/ep20_frontier_ckpt.py
     script: 'chapters/01-inference/ep21_hf_align.py',
     partId: 'frontier',
     estimatedMinutes: 20,
-    markdown: `## 验证手写计算图
+    markdown: `## 一句话
+有权重时，验证手写图与 Hugging Face Llama 3.2 在短 prompt 上 logits 对齐。
 
-\`compare_logits_to_hf\` 把门禁 1B 权重载入两边，检查 argmax 与 max-abs 漂移。
+## 开始之前
+- 权重与生成章。约 20 分钟。
+- 需要门禁权重/登录。
 
-无登录 / 无缓存时章节会干净退出；CI 仍跑合成权重的 bit-exact 映射测试。
+## 用人话讲
+同一权重、同一数学：argmax 应一致，max-abs 漂移应很小。
+无权重时章节干净退出；CI 仍测合成映射 bit-exact。
 
+## 对应代码
+- \`arche/align_hf.py\`
+- \`chapters/01-inference/ep21_hf_align.py\`
+
+## 现在就做
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep21_hf_align.py
-# 或：ARCH_HF_ALIGN=1 pytest tests/test_align_hf.py -q
 \`\`\`
+
+## 如果翻车了
+- 不可达：先完成 HF 设置；合成测试仍验证映射器。
+
+## 先别深挖
+所有 kernel/dtype 的逐比特一致。
+
+## 下一章
+**分片 MoE / MLA**（\`?c=sharded-frontier\`）。
+
 `,
   },
   {
@@ -791,13 +871,33 @@ python chapters/01-inference/ep21_hf_align.py
     script: 'chapters/02-training/ep22_sharded_frontier.py',
     partId: 'frontier',
     estimatedMinutes: 15,
-    markdown: `## 与 HF index 同形
+    markdown: `## 一句话
+写出 index.json + 分片，再装回 Mixtral 形 MoE 与 DeepSeek 形 MLA，并用 allclose 检查。
 
-写出合成 Mixtral / DeepSeek 分片，再装回 \`MoESwiGLU\` 与 \`MultiHeadLatentAttention\`，用 allclose 校验。
+## 开始之前
+- 前沿检查点章。约 15 分钟。
 
+## 用人话讲
+真实 HF 仓库用 index 列出分片。我们用合成 \`.pt\` 练习同形布局——不必下好几 GB。
+
+## 对应代码
+- \`arche/shards.py\`、\`load_mixtral.py\`、\`load_deepseek_mla.py\`
+- \`chapters/02-training/ep22_sharded_frontier.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/02-training/ep22_sharded_frontier.py
 \`\`\`
+
+## 如果翻车了
+- 临时目录权限：在普通用户目录运行。
+
+## 先别深挖
+各种宿主上的 safetensors 细节。
+
+## 下一章
+**Paged KV · CUDA Graph**（\`?c=paged-cuda-graph\`）。
+
 `,
   },
   {
@@ -808,15 +908,34 @@ python chapters/02-training/ep22_sharded_frontier.py
     script: 'chapters/01-inference/ep23_paged_cuda_graph.py',
     partId: 'frontier',
     estimatedMinutes: 18,
-    markdown: `## 走向生产解码
+    markdown: `## 一句话
+用块表把 KV 放进固定 page；在 CUDA 上演示固定 shape 的 graph 捕获。
 
-**Paged KV** 把 token 放进固定 page，再 gather 成连续 cache 给 SDPA。
+## 开始之前
+- 连续批处理与 KV cache。约 18 分钟。
 
-**CUDA graphs** 捕获固定 shape 的模块步进；在 KV 变成页内原地写之前，Llama 解码仍走 eager——这也是引擎下一步会 graph 的部分。
+## 用人话讲
+**Paged KV** 分配 page，再 gather 成连续 cache——教学版 vLLM 思路。
+**CUDA graphs** 捕获固定 shape 计算；在 KV 变成页内原地写之前，Llama 解码仍 eager。
 
+## 对应代码
+- \`arche/paged_kv.py\`、\`cuda_graphs.py\`
+- \`chapters/01-inference/ep23_paged_cuda_graph.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep23_paged_cuda_graph.py
 \`\`\`
+
+## 如果翻车了
+- 无 CUDA：跳过 graph；paged KV 仍可在 CPU 跑。
+
+## 先别深挖
+重写整个 vLLM——课程到这里是为了叫出生产零件的名字。
+
+## 下一章
+路径走完了。可回看薄弱章，或在有权重时跑真正的 HF 对齐。
+
 `,
   },
 ];
