@@ -348,10 +348,61 @@ python chapters/02-training/ep19_sft_dpo.py
 
 用 \`save_checkpoint\` / \`load_checkpoint\` 存取 MoE 与 MLA。把 Mixtral 的 \`w1/w2/w3\` expert key 映射进 \`MoESwiGLU\`。
 
-完整 DeepSeek/Mixtral 生产加载器还要分片布局与内核——本章先钉死教学接口。
+分片版 Mixtral / DeepSeek 布局见 ep22。
 
 \`\`\`bash
 python chapters/02-training/ep20_frontier_ckpt.py
+\`\`\`
+`,
+  },
+  {
+    id: 'hf-align',
+    ep: '21',
+    title: 'HF logits 对齐',
+    summary: '在短 prompt 上对比 arche 与 Hugging Face Llama 3.2。',
+    script: 'chapters/01-inference/ep21_hf_align.py',
+    markdown: `## 验证手写计算图
+
+\`compare_logits_to_hf\` 把门禁 1B 权重载入两边，检查 argmax 与 max-abs 漂移。
+
+无登录 / 无缓存时章节会干净退出；CI 仍跑合成权重的 bit-exact 映射测试。
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep21_hf_align.py
+# 或：ARCH_HF_ALIGN=1 pytest tests/test_align_hf.py -q
+\`\`\`
+`,
+  },
+  {
+    id: 'sharded-frontier',
+    ep: '22',
+    title: '分片 MoE / MLA',
+    summary: 'index.json + 分片文件装进 Mixtral MoE 与 DeepSeek MLA。',
+    script: 'chapters/02-training/ep22_sharded_frontier.py',
+    markdown: `## 与 HF index 同形
+
+写出合成 Mixtral / DeepSeek 分片，再装回 \`MoESwiGLU\` 与 \`MultiHeadLatentAttention\`，用 allclose 校验。
+
+\`\`\`bash
+python chapters/02-training/ep22_sharded_frontier.py
+\`\`\`
+`,
+  },
+  {
+    id: 'paged-cuda-graph',
+    ep: '23',
+    title: 'Paged KV · CUDA Graph',
+    summary: '块表 KV 池 + 固定 shape 的 CUDA graph 捕获。',
+    script: 'chapters/01-inference/ep23_paged_cuda_graph.py',
+    markdown: `## 走向生产解码
+
+**Paged KV** 把 token 放进固定 page，再 gather 成连续 cache 给 SDPA。
+
+**CUDA graphs** 捕获固定 shape 的模块步进；在 KV 变成页内原地写之前，Llama 解码仍走 eager——这也是引擎下一步会 graph 的部分。
+
+\`\`\`bash
+python chapters/01-inference/ep23_paged_cuda_graph.py
 \`\`\`
 `,
   },

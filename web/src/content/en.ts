@@ -348,10 +348,61 @@ python chapters/02-training/ep19_sft_dpo.py
 
 Save/load MoE and MLA modules with \`save_checkpoint\` / \`load_checkpoint\`. Map Mixtral \`w1/w2/w3\` expert keys into \`MoESwiGLU\`.
 
-Full DeepSeek/Mixtral production loaders still need shard layouts and kernels — this chapter locks the teaching interfaces.
+Sharded Mixtral / DeepSeek layouts continue in ep22.
 
 \`\`\`bash
 python chapters/02-training/ep20_frontier_ckpt.py
+\`\`\`
+`,
+  },
+  {
+    id: 'hf-align',
+    ep: '21',
+    title: 'HF logits alignment',
+    summary: 'Compare arche vs Hugging Face Llama 3.2 on a short prompt.',
+    script: 'chapters/01-inference/ep21_hf_align.py',
+    markdown: `## Prove the hand-written graph
+
+\`compare_logits_to_hf\` loads Meta's gated 1B weights into both stacks and checks argmax + max-abs drift.
+
+Without login / cache the chapter exits cleanly; CI keeps the synthetic bit-exact mapping test.
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep21_hf_align.py
+# or: ARCH_HF_ALIGN=1 pytest tests/test_align_hf.py -q
+\`\`\`
+`,
+  },
+  {
+    id: 'sharded-frontier',
+    ep: '22',
+    title: 'Sharded MoE / MLA',
+    summary: 'index.json + shard files into Mixtral MoE and DeepSeek MLA.',
+    script: 'chapters/02-training/ep22_sharded_frontier.py',
+    markdown: `## Same shape as HF indexes
+
+Write synthetic Mixtral / DeepSeek shards, then reload into \`MoESwiGLU\` and \`MultiHeadLatentAttention\` with allclose checks.
+
+\`\`\`bash
+python chapters/02-training/ep22_sharded_frontier.py
+\`\`\`
+`,
+  },
+  {
+    id: 'paged-cuda-graph',
+    ep: '23',
+    title: 'Paged KV · CUDA graphs',
+    summary: 'Block-table KV pool plus fixed-shape CUDA graph capture.',
+    script: 'chapters/01-inference/ep23_paged_cuda_graph.py',
+    markdown: `## Toward production decode
+
+**Paged KV** stores tokens in fixed pages and gathers a contiguous cache for SDPA.
+
+**CUDA graphs** capture a fixed-shape module step; Llama decode stays eager until KV writes are in-place (pages), which is what engines graph next.
+
+\`\`\`bash
+python chapters/01-inference/ep23_paged_cuda_graph.py
 \`\`\`
 `,
   },

@@ -50,6 +50,9 @@ python chapters/01-inference/ep17_continuous_batching.py
 python chapters/02-training/ep18_pretrain.py
 python chapters/02-training/ep19_sft_dpo.py
 python chapters/02-training/ep20_frontier_ckpt.py
+python chapters/01-inference/ep21_hf_align.py
+python chapters/02-training/ep22_sharded_frontier.py
+python chapters/01-inference/ep23_paged_cuda_graph.py
 ```
 
 Tokenizer / weights / generation need the official Llama 3.2 artifacts (Hugging Face gated). After you accept the license:
@@ -59,6 +62,7 @@ huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 python chapters/01-inference/ep10_load_weights.py
 python chapters/01-inference/ep11_generate.py
+python chapters/01-inference/ep21_hf_align.py
 ```
 
 Optional HF logits alignment (skipped in CI without weights):
@@ -108,6 +112,13 @@ cd web && npm run build
 npx wrangler pages deploy dist --project-name=arche --branch=main
 ```
 
+Automatic deploy on `main` (workflow `.github/workflows/deploy-pages.yml`) needs repo secrets:
+
+- `CLOUDFLARE_API_TOKEN` — Pages edit permission
+- `CLOUDFLARE_ACCOUNT_ID` — from `wrangler whoami`
+
+Without those secrets the deploy job is skipped; CI tests still run.
+
 ## Curriculum
 
 | # | Topic | Script |
@@ -132,6 +143,9 @@ npx wrangler pages deploy dist --project-name=arche --branch=main
 | 18 | Pretrain toy loop | [ep18](chapters/02-training/ep18_pretrain.py) |
 | 19 | SFT · DPO | [ep19](chapters/02-training/ep19_sft_dpo.py) |
 | 20 | Frontier MoE/MLA checkpoints | [ep20](chapters/02-training/ep20_frontier_ckpt.py) |
+| 21 | HF logits alignment | [ep21](chapters/01-inference/ep21_hf_align.py) |
+| 22 | Sharded Mixtral / DeepSeek MLA | [ep22](chapters/02-training/ep22_sharded_frontier.py) |
+| 23 | Paged KV · CUDA graphs | [ep23](chapters/01-inference/ep23_paged_cuda_graph.py) |
 
 Library code lives under [`arche/`](arche/).
 
