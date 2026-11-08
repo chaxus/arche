@@ -38,12 +38,13 @@ def main() -> None:
     )
     block = TransformerBlock(cfg)
     x = torch.randn(1, 5, cfg.embed_dim)
-    y = block(x)
+    y, cache = block(x)
 
     print("TransformerBlock")
     print("  flow: x → RMSNorm → Attn → +x → RMSNorm → SwiGLU → +x")
     print(f"  input  shape = {tuple(x.shape)}")
     print(f"  output shape = {tuple(y.shape)}")
+    print(f"  cache seq    = {cache.seq_len}")
     print(f"  residual preserves shape so blocks can stack ({base.num_layers}× in Llama 3.2 1B)")
 
 

@@ -21,4 +21,6 @@ def test_block_preserves_shape():
     )
     block = TransformerBlock(cfg)
     x = torch.randn(1, 6, 64)
-    assert block(x).shape == x.shape
+    out, cache = block(x)
+    assert out.shape == x.shape
+    assert cache.seq_len == 6

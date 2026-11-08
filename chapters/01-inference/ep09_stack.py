@@ -39,7 +39,7 @@ def main() -> None:
     )
     model = Llama(cfg)
     ids = torch.randint(0, cfg.vocab_size, (1, 6))
-    logits = model(ids)
+    logits, caches = model(ids)
 
     n_params = sum(p.numel() for p in model.parameters())
     print("Llama stack")
@@ -47,6 +47,7 @@ def main() -> None:
     print(f"  this demo      = {cfg.num_layers} layers, dim {cfg.embed_dim}")
     print(f"  input_ids      = {tuple(ids.shape)}")
     print(f"  logits         = {tuple(logits.shape)}  # (batch, seq, vocab)")
+    print(f"  caches         = {len(caches)} layers, seq={caches[0].seq_len}")
     print(f"  tied embed/lm  = {model.lm_head.weight is model.embed_tokens.weight}")
     print(f"  parameters     = {n_params:,}")
     print()

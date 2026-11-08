@@ -26,8 +26,9 @@ def test_llama_logits_shape_and_tying():
     cfg = _tiny_cfg()
     model = Llama(cfg)
     ids = torch.randint(0, cfg.vocab_size, (2, 5))
-    logits = model(ids)
+    logits, caches = model(ids)
     assert logits.shape == (2, 5, cfg.vocab_size)
+    assert len(caches) == cfg.num_layers
     assert model.lm_head.weight is model.embed_tokens.weight
 
 

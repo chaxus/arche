@@ -44,20 +44,14 @@ def test_generate_respects_eos():
     )
     model = Llama(cfg)
 
-    # Force the next-token distribution via a hook on lm_head output by
-    # replacing forward temporarily — simpler: monkeypatch model forward.
-    calls = {"n": 0}
-
-    def fake_forward(input_ids: torch.Tensor) -> torch.Tensor:
+    def fake_forward(input_ids: torch.Tensor, caches=None, start_pos: int = 0):
         bsz, seq = input_ids.shape
         logits = torch.zeros(bsz, seq, cfg.vocab_size)
-        # Always prefer eos id 7 at the last position.
         logits[:, -1, 7] = 10.0
-        calls["n"] += 1
-        return logits
+        return logits, caches or []
 
     model.forward = fake_forward  # type: ignore[method-assign]
     prompt = torch.tensor([[1, 2]])
-    out = generate(model, prompt, max_new_tokens=10, temperature=0.0, eos_id=7)
-    assert out.shape[1] == 3  # prompt + one eos then stop
+    out = generate(model, prompt, max_new_tokens=10, temperature=0.0, eos_id=7, use_cache=False)
+    assert out.shape[1] == 3
     assert int(out[0, -1]) == 7

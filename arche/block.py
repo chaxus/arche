@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from arche.attention import CausalSelfAttention
+from arche.cache import KVCache
 from arche.config import Llama32Config
 from arche.mlp import SwiGLU
 from arche.norms import RMSNorm
@@ -26,7 +27,13 @@ class TransformerBlock(nn.Module):
         self.post_attention_layernorm = RMSNorm(cfg.embed_dim, eps=cfg.norm_eps)
         self.mlp = SwiGLU(cfg.embed_dim, cfg.intermediate_dim)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x + self.self_attn(self.input_layernorm(x))
+    def forward(
+        self,
+        x: torch.Tensor,
+        cache: KVCache | None = None,
+        start_pos: int = 0,
+    ) -> tuple[torch.Tensor, KVCache]:
+        h, new_cache = self.self_attn(self.input_layernorm(x), cache=cache, start_pos=start_pos)
+        x = x + h
         x = x + self.mlp(self.post_attention_layernorm(x))
-        return x
+        return x, new_cache

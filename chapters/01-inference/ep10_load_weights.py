@@ -35,7 +35,7 @@ def main() -> None:
 
     ids = torch.tensor([[1, 2, 3, 4]])
     with torch.no_grad():
-        logits = model(ids)
+        logits, _ = model(ids)
     print(f"  smoke logits shape = {tuple(logits.shape)}")
     print()
     print("Next: sample tokens from these logits (ep11).")

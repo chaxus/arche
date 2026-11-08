@@ -32,7 +32,7 @@ def main() -> None:
         max_seq_len=64,
     )
     x = torch.randn(1, 4, embed_dim)
-    y = attn(x)
+    y, cache = attn(x)
 
     print("CausalSelfAttention (GQA)")
     print(f"  Llama 3.2 1B: heads={cfg.num_heads}, kv_heads={cfg.num_kv_heads}, head_dim={cfg.head_dim}")
@@ -40,6 +40,7 @@ def main() -> None:
     print(f"  n_rep (Q per KV head) = {num_heads // num_kv_heads}")
     print(f"  input  shape = {tuple(x.shape)}")
     print(f"  output shape = {tuple(y.shape)}")
+    print(f"  cache seq    = {cache.seq_len}")
     print()
     print("Why GQA: fewer KV heads → smaller KV cache at decode time, quality close to full MHA.")
 

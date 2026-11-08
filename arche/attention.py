@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from arche.cache import KVCache
 from arche.rope import apply_rotary_emb, build_rope_cache
 
 
@@ -41,32 +42,45 @@ class CausalSelfAttention(nn.Module):
         self.register_buffer("rope_cos", cos, persistent=False)
         self.register_buffer("rope_sin", sin, persistent=False)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        cache: KVCache | None = None,
+        start_pos: int = 0,
+    ) -> tuple[torch.Tensor, KVCache]:
         """Args:
-            x: ``(batch, seq, embed_dim)``
+            x: ``(batch, seq, embed_dim)`` — full prompt or a single new token
+            cache: optional past K/V
+            start_pos: absolute position of ``x[:, 0]``
         """
         bsz, seq_len, _ = x.shape
         q = self.q_proj(x).view(bsz, seq_len, self.num_heads, self.head_dim)
         k = self.k_proj(x).view(bsz, seq_len, self.num_kv_heads, self.head_dim)
         v = self.v_proj(x).view(bsz, seq_len, self.num_kv_heads, self.head_dim)
 
-        # (batch, heads, seq, head_dim)
         q = q.transpose(1, 2)
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
-        cos = self.rope_cos[:seq_len]
-        sin = self.rope_sin[:seq_len]
+        end = start_pos + seq_len
+        cos = self.rope_cos[start_pos:end]
+        sin = self.rope_sin[start_pos:end]
         q = apply_rotary_emb(q, cos, sin)
         k = apply_rotary_emb(k, cos, sin)
 
-        # Repeat KV heads to match Q heads (GQA).
-        k = k.repeat_interleave(self.n_rep, dim=1)
-        v = v.repeat_interleave(self.n_rep, dim=1)
+        new_cache = KVCache(k=k, v=v) if cache is None else cache.append(k, v)
 
-        # Causal attention: each position may only see itself and the past.
+        k_full = new_cache.k.repeat_interleave(self.n_rep, dim=1)
+        v_full = new_cache.v.repeat_interleave(self.n_rep, dim=1)
+
+        # Prefill without past: causal. Decode with cache: attend to all cached keys.
+        is_causal = cache is None and seq_len > 1
         attn = F.scaled_dot_product_attention(
-            q, k, v, is_causal=True, scale=1.0 / math.sqrt(self.head_dim)
+            q,
+            k_full,
+            v_full,
+            is_causal=is_causal,
+            scale=1.0 / math.sqrt(self.head_dim),
         )
         out = attn.transpose(1, 2).contiguous().view(bsz, seq_len, -1)
-        return self.o_proj(out)
+        return self.o_proj(out), new_cache

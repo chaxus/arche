@@ -2,6 +2,7 @@
 
 from arche.attention import CausalSelfAttention
 from arche.block import TransformerBlock
+from arche.cache import KVCache
 from arche.config import Llama32Config, llama32_1b, llama32_3b
 from arche.embedding import TokenEmbedding
 from arche.generate import generate
@@ -12,6 +13,7 @@ from arche.norms import RMSNorm
 
 __all__ = [
     "CausalSelfAttention",
+    "KVCache",
     "DEFAULT_MODEL_ID",
     "Llama",
     "Llama32Config",
