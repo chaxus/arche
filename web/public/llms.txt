@@ -2,7 +2,7 @@
 
 > From zero toward frontier-ready—one path. Hand-write a Llama 3.2–style dense LLM (running example ~1B), train weights, serve faster, then map MoE/MLA-style structures. Bilingual EN / 简体中文。By chaxus (https://chaxus.com/).
 
-arche is a beginner curriculum plus companion Python labs. Site UI is Vite + ranui. One spine: grow tables → hand-write the Llama-style trunk → train → serve → frontier maps. Llama 3.2 ~1B is the continuous example (official tokenizer/weights = that example’s finished pair), not a second track.
+arche is a beginner curriculum plus companion Python labs. Site UI is Vite + ranui. One spine: grow tables → **next-token train** → hand-write dense bricks → align → serve → frontier maps (DeepSeek-shaped MoE+MLA). Llama 3.2 ~1B is the continuous dense example.
 
 ## Docs
 

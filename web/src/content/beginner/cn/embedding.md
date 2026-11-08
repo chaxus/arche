@@ -150,4 +150,4 @@ python chapters/01-inference/ep03_embedding.py
 
 ## 下一章
 
-**RMSNorm**（`/cn/rmsnorm/`）：嵌入给出的小数进深网前，如何稳住尺度（从零训时的关键）。
+**预训练**（`/cn/pretrain/`）：猜下一个词的训练回路——**写出**那些小数行（以及整棵主干）。

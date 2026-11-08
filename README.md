@@ -2,14 +2,14 @@
 
 **ἀρχή** — origin, first principle.
 
-**From zero toward frontier-ready—one path.** See what a chatbot computes by writing one: build the dense trunk, **train weights**, serve faster, then map MoE/MLA-style tips. **Llama 3.2 ~1B** is the running example (official tokenizer/weights = that example’s finished pair). Site: **[arche.chaxus.com](https://arche.chaxus.com)** (EN / 中文).
+**From zero toward frontier-ready—one path.** See what a chatbot computes by writing one: grow tables, learn **next-token training**, hand-write the dense trunk, align, serve, then map MoE/MLA. **Llama 3.2 ~1B** is the running example. Site: **[arche.chaxus.com](https://arche.chaxus.com)** (EN / 中文).
 
-从零对接前沿——一条路：亲手写出主干 → 训练写出权重 → 服务加速 → 前沿结构地图。**Llama 3.2 ~1B** 是贯穿例子。学习站：[arche.chaxus.com/cn/](https://arche.chaxus.com/cn/)。
+从零对接前沿——一条路：建表 → **猜词训练** → 手写 dense 积木 → 对齐 → 服务 → 前沿地图。**Llama 3.2 ~1B** 是贯穿例子。学习站：[arche.chaxus.com/cn/](https://arche.chaxus.com/cn/)。
 
 | Plain path | What’s inside |
 | --- | --- |
-| **1 Build the dense trunk** | Grow tokenizer/embeds → RMSNorm, RoPE, GQA, SwiGLU, stack → generate → check against the Llama example |
-| **2 Train from zero** | Toy pretrain, SFT, DPO — how weights get written |
+| **1 Tables, next-token train, dense bricks** | Tokenizer → embedding → **pretrain loop** → RMSNorm…stack → load/generate → HF check |
+| **2 Align** | SFT / DPO — steer after the base next-token skill |
 | **3 Generate & serve faster** | KV cache, RoPE scaling, device/quant/chat, continuous batching, paged KV / CUDA Graph |
 | **4 Frontier structures** | MoE, MLA, frontier checkpoints, sharded loads |
 
@@ -44,27 +44,27 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Run chapters (each script is standalone). Order below matches the **from-zero site path** (train before heavy serving):
+Run chapters (each script is standalone). Order below matches the **from-zero site path** (next-token train early, then bricks, then align/serve):
 
 ```bash
 python chapters/00-start/ep00_check_setup.py
 python chapters/01-inference/ep01_overview.py
-python chapters/01-inference/ep02_teach_bpe.py          # train a tiny tokenizer table (no HF)
-python chapters/01-inference/ep03_embedding.py          # gather + one toy train step
+python chapters/01-inference/ep02_teach_bpe.py          # tiny tokenizer table (no HF)
+python chapters/01-inference/ep03_embedding.py          # gather + one toy update
+python chapters/02-training/ep18_pretrain.py            # next-token loop (writes floats)
 python chapters/01-inference/ep04_rmsnorm.py
 python chapters/01-inference/ep05_rope.py
 python chapters/01-inference/ep06_gqa.py
 python chapters/01-inference/ep07_swiglu.py
 python chapters/01-inference/ep08_block.py
 python chapters/01-inference/ep09_stack.py
-python chapters/02-training/ep18_pretrain.py            # Part 2 — write weights (toy)
-python chapters/02-training/ep19_sft_dpo.py
-python chapters/01-inference/ep12_kv_cache.py           # Part 3 — serve
+python chapters/02-training/ep19_sft_dpo.py             # align after base skill
+python chapters/01-inference/ep12_kv_cache.py           # serve
 python chapters/01-inference/ep13_rope_scaling.py
 python chapters/01-inference/ep16_device_quant_chat.py
 python chapters/01-inference/ep17_continuous_batching.py
 python chapters/01-inference/ep23_paged_cuda_graph.py
-python chapters/01-inference/ep14_moe.py                # Part 4 — frontier
+python chapters/01-inference/ep14_moe.py                # frontier
 python chapters/01-inference/ep15_mla.py
 python chapters/02-training/ep20_frontier_ckpt.py
 python chapters/02-training/ep22_sharded_frontier.py

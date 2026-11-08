@@ -46,4 +46,4 @@ python chapters/01-inference/ep21_hf_align.py
 ## 下一章
 
 
-**预训练**（`/cn/pretrain/`）：从零写出权重（玩具 API）。
+**SFT · DPO**（`/cn/sft-dpo/`）：在会猜词之后做对齐。

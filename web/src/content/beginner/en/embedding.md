@@ -134,4 +134,4 @@ python chapters/01-inference/ep03_embedding.py
 
 ## Next
 
-**RMSNorm** (`/rmsnorm/`): how to steady scales after embedding—critical when training deep nets from zero.
+**Pretrain** (`/pretrain/`): the next-token loop that **writes** those float rows (and the rest of the trunk).

@@ -43,4 +43,4 @@ No weights/login → skip ≠ broken logic.
 ## Next
 
 
-**Pretrain** (`/pretrain/`): write weights from zero (toy API).
+**SFT · DPO** (`/sft-dpo/`): align after the base next-token skill.

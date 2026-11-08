@@ -21,8 +21,8 @@ export const PART0_EN: Chapter[] = [
 | Stage | In plain words | Names you will meet later |
 | --- | --- | --- |
 | **0 Start** | Set up; learn to read a chapter and run one command | — |
-| **1 Build the dense trunk** | Grow a tiny tokenizer/embeds → hand-write RMSNorm, RoPE, GQA, SwiGLU… → generate → compare with the Llama example (HF) | dense decoder |
-| **2 Train from zero** | Feel how pretrain / SFT / DPO write the weights | pretrain, SFT, DPO |
+| **1 Tables + next-token train + dense bricks** | Tokenizer → embedding → **how guess-next training writes floats** → RMSNorm…stack → load/generate → HF check | dense decoder, pretrain |
+| **2 Align** | SFT / DPO after the base next-token skill | SFT, DPO |
 | **3 Generate & serve faster** | KV cache, long context, device/quant, continuous batch, paging | KV, RoPE scaling, paged KV… |
 | **4 Frontier structures** | MoE + MLA map (DeepSeek-V3-shaped open stack), checkpoints | MoE, MLA, shards |
 
@@ -39,19 +39,21 @@ Site: left nav; Previous / Next; Mark as read is local-only. Repo: [github.com/c
     id: 'start-llm-idea',
     ep: '00b',
     title: 'What an LLM does',
-    summary: 'In one loop: keep guessing the next little text chunk.',
+    summary: 'Inference guesses the next token; training teaches that guess by rewriting floats.',
     script: '',
     partId: 'start',
-    estimatedMinutes: 4,
+    estimatedMinutes: 5,
     markdown: `## Idea
 
-A large language model (LLM) repeatedly guesses the **next little text chunk** from what it already wrote:
+At **inference**, an LLM repeatedly guesses the **next little text chunk** from what it already wrote:
 
 1. Score every candidate in the vocabulary.
-2. Pick one (always the top score, or sample by probability).
+2. Pick one (argmax or sample).
 3. Append it; repeat.
 
-Three names you will meet: **token** = a small chunk of text; **embedding** = that chunk as a list of numbers (a vector); **logits** = scores for the next chunk.
+At **training** (the important half), the dataset already knows the true next chunk. The model still scores every id; you measure the miss (**cross-entropy**), then **backprop** so embedding rows and later weights move. Huge text × many steps = how random floats become a language model. Full loop after embedding: [\`/pretrain/\`](/pretrain/).
+
+Three names: **token** = chunk; **embedding** = float row for an id; **logits** = next-chunk scores.
 
 \`\`\`mermaid
 flowchart LR
@@ -166,17 +168,17 @@ In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \
 
 \`\`\`mermaid
 flowchart LR
-  p0[0 Setup] --> p1[1 Build trunk]
-  p1 --> p2[2 Train from zero]
+  p0[0 Setup] --> p1[1 Tables_train_bricks]
+  p1 --> p2[2 Align]
   p2 --> p3[3 Serve faster]
-  p3 --> p4[4 Frontier structures]
+  p3 --> p4[4 Frontier]
 \`\`\`
 
-**One path:** from zero → hand-write the trunk → train (feel how weights are written) → serve faster → frontier map.
+**One path:** tokenizer → embedding → **next-token train** → dense bricks → load/check Llama → align → serve → frontier map.
 
-- **Running example:** Llama 3.2 ~1B (config numbers, official tokenizer/weights as the finished pair of that example).  
-- **Teach BPE / toy train:** how tables and floats get made—not a second curriculum.  
-- **HF login** when you load or align against the official Llama files; shape labs and teach-BPE need no login.
+- **Running example:** Llama 3.2 ~1B.  
+- **Core idea early:** pretrain is how embedding rows and trunk weights get written.  
+- **HF login** when you load or align against official Llama files; teach-BPE and most shape labs need no login.
 
 ## Next
 

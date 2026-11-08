@@ -1,6 +1,6 @@
 ## Idea
 
-This course is **one path from zero toward frontier-ready**. Reading order: build the dense trunk → **train weights from zero** → serve faster → frontier structures (MoE/MLA). The running example is **Llama 3.2 ~1B**—wrong example recipe ⇒ later “how industry does it” won’t match.
+This course is **one path from zero toward frontier-ready**. Reading order: tables → **next-token train** → dense bricks → align → serve → frontier (MoE/MLA). The running example is **Llama 3.2 ~1B**—wrong example recipe ⇒ later “how industry does it” won’t match.
 
 ### 1. What it is for
 
@@ -39,10 +39,10 @@ When people say **DeepSeek’s frontier open stack** (V2 / V3 / R1-on-V3), they 
 | Step | What you do |
 | --- | --- |
 | **1. Fix the example** | Llama 3.2 ~1B |
-| **2. Learn how its kind of tokenizer/embeds are made** | Teach-BPE + toy embed; record V, D, depth, heads |
-| **3. Hand-write the same bricks** | RMSNorm, RoPE, GQA, SwiGLU… |
-| **4. Random shapes first, then train (Part 2) and/or load the Llama example to check** | Graph → numbers |
-| **5. Generate + HF check → serve → frontier** | One sidebar path |
+| **2. Tokenizer + embedding** | Teach-BPE + lookup table; record V, D, depth, heads |
+| **3. Next-token train** | Shift + CE + backprop—**writes** embeds and weights |
+| **4. Hand-write the bricks** | RMSNorm, RoPE, GQA, SwiGLU… then stack |
+| **5. Load Llama / generate / HF → align → serve → frontier** | One sidebar path |
 
 ### 5. What “good example” means
 

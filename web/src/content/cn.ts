@@ -3,7 +3,7 @@ import { PART0_CN } from './part0-cn';
 
 export const CHAPTERS_CN: Chapter[] = [
   ...PART0_CN,
-  {
+{
     id: 'overview',
     ep: '01',
     title: '总览',
@@ -13,7 +13,7 @@ export const CHAPTERS_CN: Chapter[] = [
     estimatedMinutes: 12,
     markdown: `## 要点
 
-本课是**一条从零到对接业界前沿**的路。阅读顺序：写出 dense 本体 → **从零训练写出权重** → 服务加速 → 前沿结构（MoE/MLA）。贯穿例子是 **Llama 3.2 ~1B**——例子配方错了，后面「业界怎么做」会对不上。
+本课是**一条从零到对接业界前沿**的路。阅读顺序：建表 → **猜词训练** → dense 积木 → 对齐 → 服务 → 前沿（MoE/MLA）。贯穿例子是 **Llama 3.2 ~1B**——例子配方错了，后面「业界怎么做」会对不上。
 
 ### 1. 有什么作用
 
@@ -59,10 +59,10 @@ Llama 3.2 是 Meta **Llama 3** 系列的开放小规格——与更大 Llama（�
 | 步骤 | 做什么 |
 | --- | --- |
 | **1. 钉死例子** | Llama 3.2 ~1B |
-| **2. 学会这类分词/嵌入表怎么生成** | 教学 BPE + 玩具嵌入；记下 V、D、层数、头数 |
-| **3. 按同积木手写模块** | RMSNorm、RoPE、GQA、SwiGLU… |
-| **4. 先随机权重跑通形状，再 Part 2 自训，并可用 Llama 例子加载对照** | 图对 → 数对 |
-| **5. 生成 + HF 验收 → 服务 → 前沿** | 侧栏一条路 |
+| **2. 分词 + 嵌入** | 教学 BPE + 查表；记下 V、D、层数、头数 |
+| **3. 猜下一个词训练** | shift + 交叉熵 + 反传——**写出**嵌入与权重 |
+| **4. 手写积木** | RMSNorm、RoPE、GQA、SwiGLU… 再堆叠 |
+| **5. 加载 Llama / 生成 / HF → 对齐 → 服务 → 前沿** | 侧栏一条路 |
 
 ### 5. 怎么样算选对了
 
@@ -101,7 +101,7 @@ python chapters/01-inference/ep01_overview.py
 
 `,
   },
-  {
+{
     id: 'tokenizer',
     ep: '02',
     title: '分词器',
@@ -263,7 +263,7 @@ python chapters/01-inference/ep02_tokenizer.py
 
 `,
   },
-  {
+{
     id: 'embedding',
     ep: '03',
     title: '嵌入层',
@@ -424,12 +424,115 @@ python chapters/01-inference/ep03_embedding.py
 
 ## 下一章
 
-**RMSNorm**（\`/cn/rmsnorm/\`）：嵌入给出的小数进深网前，如何稳住尺度（从零训时的关键）。
+**预训练**（\`/cn/pretrain/\`）：猜下一个词的训练回路——**写出**那些小数行（以及整棵主干）。
 
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',
   },
-  {
+{
+    id: 'pretrain',
+    ep: '18',
+    title: '预训练',
+    summary: '猜下一个词：错位、交叉熵、反传——嵌入和权重怎样被写出来。',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'trunk',
+    estimatedMinutes: 15,
+    demo: 'pretrain',
+    markdown: `## 要点
+
+这是从零的**核心**：**猜下一个词的训练**（预训练）。嵌入行和几乎全部主干权重，都是这样从随机变成有用的。没有它，你只有空壳——或者只能加载别人训好的小数（后面的 Llama 例子）。
+
+### 1. 有什么作用
+
+在海量文本上，迫使模型根据前面的 id **猜下一个 id**。猜错 → 损失 → 反传 → 改参数（**含嵌入**）。嵌入章里「柜子里的小数」的主要作者，就是这个回路。
+
+### 2. 推理猜词 vs 训练猜词
+
+| | **推理**（聊天） | **训练**（本章） |
+| --- | --- | --- |
+| 真正的下一个 token | 不知道——从分数里选 | 数据里**已经有** |
+| 打分之后 | argmax / 采样 → 拼上 | 和真 id 比 → **算损失** |
+| 参数 | 通常冻住 | **每步更新** |
+
+前向形状一样；训练多了「老师信号」和「改写权重」。
+
+### 3. 从零：回路怎么走（人话步骤）
+
+假想句子分词后 ids 是 \`[10, 20, 30]\`（对应 \`The cat sat\` 一类，编号是假的）：
+
+| 位置 | 上下文 ids | 真正的下一个 id |
+| --- | --- | --- |
+| 0 | \`[10]\` | \`20\`（cat） |
+| 1 | \`[10, 20]\` | \`30\`（sat） |
+
+一步训练在干什么：
+
+1. **文本 batch** → 分词 → id 张量  
+2. **嵌入** = 按 id 取出小数行  
+3. **前向**过主干 → **logits**，形状大约 \`(batch, 时间，V)\`——每个位置对词表里每个 id 打分  
+4. **错位（shift）**：用位置 \`t\` 的上下文去预测位置 \`t+1\` 的 id（不能把答案漏进该步输入）  
+5. **损失** = logits 与真下一 id 的交叉熵（对位置平均）  
+6. **反向** = 梯度流回用过的嵌入行和每一块权重  
+7. **优化器**（如 AdamW）走一小步；真跑会重复到海量 token  
+
+\`\`\`mermaid
+flowchart LR
+  data[文本 batch] --> tok[分词]
+  tok --> emb[嵌入取行]
+  emb --> fwd[前向主干]
+  fwd --> logits[logits]
+  logits --> ce[与下一 id 交叉熵]
+  ce --> bwd[反传]
+  bwd --> upd[更新嵌入行与权重]
+\`\`\`
+
+初始嵌入是随机柜壁；**有用的小数是这个回路写进去的。** 后面各章手写 RMSNorm / RoPE / …，就是为了让第 3 步的前向变成*你的*栈，而不是黑盒。
+
+### 4. 怎么样算好
+
+| 类型 | 标准 |
+| --- | --- |
+| **硬** | 目标真是下一 token；shift 正确；梯度打到嵌入 + 主干 |
+| **硬** | 无 NaN；损失算在该算的位置 |
+| **软** | loss 趋势下降；抽样不那么胡说 |
+| **软** | lr / 裁剪稳住，长跑能跑完 |
+
+### 5. 如何改进 · 对整模影响
+
+| 杠杆 | 影响 |
+| --- | --- |
+| 数据质量与配比 | 能力上限主因 |
+| 规模（参数 × token） | 缩放律 |
+| 稳定性（norm、lr、裁剪） | 能不能训完 |
+| 训练不足 | 嵌入**和**深层都欠拟合 |
+
+下一部分的 SFT / DPO 是在「已经会猜词」之上再转向；**不能代替**这个基础回路。
+
+### 6. 业界 · 开源
+
+Llama / Qwen / DeepSeek 都是 **先预训练，再对齐**。真栈：Megatron / DeepSpeed / torchtitan 一类。本课是**玩具 API + 页内 playground**——感受形状，不是集群实跑。
+
+### 7. 本课
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+页内可拖 lr / 步数。然后去写夹在「嵌入」和「logits」之间的那些积木。
+
+## 动手
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+## 下一章
+
+**RMSNorm**（\`/cn/rmsnorm/\`）：嵌入之后稳住尺度，深度猜词训练才跑得下去。
+
+`,
+  },
+{
     id: 'rmsnorm',
     ep: '04',
     title: 'RMSNorm',
@@ -503,7 +606,7 @@ python chapters/01-inference/ep04_rmsnorm.py
     latex:
       '\\mathrm{RMSNorm}(x) = \\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}} \\odot \\gamma',
   },
-  {
+{
     id: 'rope',
     ep: '05',
     title: 'RoPE',
@@ -574,7 +677,7 @@ python chapters/01-inference/ep05_rope.py
     latex:
       'q_m^{\\prime} = R_{\\Theta,m} q_m,\\quad k_n^{\\prime} = R_{\\Theta,n} k_n',
   },
-  {
+{
     id: 'gqa',
     ep: '06',
     title: 'GQA 注意力',
@@ -646,7 +749,7 @@ python chapters/01-inference/ep06_gqa.py
 
 `,
   },
-  {
+{
     id: 'swiglu',
     ep: '07',
     title: 'SwiGLU',
@@ -715,7 +818,7 @@ python chapters/01-inference/ep07_swiglu.py
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
   },
-  {
+{
     id: 'block',
     ep: '08',
     title: 'Transformer 块',
@@ -784,7 +887,7 @@ python chapters/01-inference/ep08_block.py
 
 `,
   },
-  {
+{
     id: 'stack',
     ep: '09',
     title: '堆叠 + LM head',
@@ -844,7 +947,7 @@ python chapters/01-inference/ep09_stack.py
 
 `,
   },
-  {
+{
     id: 'weights',
     ep: '10',
     title: '加载权重',
@@ -912,7 +1015,7 @@ python chapters/01-inference/ep10_load_weights.py
 
 `,
   },
-  {
+{
     id: 'generate',
     ep: '11',
     title: '文本生成',
@@ -976,7 +1079,67 @@ python chapters/01-inference/ep11_generate.py
 
 `,
   },
-  {
+{
+    id: 'hf-align',
+    ep: '21',
+    title: 'HF logits 对齐',
+    summary: '短 prompt 上对照 HF 的 logits。',
+    script: 'chapters/01-inference/ep21_hf_align.py',
+    partId: 'trunk',
+    estimatedMinutes: 20,
+    markdown: `## 要点
+
+Part 1 收尾验收：**与权威 HF 实现对短 prompt logits**——证明映射与公式没大错。过关后再进入 Part 2，体会权重如何从零训练出来。
+
+### 1. 有什么作用
+
+同 prompt 跑 arche vs HF Llama 3.2；比 argmax 与 max abs diff。
+
+### 2. 从零开始：怎么做
+
+固定种子与精度；加载同一权重；比短序列；无权重则干净跳过。
+
+### 3. 怎么样算好
+
+| 类型 | 标准 |
+| --- | --- |
+| **硬** | 有权时足够接近；无权时明确跳过 |
+| **软** | 覆盖更长序列/更多算子 |
+
+### 4. 如何改进 · 对整模影响
+
+对齐失败 → 回查映射/RoPE/norm。通过对齐再谈优化与服务。
+
+### 5. 业界 · 开源
+
+开源复现常把「对上 HF/官方」当 CI 门禁；vLLM 等也有数值回归测。
+
+### 6. 本课
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep21_hf_align.py
+\`\`\`
+
+## 动手
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep21_hf_align.py
+\`\`\`
+
+## 翻车
+
+无权/未登录 → 跳过 ≠ 逻辑坏。
+
+## 下一章
+
+
+**SFT · DPO**（\`/cn/sft-dpo/\`）：在会猜词之后做对齐。
+
+`,
+  },
+{
     id: 'kv-cache',
     ep: '12',
     title: 'KV 缓存',
@@ -1040,7 +1203,7 @@ python chapters/01-inference/ep12_kv_cache.py
 
 `,
   },
-  {
+{
     id: 'rope-scaling',
     ep: '13',
     title: 'RoPE 缩放',
@@ -1099,7 +1262,7 @@ python chapters/01-inference/ep13_rope_scaling.py
 
 `,
   },
-  {
+{
     id: 'moe',
     ep: '14',
     title: 'MoE',
@@ -1169,7 +1332,7 @@ python chapters/01-inference/ep14_moe.py
 
 `,
   },
-  {
+{
     id: 'mla',
     ep: '15',
     title: 'MLA',
@@ -1232,7 +1395,7 @@ python chapters/01-inference/ep15_mla.py
 
 `,
   },
-  {
+{
     id: 'device-quant-chat',
     ep: '16',
     title: '设备 · INT8 · 对话模板',
@@ -1293,7 +1456,7 @@ python chapters/01-inference/ep16_device_quant_chat.py
 
 `,
   },
-  {
+{
     id: 'continuous-batching',
     ep: '17',
     title: '连续批处理',
@@ -1352,73 +1515,7 @@ python chapters/01-inference/ep17_continuous_batching.py
 
 `,
   },
-  {
-    id: 'pretrain',
-    ep: '18',
-    title: '预训练',
-    summary: '玩具 next-token 训练——感受 API。',
-    script: 'chapters/02-training/ep18_pretrain.py',
-    partId: 'train',
-    estimatedMinutes: 15,
-    demo: 'pretrain',
-    markdown: `## 要点
-
-从零的核心阶段：**预训练**写出嵌入与几乎全部主干权重。没有它，只有随机空壳。
-
-### 1. 有什么作用
-
-海量文本上 next-token：logits→CE→反向更新（含嵌入）。
-
-### 2. 从零开始：怎么生成
-
-| 步骤 | 做什么 |
-| --- | --- |
-| **1** | 分词冻结、模型空壳、数据管线 |
-| **2** | AdamW 等优化器；拼 batch；shift 预测下一 id |
-| **3** | 大规模多卡长时间跑；存检查点 |
-| **4** | 本课：玩具步数 + 页内 playground 感受 API |
-
-### 3. 怎么样算好
-
-| 类型 | 标准 |
-| --- | --- |
-| **硬** | 目标确是下一 token；梯度到该到的参数 |
-| **软** | loss 下降；下游/探针指标；稳定无炸 |
-
-### 4. 如何改进 · 对整模影响
-
-| 杠杆 | 影响 |
-| --- | --- |
-| 数据质量与配比 | 能力上限主因 |
-| 规模（参数/token） | 缩放律 |
-| 稳定性（norm、lr、裁剪） | 能否训完 |
-| 训练不足 | 嵌入与深层都欠拟合 |
-
-### 5. 业界 · 开源
-
-Llama/Qwen/DeepSeek 均公开「预训练→再对齐」叙事；数据细节多不全开。Megatron/DeepSpeed/torchtitan 等是从零训练栈。
-
-### 6. 本课
-
-\`\`\`bash
-python chapters/02-training/ep18_pretrain.py
-\`\`\`
-
-页内可拖 lr/步数。
-
-## 动手
-
-\`\`\`bash
-python chapters/02-training/ep18_pretrain.py
-\`\`\`
-
-## 下一章
-
-**SFT · DPO**（\`/cn/sft-dpo/\`）。
-
-`,
-  },
-  {
+{
     id: 'sft-dpo',
     ep: '19',
     title: 'SFT · DPO',
@@ -1479,7 +1576,7 @@ python chapters/02-training/ep19_sft_dpo.py
 
 `,
   },
-  {
+{
     id: 'frontier-ckpt',
     ep: '20',
     title: '前沿检查点',
@@ -1533,67 +1630,7 @@ python chapters/02-training/ep20_frontier_ckpt.py
 
 `,
   },
-  {
-    id: 'hf-align',
-    ep: '21',
-    title: 'HF logits 对齐',
-    summary: '短 prompt 上对照 HF 的 logits。',
-    script: 'chapters/01-inference/ep21_hf_align.py',
-    partId: 'trunk',
-    estimatedMinutes: 20,
-    markdown: `## 要点
-
-Part 1 收尾验收：**与权威 HF 实现对短 prompt logits**——证明映射与公式没大错。过关后再进入 Part 2，体会权重如何从零训练出来。
-
-### 1. 有什么作用
-
-同 prompt 跑 arche vs HF Llama 3.2；比 argmax 与 max abs diff。
-
-### 2. 从零开始：怎么做
-
-固定种子与精度；加载同一权重；比短序列；无权重则干净跳过。
-
-### 3. 怎么样算好
-
-| 类型 | 标准 |
-| --- | --- |
-| **硬** | 有权时足够接近；无权时明确跳过 |
-| **软** | 覆盖更长序列/更多算子 |
-
-### 4. 如何改进 · 对整模影响
-
-对齐失败 → 回查映射/RoPE/norm。通过对齐再谈优化与服务。
-
-### 5. 业界 · 开源
-
-开源复现常把「对上 HF/官方」当 CI 门禁；vLLM 等也有数值回归测。
-
-### 6. 本课
-
-\`\`\`bash
-huggingface-cli login
-python chapters/01-inference/ep21_hf_align.py
-\`\`\`
-
-## 动手
-
-\`\`\`bash
-huggingface-cli login
-python chapters/01-inference/ep21_hf_align.py
-\`\`\`
-
-## 翻车
-
-无权/未登录 → 跳过 ≠ 逻辑坏。
-
-## 下一章
-
-
-**预训练**（\`/cn/pretrain/\`）：从零写出权重（玩具 API）。
-
-`,
-  },
-  {
+{
     id: 'sharded-frontier',
     ep: '22',
     title: '分片 MoE / MLA',
@@ -1647,7 +1684,7 @@ python chapters/02-training/ep22_sharded_frontier.py
 
 `,
   },
-  {
+{
     id: 'paged-cuda-graph',
     ep: '23',
     title: 'Paged KV · CUDA Graph',
@@ -1706,4 +1743,5 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 `,
   },
+
 ];

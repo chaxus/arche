@@ -3,7 +3,7 @@ import { PART0_EN } from './part0';
 
 export const CHAPTERS_EN: Chapter[] = [
   ...PART0_EN,
-  {
+{
     id: 'overview',
     ep: '01',
     title: 'Overview',
@@ -13,7 +13,7 @@ export const CHAPTERS_EN: Chapter[] = [
     estimatedMinutes: 12,
     markdown: `## Idea
 
-This course is **one path from zero toward frontier-ready**. Reading order: build the dense trunk → **train weights from zero** → serve faster → frontier structures (MoE/MLA). The running example is **Llama 3.2 ~1B**—wrong example recipe ⇒ later “how industry does it” won’t match.
+This course is **one path from zero toward frontier-ready**. Reading order: tables → **next-token train** → dense bricks → align → serve → frontier (MoE/MLA). The running example is **Llama 3.2 ~1B**—wrong example recipe ⇒ later “how industry does it” won’t match.
 
 ### 1. What it is for
 
@@ -52,10 +52,10 @@ When people say **DeepSeek’s frontier open stack** (V2 / V3 / R1-on-V3), they 
 | Step | What you do |
 | --- | --- |
 | **1. Fix the example** | Llama 3.2 ~1B |
-| **2. Learn how its kind of tokenizer/embeds are made** | Teach-BPE + toy embed; record V, D, depth, heads |
-| **3. Hand-write the same bricks** | RMSNorm, RoPE, GQA, SwiGLU… |
-| **4. Random shapes first, then train (Part 2) and/or load the Llama example to check** | Graph → numbers |
-| **5. Generate + HF check → serve → frontier** | One sidebar path |
+| **2. Tokenizer + embedding** | Teach-BPE + lookup table; record V, D, depth, heads |
+| **3. Next-token train** | Shift + CE + backprop—**writes** embeds and weights |
+| **4. Hand-write the bricks** | RMSNorm, RoPE, GQA, SwiGLU… then stack |
+| **5. Load Llama / generate / HF → align → serve → frontier** | One sidebar path |
 
 ### 5. What “good example” means
 
@@ -92,7 +92,7 @@ python chapters/01-inference/ep01_overview.py
 
 `,
   },
-  {
+{
     id: 'tokenizer',
     ep: '02',
     title: 'Tokenizer',
@@ -237,7 +237,7 @@ Official table: license / login / mirror. Teaching BPE needs no network.
 
 `,
   },
-  {
+{
     id: 'embedding',
     ep: '03',
     title: 'Embedding',
@@ -382,12 +382,115 @@ python chapters/01-inference/ep03_embedding.py
 
 ## Next
 
-**RMSNorm** (\`/rmsnorm/\`): how to steady scales after embedding—critical when training deep nets from zero.
+**Pretrain** (\`/pretrain/\`): the next-token loop that **writes** those float rows (and the rest of the trunk).
 
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',
   },
-  {
+{
+    id: 'pretrain',
+    ep: '18',
+    title: 'Pretrain',
+    summary: 'Next-token training: shift, CE, backprop—how embeds and weights get written.',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'trunk',
+    estimatedMinutes: 15,
+    demo: 'pretrain',
+    markdown: `## Idea
+
+This is the **core of from-zero**: **next-token training** (pretrain). It is how embedding rows and almost all trunk weights stop being random. Without it you only have a shell—or you load someone else’s finished floats (the Llama example later).
+
+### 1. What it is for
+
+On huge text, force the model to **guess the next id** given the previous ones. Wrong guesses → loss → backprop → rewrite parameters (including embeddings). That is the main author of the numbers you looked up in the embedding chapter.
+
+### 2. Inference guess vs training guess
+
+| | **Inference** (chat) | **Training** (this chapter) |
+| --- | --- | --- |
+| True next token | Unknown—you pick from scores | **Known** from the dataset |
+| After scores | argmax / sample → append | Compare to the true id → **loss** |
+| Parameters | Frozen (usually) | **Updated** every step |
+
+Same forward shape; training adds the teacher signal and the rewrite.
+
+### 3. From zero: the loop (plain steps)
+
+Tiny sentence after tokenize, say ids \`[10, 20, 30]\` for \`The cat sat\` (fake ids):
+
+| Position | Context ids | True next id |
+| --- | --- | --- |
+| 0 | \`[10]\` | \`20\` (\`cat\`) |
+| 1 | \`[10, 20]\` | \`30\` (\`sat\`) |
+
+What one train step does:
+
+1. **Batch text** → tokenizer → id tensor  
+2. **Embed** = gather float rows for those ids  
+3. **Forward** through the stack → **logits** shape roughly \`(batch, time, V)\` — a score per vocab id at each position  
+4. **Shift**: at position \`t\` predict id at \`t+1\` (never “cheat” with the answer in the input for that slot)  
+5. **Loss** = cross-entropy between logits and the true next ids (average over positions)  
+6. **Backward** = gradients flow into every used embed row and every brick weight  
+7. **Optimizer** (e.g. AdamW) takes a small step; repeat for billions of tokens in real runs  
+
+\`\`\`mermaid
+flowchart LR
+  data[text_batch] --> tok[tokenize]
+  tok --> emb[embed_gather]
+  emb --> fwd[forward_stack]
+  fwd --> logits[logits]
+  logits --> ce[cross_entropy_vs_next_id]
+  ce --> bwd[backprop]
+  bwd --> upd[update_rows_and_weights]
+\`\`\`
+
+Init embeds are random lockers; **this loop writes the useful numbers.** Later chapters hand-write RMSNorm / RoPE / … so the forward in step 3 is *your* stack—not a mystery box.
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Objective is really next-token; shift is correct; grads hit embeds + trunk |
+| **Hard** | No NaN; loss defined on the right positions |
+| **Soft** | Loss trends down; probes / samples get less nonsense |
+| **Soft** | Stable lr / grad clip so a long run can finish |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Data mix & quality | Main ceiling of capability |
+| Scale (params × tokens) | Scaling laws |
+| Stability (norm, lr, clip) | Whether you finish at all |
+| Under-train | Weak embeds **and** deep layers |
+
+SFT / DPO (next part) steer an already next-token-capable net; they do not replace this base loop.
+
+### 6. Industry · open models
+
+Llama / Qwen / DeepSeek all tell a **pretrain → then align** story. Real stacks: Megatron / DeepSpeed / torchtitan-style. This lesson is a **toy API + playground**—feel the shape, not a cluster run.
+
+### 7. This course
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+Use the page playground to drag lr / steps. Then go build the bricks that sit between embed and logits.
+
+## Run
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+## Next
+
+**RMSNorm** (\`/rmsnorm/\`): steady scales after embedding so deep next-token training can survive.
+
+`,
+  },
+{
     id: 'rmsnorm',
     ep: '04',
     title: 'RMSNorm',
@@ -448,7 +551,7 @@ python chapters/01-inference/ep04_rmsnorm.py
     latex:
       '\\mathrm{RMSNorm}(x) = \\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}} \\odot \\gamma',
   },
-  {
+{
     id: 'rope',
     ep: '05',
     title: 'RoPE',
@@ -501,7 +604,7 @@ python chapters/01-inference/ep05_rope.py
     latex:
       'q_m^{\\prime} = R_{\\Theta,m} q_m,\\quad k_n^{\\prime} = R_{\\Theta,n} k_n',
   },
-  {
+{
     id: 'gqa',
     ep: '06',
     title: 'GQA attention',
@@ -552,7 +655,7 @@ python chapters/01-inference/ep06_gqa.py
 
 `,
   },
-  {
+{
     id: 'swiglu',
     ep: '07',
     title: 'SwiGLU',
@@ -603,7 +706,7 @@ python chapters/01-inference/ep07_swiglu.py
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
   },
-  {
+{
     id: 'block',
     ep: '08',
     title: 'Transformer block',
@@ -653,7 +756,7 @@ python chapters/01-inference/ep08_block.py
 
 `,
   },
-  {
+{
     id: 'stack',
     ep: '09',
     title: 'Stack + LM head',
@@ -703,7 +806,7 @@ python chapters/01-inference/ep09_stack.py
 
 `,
   },
-  {
+{
     id: 'weights',
     ep: '10',
     title: 'Load weights',
@@ -763,7 +866,7 @@ License, login, mirror—same as tokenizer.
 
 `,
   },
-  {
+{
     id: 'generate',
     ep: '11',
     title: 'Text generation',
@@ -814,7 +917,64 @@ python chapters/01-inference/ep11_generate.py
 
 `,
   },
-  {
+{
+    id: 'hf-align',
+    ep: '21',
+    title: 'HF logits alignment',
+    summary: 'Check our logits against Hugging Face on a short prompt.',
+    script: 'chapters/01-inference/ep21_hf_align.py',
+    partId: 'trunk',
+    estimatedMinutes: 20,
+    markdown: `## Idea
+
+End of Part 1: **match authoritative HF logits** on a short prompt—proof the map and formulas are sound. Then Part 2 shows how weights get written from zero.
+
+### 1. What it is for
+
+Same prompt through arche vs HF Llama 3.2; compare argmax / max abs diff.
+
+### 2. From zero: how you build it
+
+Fixed seed/dtype; same weights; short seq; clean skip without weights.
+
+### 3. What “good” means
+
+Close enough with weights; explicit skip without; longer coverage later.
+
+### 4. Improve · whole-model impact
+
+Fail ⇒ revisit maps/RoPE/norm. Pass before optimize/serve.
+
+### 5. Industry · open models
+
+Repro CI often gates on HF/official match; engines keep numeric regressions.
+
+### 6. This course
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep21_hf_align.py
+\`\`\`
+
+## Run
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep21_hf_align.py
+\`\`\`
+
+## Fix
+
+No weights/login → skip ≠ broken logic.
+
+## Next
+
+
+**SFT · DPO** (\`/sft-dpo/\`): align after the base next-token skill.
+
+`,
+  },
+{
     id: 'kv-cache',
     ep: '12',
     title: 'KV cache',
@@ -865,7 +1025,7 @@ python chapters/01-inference/ep12_kv_cache.py
 
 `,
   },
-  {
+{
     id: 'rope-scaling',
     ep: '13',
     title: 'RoPE scaling',
@@ -916,7 +1076,7 @@ python chapters/01-inference/ep13_rope_scaling.py
 
 `,
   },
-  {
+{
     id: 'moe',
     ep: '14',
     title: 'MoE',
@@ -971,7 +1131,7 @@ python chapters/01-inference/ep14_moe.py
 
 `,
   },
-  {
+{
     id: 'mla',
     ep: '15',
     title: 'MLA',
@@ -1026,7 +1186,7 @@ python chapters/01-inference/ep15_mla.py
 
 `,
   },
-  {
+{
     id: 'device-quant-chat',
     ep: '16',
     title: 'Device · INT8 · chat',
@@ -1077,7 +1237,7 @@ python chapters/01-inference/ep16_device_quant_chat.py
 
 `,
   },
-  {
+{
     id: 'continuous-batching',
     ep: '17',
     title: 'Continuous batching',
@@ -1129,58 +1289,7 @@ python chapters/01-inference/ep17_continuous_batching.py
 
 `,
   },
-  {
-    id: 'pretrain',
-    ep: '18',
-    title: 'Pretrain',
-    summary: 'Toy next-token training—feel the API.',
-    script: 'chapters/02-training/ep18_pretrain.py',
-    partId: 'train',
-    estimatedMinutes: 15,
-    demo: 'pretrain',
-    markdown: `## Idea
-
-From-zero core: **pretrain** writes embeddings and almost all trunk weights. Without it you only have a random shell.
-
-### 1. What it is for
-
-Next-token CE on huge text; backprop updates the net including embeds.
-
-### 2. From zero: how you build it
-
-Frozen tokenizer + shell + data → AdamW next-id loss → long multi-GPU run → checkpoints. This lesson: toy steps + page playground.
-
-### 3. What “good” means
-
-Correct objective; grads hit params; loss/downstream/stability.
-
-### 4. Improve · whole-model impact
-
-Data mix dominates; scale laws; stability decides finishability; undertrain ⇒ weak embeds and deep layers.
-
-### 5. Industry · open models
-
-Llama/Qwen/DeepSeek: pretrain then align; Megatron/DeepSpeed/torchtitan-style stacks for from-zero training.
-
-### 6. This course
-
-\`\`\`bash
-python chapters/02-training/ep18_pretrain.py
-\`\`\`
-
-## Run
-
-\`\`\`bash
-python chapters/02-training/ep18_pretrain.py
-\`\`\`
-
-## Next
-
-**SFT · DPO** (\`/sft-dpo/\`).
-
-`,
-  },
-  {
+{
     id: 'sft-dpo',
     ep: '19',
     title: 'SFT · DPO',
@@ -1232,7 +1341,7 @@ python chapters/02-training/ep19_sft_dpo.py
 
 `,
   },
-  {
+{
     id: 'frontier-ckpt',
     ep: '20',
     title: 'Frontier checkpoints',
@@ -1283,64 +1392,7 @@ python chapters/02-training/ep20_frontier_ckpt.py
 
 `,
   },
-  {
-    id: 'hf-align',
-    ep: '21',
-    title: 'HF logits alignment',
-    summary: 'Check our logits against Hugging Face on a short prompt.',
-    script: 'chapters/01-inference/ep21_hf_align.py',
-    partId: 'trunk',
-    estimatedMinutes: 20,
-    markdown: `## Idea
-
-End of Part 1: **match authoritative HF logits** on a short prompt—proof the map and formulas are sound. Then Part 2 shows how weights get written from zero.
-
-### 1. What it is for
-
-Same prompt through arche vs HF Llama 3.2; compare argmax / max abs diff.
-
-### 2. From zero: how you build it
-
-Fixed seed/dtype; same weights; short seq; clean skip without weights.
-
-### 3. What “good” means
-
-Close enough with weights; explicit skip without; longer coverage later.
-
-### 4. Improve · whole-model impact
-
-Fail ⇒ revisit maps/RoPE/norm. Pass before optimize/serve.
-
-### 5. Industry · open models
-
-Repro CI often gates on HF/official match; engines keep numeric regressions.
-
-### 6. This course
-
-\`\`\`bash
-huggingface-cli login
-python chapters/01-inference/ep21_hf_align.py
-\`\`\`
-
-## Run
-
-\`\`\`bash
-huggingface-cli login
-python chapters/01-inference/ep21_hf_align.py
-\`\`\`
-
-## Fix
-
-No weights/login → skip ≠ broken logic.
-
-## Next
-
-
-**Pretrain** (\`/pretrain/\`): write weights from zero (toy API).
-
-`,
-  },
-  {
+{
     id: 'sharded-frontier',
     ep: '22',
     title: 'Sharded MoE / MLA',
@@ -1391,7 +1443,7 @@ Path complete—revisit weak chapters, or re-run HF align with weights.
 
 `,
   },
-  {
+{
     id: 'paged-cuda-graph',
     ep: '23',
     title: 'Paged KV · CUDA graphs',
@@ -1442,4 +1494,5 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 
 `,
   },
+
 ];

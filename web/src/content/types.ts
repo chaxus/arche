@@ -25,7 +25,7 @@ export type Chapter = {
   demo?: ChapterDemo;
 };
 
-/** Reading order: build → train from zero → serve → frontier architectures. */
+/** Reading order: tables + next-token train + dense trunk → align → serve → frontier. */
 export const PART_ORDER: PartId[] = ['start', 'trunk', 'train', 'infer', 'frontier'];
 
 /** Stable sort: PART_ORDER first, then original list order within a part. */
