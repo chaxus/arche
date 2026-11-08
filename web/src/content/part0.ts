@@ -6,19 +6,29 @@ export const PART0_EN: Chapter[] = [
     id: 'start-welcome',
     ep: '00a',
     title: 'Welcome',
-    summary: 'What this course is and how to move.',
+    summary: 'From zero: how an LLM is built, sped up, trained, and what the tip adds.',
     script: '',
     partId: 'start',
-    estimatedMinutes: 2,
+    estimatedMinutes: 5,
     markdown: `## Idea
 
-**arche** hand-writes a **Llama 3.2–style** dense decoder (not GPT-2 archaeology).
+**What you will learn:** what the computer is actually doing when a chatbot replies—write that path until it runs; then make it faster, try a tiny bit of training, and see the extra tricks used by more advanced models. No jargon required up front; absolute beginners start here.
 
-- Left nav = chapters (Part 0 → 4). Bottom = Previous / Next.
-- Mark as read stores progress in *this* browser only.
-- Labs are Python files under \`chapters/\` — Part 0 first, then run them.
+We use a small **Llama 3.2** model (~1 billion parameters) as the specimen: small enough to hold in your head, downloadable weights, same building blocks you meet in production.
 
-Repo: [github.com/chaxus/arche](https://github.com/chaxus/arche)
+**The full path (five stages):**
+
+| Stage | In plain words | Names you will meet later |
+| --- | --- | --- |
+| **0 Start** | Set up; learn to read a chapter and run one command | — |
+| **1 The model itself** | Hand-write “read tokens → layers → next token” piece by piece | Often called a *dense decoder*: RMSNorm, RoPE, attention, SwiGLU… |
+| **2 Make it faster** | Don’t recompute from scratch; schedule many requests; shrink the model a bit | KV cache, continuous batching, quantization, chat templates |
+| **3 Train a little** | Feel what “pretrain / follow humans” optimize on toy data | pretrain, SFT, DPO |
+| **4 Tip-of-field tricks** | Mixture of experts, compressed attention, paged memory—touch the shape as a map | MoE, MLA, paged KV, CUDA Graph |
+
+**Afterward you can roughly:** run the labs; open similar open-source code and know which layer you are in; enter papers or repos like vLLM with a map. In-course = **runnable principles + a frontier map**. Full industrial engines, huge clusters, multimodal—are the next climb *with* that map, not from zero.
+
+Site: left nav; Previous / Next; Mark as read is local-only. Repo: [github.com/chaxus/arche](https://github.com/chaxus/arche)
 
 ## Next
 
@@ -29,19 +39,19 @@ Repo: [github.com/chaxus/arche](https://github.com/chaxus/arche)
     id: 'start-llm-idea',
     ep: '00b',
     title: 'What an LLM does',
-    summary: 'Next-token prediction in one loop.',
+    summary: 'In one loop: keep guessing the next little text chunk.',
     script: '',
     partId: 'start',
     estimatedMinutes: 4,
     markdown: `## Idea
 
-An LLM repeatedly picks the **next token** from what came before:
+A large language model (LLM) repeatedly guesses the **next little text chunk** from what it already wrote:
 
-1. Score every token in the vocab.
-2. Pick one (greedy or sampled).
+1. Score every candidate in the vocabulary.
+2. Pick one (always the top score, or sample by probability).
 3. Append it; repeat.
 
-**Token** = text chunk (word or subword). **Embedding** = its vector. **Logits** = next-token scores.
+Three names you will meet: **token** = a small chunk of text; **embedding** = that chunk as a list of numbers (a vector); **logits** = scores for the next chunk.
 
 \`\`\`mermaid
 flowchart LR
@@ -156,14 +166,15 @@ In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \
 
 \`\`\`mermaid
 flowchart LR
-  p0[0 Setup] --> p1[1 Dense trunk]
-  p1 --> p2[2 Faster inference]
-  p2 --> p3[3 Tiny training]
-  p3 --> p4[4 Frontier]
+  p0[0 Setup] --> p1[1 Build the model]
+  p1 --> p2[2 Make it faster]
+  p2 --> p3[3 Train a little]
+  p3 --> p4[4 Newer tricks]
 \`\`\`
 
-- **Llama 3.2 lineage** = RMSNorm, RoPE, SwiGLU, GQA (target: 1B).
-- **HF login** only for gated tokenizer/weights chapters; most demos use tiny random tensors.
+- **Goal:** write “how the next word appears” → speed-ups and a taste of training → touch newer tricks by shape.  
+- **Specimen:** a small Llama 3.2 (~1B parameters); part names come later.  
+- **HF login** only when downloading the official tokenizer/weights; most labs use tiny random numbers.
 
 ## Next
 

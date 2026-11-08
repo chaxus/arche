@@ -2,25 +2,26 @@
 
 **ἀρχή** — origin, first principle.
 
-Hand-write a **modern dense** decoder (Llama 3.2 lineage) in PyTorch, then the frontier add-ons that matter next: **KV cache**, **RoPE scaling**, **MoE**, **MLA**, plus inference engineering and tiny **pretrain / SFT / DPO** loops. Load open weights. No GPT-2 archaeology.
+**From zero: see what a chatbot is computing—by writing one.** Build the model in PyTorch, make it faster, try a little training, then peek at newer tricks (mixture-of-experts, compressed attention, paged memory…). Specimen: small **Llama 3.2** (~1B). Site: **[arche.chaxus.com](https://arche.chaxus.com)** (EN / 中文).
 
-**New to programming?** Open [arche.chaxus.com](https://arche.chaxus.com) (home → **Continue** / Part 0). No Python assumed. Interactive pictures cover RoPE / GQA / KV cache; then run `python chapters/00-start/ep00_check_setup.py`.
+从零开始：亲手写出大模型在算什么 → 让它更快 → 练一练 → 看更前沿的招。学习站：[arche.chaxus.com/cn/](https://arche.chaxus.com/cn/)（不要求先懂术语）。
 
-- Architecture target: **Llama 3.2 1B** (same family as 3B), plus MoE / MLA primers
-- Pedagogy: Part 0 onboarding + one runnable chapter per module (EN / 中文)
-- Learning site: **[arche.chaxus.com](https://arche.chaxus.com)** (ranui, progress, demos, prev/next)
+| Plain path | What’s inside |
+| --- | --- |
+| **1 Build the model** | Write next-token path end to end (RMSNorm, RoPE, attention, SwiGLU, stack, HF weights) |
+| **2 Make it faster** | KV cache, long-context RoPE, batching, quant, chat template |
+| **3 Train a little** | Toy pretrain, SFT, DPO |
+| **4 Newer tricks** | MoE, MLA, sharded checkpoints, paged KV, CUDA Graph |
+
+In-course = runnable principles + a map into tip papers and engines. Full production stacks (vLLM-class, huge trainers, multimodal) are the **next** climb—with that map, not from zero.
+
+**New here?** Open the site → **Continue** / Part 0, then `python chapters/00-start/ep00_check_setup.py`.
+
 - License: [Apache-2.0](LICENSE)
 
-## Why not GPT-2
+## Why Llama 3.2
 
-GPT-2 is a fine teaching fossil. This repo starts on the **current trunk**:
-
-| Prefer (here) | Avoid as the main path |
-| --- | --- |
-| RMSNorm | LayerNorm-as-default story |
-| RoPE (+ long-context scaling) | Absolute learned position embeds |
-| SwiGLU / MoE | GELU FFN as the “only” FFN |
-| GQA / MLA | Multi-head without KV grouping or compression |
+Small enough to hold in your head (**~1B**), downloadable HF weights, and the same parts production models still use—then newer tricks (MoE / MLA / …) on top once the base path is yours.
 
 ## Quick start
 

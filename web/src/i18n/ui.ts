@@ -41,7 +41,7 @@ export type UiCopy = {
 };
 
 const EN: UiCopy = {
-  brandTagline: 'ἀρχή — modern dense from first principles',
+  brandTagline: 'ἀρχή — build an LLM by hand, from zero',
   chaptersNav: 'Chapters',
   lessonHeading: 'Lesson',
   companionPython: 'Companion Python',
@@ -71,14 +71,15 @@ const EN: UiCopy = {
   minutesLabel: 'min',
   partLabels: {
     start: 'Part 0 — Start here',
-    trunk: 'Part 1 — The dense trunk',
-    infer: 'Part 2 — Faster inference',
-    train: 'Part 3 — Tiny training',
-    frontier: 'Part 4 — Frontier primers',
+    trunk: 'Part 1 — Build the model',
+    infer: 'Part 2 — Make it faster',
+    train: 'Part 3 — Train a little',
+    frontier: 'Part 4 — Newer tricks',
   },
   homeNav: 'Home',
-  homeTitle: 'Hand-write a modern dense LLM',
-  homeLede: 'Part 0 if you are new. Continue resumes where you left off.',
+  homeTitle: 'See what an LLM is doing—by writing one',
+  homeLede:
+    'From zero: build the model, speed it up, try tiny training, then peek at newer tricks. Continue picks up where you left off.',
   continueLabel: 'Continue',
   continueStart: 'Start Part 0',
   homePartsHeading: 'Path',
@@ -86,7 +87,7 @@ const EN: UiCopy = {
 };
 
 const CN: UiCopy = {
-  brandTagline: 'ἀρχή — 从第一性原理手写现代 dense',
+  brandTagline: 'ἀρχή — 从零开始，亲手写出大模型',
   chaptersNav: '章节',
   lessonHeading: '课程',
   companionPython: '配套 Python',
@@ -116,14 +117,14 @@ const CN: UiCopy = {
   minutesLabel: '分钟',
   partLabels: {
     start: '第 0 部分 — 从这里开始',
-    trunk: '第 1 部分 — Dense 主干',
-    infer: '第 2 部分 — 更快推理',
-    train: '第 3 部分 — 小规模训练',
-    frontier: '第 4 部分 — 前沿引物',
+    trunk: '第 1 部分 — 写出模型本体',
+    infer: '第 2 部分 — 让它算得更快',
+    train: '第 3 部分 — 练一练',
+    frontier: '第 4 部分 — 更前沿的招',
   },
   homeNav: '首页',
-  homeTitle: '用手写学现代 dense',
-  homeLede: '新手走第 0 部分；回访点「继续」。',
+  homeTitle: '亲手写出一个大模型，看懂它在算什么',
+  homeLede: '零基础可走：写出模型 → 算得更快 → 练一练 → 看更新的招数。回访点「继续」。',
   continueLabel: '继续',
   continueStart: '开始第 0 部分',
   homePartsHeading: '路径',
