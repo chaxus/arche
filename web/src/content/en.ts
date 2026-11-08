@@ -11,27 +11,54 @@ export const CHAPTERS_EN: Chapter[] = [
     script: 'chapters/01-inference/ep01_overview.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## Why this path
+    markdown: `## In one sentence
+You will see the big picture of a modern dense language model—and why this course does not start with GPT-2.
 
-**arche** (ἀρχή) means *first principle*. We hand-write a **current** dense decoder:
+## Before you start
+- Finish Part 0 (especially the journey map).
+- Time: about 12 minutes.
+- Optional: run the companion script after reading.
 
-- **RMSNorm** instead of LayerNorm-as-default
-- **RoPE** instead of absolute position tables
-- **SwiGLU** instead of a GELU-only FFN story
-- **GQA** so decode-time KV cache stays affordable
+## The idea (plain language)
+A **dense decoder** reads tokens from left to right and predicts the next one. Inside, the same kind of block repeats many times. Modern stacks prefer:
 
-Target weights: **Llama 3.2 1B** (same family as 3B). Capability comes from open weights; understanding comes from writing the forward pass.
+- **RMSNorm** to stabilize numbers
+- **RoPE** to encode position by rotating vectors
+- **SwiGLU** as the feed-forward recipe
+- **GQA** so key/value memory stays smaller while decoding
+
+**Llama 3.2 lineage** means we follow that recipe (1B is the teaching target). Capability later comes from official weights; understanding comes from writing the forward pass.
 
 \`\`\`mermaid
 flowchart LR
   tok[Tokenizer] --> emb[Embedding]
   emb --> stack[Block_x_N]
   stack --> head[LM_head]
-  stack --- rms[RMSNorm]
-  stack --- rope[RoPE]
-  stack --- gqa[GQA]
-  stack --- swiglu[SwiGLU]
 \`\`\`
+
+## Picture / formula
+Keep the diagram above in mind. Formulas appear when a chapter needs them.
+
+## In the code
+- Config helpers: \`arche/config.py\` (\`llama32_1b\`)
+- Companion: \`chapters/01-inference/ep01_overview.py\` prints sizes (layers, heads, dim)—not chat text.
+
+## Do this now
+\`\`\`bash
+python chapters/01-inference/ep01_overview.py
+\`\`\`
+You should see numbers for vocab size, layers, and heads.
+
+## If something breaks
+- \`No module named arche\` → activate \`.venv\` and run from the repo root.
+- Script not found → \`cd\` into the \`arche\` folder first.
+
+## Don't worry about yet
+Training giant models, serving millions of users, or every Llama variant.
+
+## Next
+**Tokenizer** (\`?c=tokenizer\`).
+
 `,
   },
   {
@@ -42,18 +69,40 @@ flowchart LR
     script: 'chapters/01-inference/ep02_tokenizer.py',
     partId: 'trunk',
     estimatedMinutes: 15,
-    markdown: `## Role
+    markdown: `## In one sentence
+Text becomes integer **token ids** before the model can think in vectors.
 
-The model never sees characters. A tokenizer maps text ↔ integer ids in a fixed vocabulary (\`128256\` for Llama 3.2).
+## Before you start
+- Overview done.
+- Time: ~15 minutes.
+- Official Llama 3.2 tokenizer is **gated** on Hugging Face—login only when you run this lab.
 
-We use the **official** tokenizer (Hugging Face gated model). The learning focus of this repo is the dense trunk, not reinventing BPE.
+## The idea (plain language)
+Models do not read letters the way humans do. A **tokenizer** chops text into tokens and maps each to an id in a fixed vocabulary (Llama 3.2: 128256 entries).
 
-Run locally:
+We use the **official** tokenizer. This course focuses on the neural trunk, not reinventing compression algorithms (BPE).
 
+## In the code
+- \`arche/tokenizer.py\`
+- Companion: \`chapters/01-inference/ep02_tokenizer.py\`
+
+## Do this now
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 \`\`\`
+Expect printed token ids for a sample string. If you skip login, continue reading—you can return later.
+
+## If something breaks
+- Gated 401/403 → accept the model license on Hugging Face, then login again.
+- Slow download → optional \`export HF_ENDPOINT=https://hf-mirror.com\` (mainland networks).
+
+## Don't worry about yet
+Training your own tokenizer or Unicode edge cases.
+
+## Next
+**Embedding** (\`?c=embedding\`).
+
 `,
   },
   {
@@ -64,13 +113,42 @@ python chapters/01-inference/ep02_tokenizer.py
     script: 'chapters/01-inference/ep03_embedding.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## Lookup, not position
+    markdown: `## In one sentence
+Each token id becomes a learned list of numbers—a row in a big lookup table.
 
-\`TokenEmbedding\` is a table of shape \`(vocab_size, embed_dim)\`.
+## Before you start
+- Tokenizer concept clear (ids exist).
+- Time: ~12 minutes.
 
-Modern dense stacks **do not** add a learned absolute position embedding here. Position enters later through **RoPE** on Q and K.
+## The idea (plain language)
+Think of a dictionary: token id → vector of length \`embed_dim\`. That table is **TokenEmbedding**.
 
-Llama 3.2 1B/3B also **tie** the embedding weight with the LM head.
+Modern dense models usually **do not** add a separate absolute position table here. Position arrives later via **RoPE** on attention queries/keys.
+
+Llama 3.2 also **ties** embedding weights with the final LM head (same numbers reused).
+
+## Picture / formula
+$$X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}$$
+
+## In the code
+- \`arche/embedding.py\`
+- Companion: \`chapters/01-inference/ep03_embedding.py\`
+
+## Do this now
+\`\`\`bash
+python chapters/01-inference/ep03_embedding.py
+\`\`\`
+Look for output shapes like \`(batch, seq, embed_dim)\`.
+
+## If something breaks
+- Shape errors usually mean you edited the demo sizes—re-copy the script from git.
+
+## Don't worry about yet
+How embeddings are trained, or fancy token types (segment ids).
+
+## Next
+**RMSNorm** (\`?c=rmsnorm\`).
+
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',
   },

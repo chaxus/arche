@@ -11,27 +11,54 @@ export const CHAPTERS_CN: Chapter[] = [
     script: 'chapters/01-inference/ep01_overview.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## 为什么走这条路
+    markdown: `## 一句话
+先看清现代 dense 语言模型的全貌——以及为什么本课不从 GPT-2 考古开始。
 
-**arche**（ἀρχή）意为「本原 / 第一原理」。我们手写的是**当下**的 dense 解码器：
+## 开始之前
+- 第 0 部分（尤其是旅程地图）已完成。
+- 约 12 分钟。
+- 读完可跑配套脚本。
 
-- **RMSNorm**，而不是把 LayerNorm 当默认故事
-- **RoPE**，而不是绝对位置嵌入表
-- **SwiGLU**，而不是只讲 GELU FFN
-- **GQA**，让解码时的 KV cache 更省
+## 用人话讲
+**Dense 解码器**从左到右读 token，预测下一个。内部是同一种积木重复很多层。现代做法更偏向：
 
-目标权重：**Llama 3.2 1B**（与 3B 同族）。能力来自开源权重；理解来自自己写前向。
+- **RMSNorm** 稳住数值
+- **RoPE** 用旋转表达位置
+- **SwiGLU** 作为前馈网络配方
+- **GQA** 让解码时的 KV 更省
+
+**Llama 3.2 谱系**就是按这张零件清单走（教学目标是 1B）。能力以后来自官方权重；理解来自自己写前向。
 
 \`\`\`mermaid
 flowchart LR
-  tok[Tokenizer] --> emb[Embedding]
+  tok[分词] --> emb[嵌入]
   emb --> stack[Block_x_N]
   stack --> head[LM_head]
-  stack --- rms[RMSNorm]
-  stack --- rope[RoPE]
-  stack --- gqa[GQA]
-  stack --- swiglu[SwiGLU]
 \`\`\`
+
+## 图或公式
+先记住上面的流程图；公式会在需要时出现。
+
+## 对应代码
+- 配置：\`arche/config.py\`（\`llama32_1b\`）
+- 配套：\`chapters/01-inference/ep01_overview.py\` 打印层数、头数、维度——不是聊天。
+
+## 现在就做
+\`\`\`bash
+python chapters/01-inference/ep01_overview.py
+\`\`\`
+应看到词表大小、层数、头数等数字。
+
+## 如果翻车了
+- \`No module named arche\`：激活 \`.venv\`，在仓库根目录运行。
+- 找不到脚本：先 \`cd\` 到 \`arche\` 目录。
+
+## 先别深挖
+训练超大模型、线上服务、所有 Llama 变体。
+
+## 下一章
+**分词器**（\`?c=tokenizer\`）。
+
 `,
   },
   {
@@ -42,18 +69,40 @@ flowchart LR
     script: 'chapters/01-inference/ep02_tokenizer.py',
     partId: 'trunk',
     estimatedMinutes: 15,
-    markdown: `## 作用
+    markdown: `## 一句话
+文字要先变成整数 **token id**，模型才能用向量计算。
 
-模型从不直接看字符。分词器在固定词表（Llama 3.2 为 \`128256\`）上做文本 ↔ 整数 id。
+## 开始之前
+- 已读总览。
+- 约 15 分钟。
+- 官方 Llama 3.2 分词器在 Hugging Face 上是**门禁**的——跑本章实验时再登录即可。
 
-这里使用**官方**分词器（Hugging Face 门禁模型）。本仓库的学习重点是 dense 主干，而不是重造 BPE。
+## 用人话讲
+模型不像人那样直接读字母。**分词器**把文本切成 token，并映射到固定词表里的编号（Llama 3.2：128256）。
 
-本地运行：
+我们用**官方**分词器。本课重点是神经网络主干，不重造 BPE。
 
+## 对应代码
+- \`arche/tokenizer.py\`
+- 配套：\`chapters/01-inference/ep02_tokenizer.py\`
+
+## 现在就做
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep02_tokenizer.py
 \`\`\`
+会打印示例字符串的 token id。若暂时不登录，可先继续读，稍后再回来跑。
+
+## 如果翻车了
+- 401/403：先在网页接受模型协议，再 login。
+- 下载慢：可设 \`export HF_ENDPOINT=https://hf-mirror.com\`。
+
+## 先别深挖
+自己训练分词器，或纠结所有 Unicode 边角。
+
+## 下一章
+**嵌入层**（\`?c=embedding\`）。
+
 `,
   },
   {
@@ -64,13 +113,42 @@ python chapters/01-inference/ep02_tokenizer.py
     script: 'chapters/01-inference/ep03_embedding.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## 查表，不是位置
+    markdown: `## 一句话
+每个 token id 变成一串学来的数字——大查找表里的一行。
 
-\`TokenEmbedding\` 是形状为 \`(vocab_size, embed_dim)\` 的查找表。
+## 开始之前
+- 理解「先有 token id」。
+- 约 12 分钟。
 
-现代 dense 堆叠**不会**在这里再加一份可学习的绝对位置嵌入。位置稍后通过 Q/K 上的 **RoPE** 进入。
+## 用人话讲
+把它想成词典：token id → 长度为 \`embed_dim\` 的向量。这张表就是 **TokenEmbedding**。
 
-Llama 3.2 1B/3B 还会把嵌入权重与 LM head **绑在一起**（weight tying）。
+现代 dense 模型通常**不会**在这里再加一张绝对位置表。位置稍后由注意力里的 **RoPE** 提供。
+
+Llama 3.2 还会把嵌入与最终 LM head **绑权**（共用同一份数字）。
+
+## 图或公式
+$$X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}$$
+
+## 对应代码
+- \`arche/embedding.py\`
+- 配套：\`chapters/01-inference/ep03_embedding.py\`
+
+## 现在就做
+\`\`\`bash
+python chapters/01-inference/ep03_embedding.py
+\`\`\`
+关注形状是否像 \`(batch, seq, embed_dim)\`。
+
+## 如果翻车了
+- 形状对不上：多半改乱了示例尺寸——用 git 恢复脚本。
+
+## 先别深挖
+嵌入如何训练、segment id 等花样。
+
+## 下一章
+**RMSNorm**（\`?c=rmsnorm\`）。
+
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',
   },
