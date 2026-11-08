@@ -41,7 +41,20 @@ Llama 3.2 是 Meta **Llama 3** 系列的开放小规格——与更大 Llama（�
 
 所以：**架构 = 当前前沿 dense；规模 = ~1B，好让从零写得完。** 不是「聊天最强」，也不是「在家训 70B」。
 
-### 3. 从零开始：怎么「生成」这条路线
+### 3. DeepSeek 算什么架构（同一条路，后面的地图）
+
+口语里的 **DeepSeek 前沿开源**（V2 / V3、以及以 V3 为底的 R1）**不是**「另一个 Llama dense」。一句话对照：
+
+| | **Llama 3.2（本课例子）** | **DeepSeek-V2 / V3 系** |
+| --- | --- | --- |
+| 容量 | 每层 **Dense** FFN | **MoE**——多专家，每次 top-k 激活 |
+| 注意力 / KV | **GQA** | **MLA**——用 latent 压 KV |
+| 共同底色 | RMSNorm / RoPE / 现代解码器骨架 | 同属 Transformer 家族，升级点不同 |
+| 在本课位置 | 第 1–3 部分手写并跑通 | 第 4 部分引物：MoE → MLA → 检查点地图 |
+
+**读法：** Llama 教 dense 主干；DeepSeek 是这条家族上很重要的开源 **MoE + MLA** 分支。不第一天就从 DeepSeek 起手——先要有 dense 栈。
+
+### 4. 从零开始：怎么「生成」这条路线
 
 | 步骤 | 做什么 |
 | --- | --- |
@@ -51,24 +64,24 @@ Llama 3.2 是 Meta **Llama 3** 系列的开放小规格——与更大 Llama（�
 | **4. 先随机权重跑通形状，再 Part 2 自训，并可用 Llama 例子加载对照** | 图对 → 数对 |
 | **5. 生成 + HF 验收 → 服务 → 前沿** | 侧栏一条路 |
 
-### 4. 怎么样算选对了
+### 5. 怎么样算选对了
 
 | 类型 | 标准 |
 | --- | --- |
 | **硬** | 配置自洽；积木与声称的开源配方一致 |
 | **硬** | 能支撑「从零」叙事：表可训、网可叠、权可装 |
 | **软** | 社区文档全、权重可申请 |
-| **软** | 后续前沿引物（MoE/MLA）有地方挂 |
+| **软** | 后续 MoE/MLA 引物有地方挂（DeepSeek 向地图） |
 
-### 5. 如何改进 · 对整模影响
+### 6. 如何改进 · 对整模影响
 
 换例子（如改 Qwen）→ 分词/嵌入/块配置全换，课程映射要重做。加深/加宽 → 全面重训。本课保持 1B 例子，用引物看更大模型。
 
-### 6. 业界 · 开源怎么做
+### 7. 业界 · 开源怎么做
 
-Llama / Qwen / DeepSeek 等均以「公开配置 + 检查点 + 分词」发布；教学与复现都先对齐一份配方。vLLM 等引擎假设你已有这类 dense/MoE 检查点。
+Llama / Qwen 主推 dense（也有 MoE 变体）；**DeepSeek-V3** 是开源侧 **大 MoE + MLA** 的旗舰叙事。都以「公开配置 + 检查点 + 分词」发布；vLLM 等引擎假设你已有这类检查点。
 
-### 7. 本课
+### 8. 本课
 
 \`\`\`bash
 python chapters/01-inference/ep01_overview.py
@@ -1071,11 +1084,11 @@ python chapters/01-inference/ep13_rope_scaling.py
     estimatedMinutes: 15,
     markdown: `## 要点
 
-从零若要「更大容量、可控算力」，dense FFN 会贵——**MoE** 用稀疏专家换参数量，是前沿开源（Mixtral、DeepSeek-MoE 等）主路线之一。
+从零若要「更大容量、可控算力」，dense FFN 会贵——**MoE** 用稀疏专家换参数量。**DeepSeek-V3** 的开源叙事大体是 **MoE（容量）+ MLA（压 KV）**；本章先讲 MoE 这一半。Mixtral 也是开源 MoE；本课 Llama 3.2 例子故意先停在 **dense**。
 
 ### 1. 有什么作用
 
-多专家 SwiGLU + 路由：每 token **top-k** 专家，其余不算。
+多专家 SwiGLU + 路由：每 token **top-k** 专家，其余不算。替换的是前面手写的 dense FFN——解码器骨架还在，换的是容量手段。
 
 ### 2. 从零开始：怎么生成
 
@@ -1106,12 +1119,12 @@ python chapters/01-inference/ep13_rope_scaling.py
 
 ### 5. 业界 · 开源
 
-| 系 | 做法 |
+| 系 | 角色 |
 | --- | --- |
-| **Mixtral** | top-2 专家 SwiGLU |
-| **DeepSeek-V3** | 大规模 MoE + 精细路由 |
+| **DeepSeek-V3** | 大 **MoE** + **MLA**（下一章）——开源非 dense 旗舰叙事 |
+| **Mixtral** | top-2 专家 SwiGLU 的 MoE |
 | **Qwen-MoE 等** | 各自 E/k 配方 |
-| **Llama 3.2 1B 例子** | dense——先懂 dense 再挂 MoE |
+| **Llama 3.2 ~1B（本课）** | 先 dense——再读 DeepSeek 地图 |
 
 ### 6. 本课
 
@@ -1141,11 +1154,11 @@ python chapters/01-inference/ep14_moe.py
     estimatedMinutes: 18,
     markdown: `## 要点
 
-从零做长上下文服务：GQA 之后 KV 仍可能爆——**MLA** 用低秩 latent 压缓存，是 DeepSeek 系对接前沿的关键一招。
+从零做长上下文服务：GQA 之后 KV 仍可能爆——**MLA**（Multi-head Latent Attention）用低秩 latent 压缓存。和 **MoE** 合在一起，就是口语里 **DeepSeek-V2 / V3** 的一句话画像：MoE 管容量，MLA 管 KV。
 
 ### 1. 有什么作用
 
-缓存 latent（+ 小段 RoPE 流）而非满头 K/V，需要时再展开。
+缓存 latent（+ 小段 RoPE 流）而非满头 K/V，需要时再展开。Llama / Qwen 主线仍是 **GQA**；DeepSeek 开源前沿线推 **MLA**。
 
 ### 2. 从零开始：怎么生成
 
@@ -1169,7 +1182,11 @@ python chapters/01-inference/ep14_moe.py
 
 ### 5. 业界 · 开源
 
-DeepSeek-V2/V3 推 MLA；Llama/Qwen 主线仍 GQA。引擎侧逐步增加 MLA 支持。
+| 系 | 注意力 / KV |
+| --- | --- |
+| **DeepSeek-V2 / V3** | **MLA**（+ MoE 本体） |
+| **Llama 3 / Qwen dense** | **GQA** 主线 |
+| 引擎（vLLM 等） | 逐步加 MLA 支持 |
 
 ### 6. 本课
 

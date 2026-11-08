@@ -1,10 +1,10 @@
 ## 要点
 
-从零做长上下文服务：GQA 之后 KV 仍可能爆——**MLA** 用低秩 latent 压缓存，是 DeepSeek 系对接前沿的关键一招。
+从零做长上下文服务：GQA 之后 KV 仍可能爆——**MLA**（Multi-head Latent Attention）用低秩 latent 压缓存。和 **MoE** 合在一起，就是口语里 **DeepSeek-V2 / V3** 的一句话画像：MoE 管容量，MLA 管 KV。
 
 ### 1. 有什么作用
 
-缓存 latent（+ 小段 RoPE 流）而非满头 K/V，需要时再展开。
+缓存 latent（+ 小段 RoPE 流）而非满头 K/V，需要时再展开。Llama / Qwen 主线仍是 **GQA**；DeepSeek 开源前沿线推 **MLA**。
 
 ### 2. 从零开始：怎么生成
 
@@ -28,7 +28,11 @@
 
 ### 5. 业界 · 开源
 
-DeepSeek-V2/V3 推 MLA；Llama/Qwen 主线仍 GQA。引擎侧逐步增加 MLA 支持。
+| 系 | 注意力 / KV |
+| --- | --- |
+| **DeepSeek-V2 / V3** | **MLA**（+ MoE 本体） |
+| **Llama 3 / Qwen dense** | **GQA** 主线 |
+| 引擎（vLLM 等） | 逐步加 MLA 支持 |
 
 ### 6. 本课
 

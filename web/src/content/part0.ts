@@ -24,7 +24,7 @@ export const PART0_EN: Chapter[] = [
 | **1 Build the dense trunk** | Grow a tiny tokenizer/embeds → hand-write RMSNorm, RoPE, GQA, SwiGLU… → generate → compare with the Llama example (HF) | dense decoder |
 | **2 Train from zero** | Feel how pretrain / SFT / DPO write the weights | pretrain, SFT, DPO |
 | **3 Generate & serve faster** | KV cache, long context, device/quant, continuous batch, paging | KV, RoPE scaling, paged KV… |
-| **4 Frontier structures** | MoE, MLA, checkpoint map—touch the shape | MoE, MLA, shards |
+| **4 Frontier structures** | MoE + MLA map (DeepSeek-V3-shaped open stack), checkpoints | MoE, MLA, shards |
 
 **Afterward you can roughly:** run the labs; open similar open-source code and know which layer you are in; enter papers or repos like vLLM with a map. In-course = **runnable principles + a frontier map**. Full industrial engines, huge clusters, multimodal—are the next climb *with* that map, not from zero.
 

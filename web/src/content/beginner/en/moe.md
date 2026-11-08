@@ -1,10 +1,10 @@
 ## Idea
 
-From zero, huge capacity at controlled compute often means **MoE**—sparse experts (Mixtral, DeepSeek-MoE, …).
+From zero, huge capacity at controlled compute often means **MoE**—sparse experts. **DeepSeek-V3**’s open story is largely **MoE (capacity) + MLA (KV)**; this chapter is the MoE half. Mixtral is another open MoE; our Llama 3.2 example stayed **dense** on purpose.
 
 ### 1. What it is for
 
-Many SwiGLU experts + router; each token runs top-k only.
+Many SwiGLU experts + router; each token runs top-k only. Replaces the dense FFN you wrote earlier—same decoder spine, different capacity trick.
 
 ### 2. From zero: how you build it
 
@@ -20,7 +20,12 @@ More experts/k ⇒ capacity/compute; balance loss fights collapse; replacing den
 
 ### 5. Industry · open models
 
-Mixtral top-2; DeepSeek-V3 large MoE; Qwen-MoE variants; Llama 3.2 1B example stays dense first.
+| Line | Role |
+| --- | --- |
+| **DeepSeek-V3** | Large **MoE** + **MLA** (next chapter)—flagship open non-dense stack |
+| **Mixtral** | MoE with top-2 SwiGLU experts |
+| **Qwen-MoE** | Own E/k recipes |
+| **Llama 3.2 ~1B (this course)** | Dense first—then you can read DeepSeek’s map |
 
 ### 6. This course
 

@@ -1,10 +1,10 @@
 ## Idea
 
-From-zero long-context serving: after GQA, KV can still explode—**MLA** compresses cache with latents (DeepSeek line).
+From-zero long-context serving: after GQA, KV can still explode—**MLA** (Multi-head Latent Attention) compresses cache with latents. Together with **MoE**, this is the usual one-line picture of **DeepSeek-V2 / V3**: MoE for capacity, MLA for KV.
 
 ### 1. What it is for
 
-Store low-rank latents (+ small RoPE stream), expand when needed.
+Store low-rank latents (+ small RoPE stream), expand when needed. Llama / Qwen mainlines stay on **GQA**; DeepSeek’s open frontier line pushes **MLA**.
 
 ### 2. From zero: how you build it
 
@@ -20,7 +20,11 @@ Smaller latent ⇒ save memory / risk quality; composable with paging; architect
 
 ### 5. Industry · open models
 
-DeepSeek-V2/V3 push MLA; Llama/Qwen stay GQA-mainline; engines add support over time.
+| Line | Attention / KV |
+| --- | --- |
+| **DeepSeek-V2 / V3** | **MLA** (+ MoE body) |
+| **Llama 3 / Qwen dense** | **GQA** mainline |
+| Engines (vLLM, …) | Adding MLA support over time |
 
 ### 6. This course
 

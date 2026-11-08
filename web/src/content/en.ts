@@ -34,7 +34,20 @@ Llama 3.2 is the small open release of Meta’s **Llama 3** line—the same reci
 
 So: **architecture = current frontier dense; scale = ~1B so from-zero is finishable.** Not “the smartest chatbot,” and not “train 70B at home.”
 
-### 3. From zero: how you “generate” this path
+### 3. Where DeepSeek fits (same path, later map)
+
+When people say **DeepSeek’s frontier open stack** (V2 / V3 / R1-on-V3), they usually mean **not** “another Llama dense.” Headline:
+
+| | **Llama 3.2 (this course’s example)** | **DeepSeek-V2 / V3 line** |
+| --- | --- | --- |
+| Capacity | **Dense** FFN every layer | **MoE** — many experts, top-k active |
+| Attention / KV | **GQA** | **MLA** — latent-compressed KV |
+| Shared DNA | RMSNorm / RoPE / modern decoder shape | Same Transformer family, different upgrades |
+| In this course | Parts 1–3 hand-write and run | Part 4 primers: MoE → MLA → checkpoint map |
+
+**Read it as:** Llama teaches the dense trunk; DeepSeek is a major open **MoE + MLA** branch on top of that family. We do not start from DeepSeek day one—you need the dense stack first.
+
+### 4. From zero: how you “generate” this path
 
 | Step | What you do |
 | --- | --- |
@@ -44,24 +57,24 @@ So: **architecture = current frontier dense; scale = ~1B so from-zero is finisha
 | **4. Random shapes first, then train (Part 2) and/or load the Llama example to check** | Graph → numbers |
 | **5. Generate + HF check → serve → frontier** | One sidebar path |
 
-### 4. What “good example” means
+### 5. What “good example” means
 
 | Kind | Check |
 | --- | --- |
 | **Hard** | Config consistent; bricks match the claimed recipe |
 | **Hard** | Supports from-zero: tables trainable, net stackable, weights loadable |
 | **Soft** | Docs + obtainable weights |
-| **Soft** | Room for MoE/MLA primers |
+| **Soft** | Room for MoE/MLA primers (DeepSeek-shaped map) |
 
-### 5. Improve · whole-model impact
+### 6. Improve · whole-model impact
 
 Swap the example (e.g. Qwen) ⇒ retarget tokenizer/embeds/blocks. Wider/deeper ⇒ full retrain. We keep 1B and use primers for larger ideas.
 
-### 6. Industry · open models
+### 7. Industry · open models
 
-Llama / Qwen / DeepSeek ship config + checkpoint + tokenizer; engines like vLLM assume such checkpoints.
+Llama / Qwen ship dense (and some MoE variants); **DeepSeek-V3** is the open flagship of **large MoE + MLA**. All ship config + checkpoint + tokenizer; engines like vLLM assume such checkpoints.
 
-### 7. This course
+### 8. This course
 
 \`\`\`bash
 python chapters/01-inference/ep01_overview.py
@@ -888,11 +901,11 @@ python chapters/01-inference/ep13_rope_scaling.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
-From zero, huge capacity at controlled compute often means **MoE**—sparse experts (Mixtral, DeepSeek-MoE, …).
+From zero, huge capacity at controlled compute often means **MoE**—sparse experts. **DeepSeek-V3**’s open story is largely **MoE (capacity) + MLA (KV)**; this chapter is the MoE half. Mixtral is another open MoE; our Llama 3.2 example stayed **dense** on purpose.
 
 ### 1. What it is for
 
-Many SwiGLU experts + router; each token runs top-k only.
+Many SwiGLU experts + router; each token runs top-k only. Replaces the dense FFN you wrote earlier—same decoder spine, different capacity trick.
 
 ### 2. From zero: how you build it
 
@@ -908,7 +921,12 @@ More experts/k ⇒ capacity/compute; balance loss fights collapse; replacing den
 
 ### 5. Industry · open models
 
-Mixtral top-2; DeepSeek-V3 large MoE; Qwen-MoE variants; Llama 3.2 1B example stays dense first.
+| Line | Role |
+| --- | --- |
+| **DeepSeek-V3** | Large **MoE** + **MLA** (next chapter)—flagship open non-dense stack |
+| **Mixtral** | MoE with top-2 SwiGLU experts |
+| **Qwen-MoE** | Own E/k recipes |
+| **Llama 3.2 ~1B (this course)** | Dense first—then you can read DeepSeek’s map |
 
 ### 6. This course
 
@@ -938,11 +956,11 @@ python chapters/01-inference/ep14_moe.py
     estimatedMinutes: 18,
     markdown: `## Idea
 
-From-zero long-context serving: after GQA, KV can still explode—**MLA** compresses cache with latents (DeepSeek line).
+From-zero long-context serving: after GQA, KV can still explode—**MLA** (Multi-head Latent Attention) compresses cache with latents. Together with **MoE**, this is the usual one-line picture of **DeepSeek-V2 / V3**: MoE for capacity, MLA for KV.
 
 ### 1. What it is for
 
-Store low-rank latents (+ small RoPE stream), expand when needed.
+Store low-rank latents (+ small RoPE stream), expand when needed. Llama / Qwen mainlines stay on **GQA**; DeepSeek’s open frontier line pushes **MLA**.
 
 ### 2. From zero: how you build it
 
@@ -958,7 +976,11 @@ Smaller latent ⇒ save memory / risk quality; composable with paging; architect
 
 ### 5. Industry · open models
 
-DeepSeek-V2/V3 push MLA; Llama/Qwen stay GQA-mainline; engines add support over time.
+| Line | Attention / KV |
+| --- | --- |
+| **DeepSeek-V2 / V3** | **MLA** (+ MoE body) |
+| **Llama 3 / Qwen dense** | **GQA** mainline |
+| Engines (vLLM, …) | Adding MLA support over time |
 
 ### 6. This course
 

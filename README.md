@@ -32,6 +32,8 @@ Llama 3.2 is the small open sibling of Meta’s **Llama 3** line—the same bric
 
 Not “best chatbot,” not “train 70B at home”—one recipe for from-zero writing and industry-shaped reading.
 
+**DeepSeek (V2/V3 line)** is a different open headline: **MoE + MLA**, not another Llama dense. This course writes the dense trunk first; Part 4 maps MoE/MLA so you can read that stack.
+
 ## Quick start
 
 ```bash

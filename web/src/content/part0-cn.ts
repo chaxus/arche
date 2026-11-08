@@ -24,7 +24,7 @@ export const PART0_CN: Chapter[] = [
 | **1 写出 dense 本体** | 自训小分词/嵌入 → 手写 RMSNorm、RoPE、GQA、SwiGLU… → 生成 → 用 Llama 例子对照（HF） | dense 解码器 |
 | **2 从零训练** | 用玩具数据感受「预训练 / SFT / DPO」怎样写出权重 | pretrain、SFT、DPO |
 | **3 生成与服务加速** | KV 缓存、长上下文、设备与量化、连续批、分页 | KV、RoPE 缩放、Paged KV… |
-| **4 前沿结构** | MoE、MLA 与检查点地图——先摸形状 | MoE、MLA、分片 |
+| **4 前沿结构** | MoE + MLA 地图（DeepSeek-V3 向开源栈）、检查点 | MoE、MLA、分片 |
 
 **学完你大概能：** 自己跑通实验；看懂同类开源代码大概在哪一层；再去读论文或 vLLM 一类仓库时知道从哪切入。课内是**能跑的原理 + 前沿地图**；完整工业引擎、超大集群、多模态是下一层，带着地图去接，不用从零猜。
 

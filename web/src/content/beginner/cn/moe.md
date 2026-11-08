@@ -1,10 +1,10 @@
 ## 要点
 
-从零若要「更大容量、可控算力」，dense FFN 会贵——**MoE** 用稀疏专家换参数量，是前沿开源（Mixtral、DeepSeek-MoE 等）主路线之一。
+从零若要「更大容量、可控算力」，dense FFN 会贵——**MoE** 用稀疏专家换参数量。**DeepSeek-V3** 的开源叙事大体是 **MoE（容量）+ MLA（压 KV）**；本章先讲 MoE 这一半。Mixtral 也是开源 MoE；本课 Llama 3.2 例子故意先停在 **dense**。
 
 ### 1. 有什么作用
 
-多专家 SwiGLU + 路由：每 token **top-k** 专家，其余不算。
+多专家 SwiGLU + 路由：每 token **top-k** 专家，其余不算。替换的是前面手写的 dense FFN——解码器骨架还在，换的是容量手段。
 
 ### 2. 从零开始：怎么生成
 
@@ -35,12 +35,12 @@
 
 ### 5. 业界 · 开源
 
-| 系 | 做法 |
+| 系 | 角色 |
 | --- | --- |
-| **Mixtral** | top-2 专家 SwiGLU |
-| **DeepSeek-V3** | 大规模 MoE + 精细路由 |
+| **DeepSeek-V3** | 大 **MoE** + **MLA**（下一章）——开源非 dense 旗舰叙事 |
+| **Mixtral** | top-2 专家 SwiGLU 的 MoE |
 | **Qwen-MoE 等** | 各自 E/k 配方 |
-| **Llama 3.2 1B 例子** | dense——先懂 dense 再挂 MoE |
+| **Llama 3.2 ~1B（本课）** | 先 dense——再读 DeepSeek 地图 |
 
 ### 6. 本课
 
