@@ -767,36 +767,33 @@ python chapters/01-inference/ep11_generate.py
     demo: 'kv',
     markdown: `## Idea
 
+From zero to serving: a correct generate loop isn’t enough—**without KV cache long decode is unusable**.
+
 ### 1. What it is for
 
-**KV cache** stores per-layer K/V after prefill. Each decode step only computes the new position’s K/V, appends, and attends over the cache—no full-prompt recompute every step.
+Prefill stores K/V; decode appends one step and attends to the cache.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Naive decode recomputes K/V over the whole prefix every step. Generation is already a loop; cache makes that loop practical. Without it, long chats are painfully slow and expensive.
+Per-layer buffers; prefill write; decode append; later paging + GQA/MLA to shrink.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Stage | What happens |
-| --- | --- |
-| **Prefill** | One forward; write K/V per layer |
-| **Decode** | Append one step; attend to cache |
-| **Layout** | This course: concat in time; production may page (later) |
-| **Shrink** | GQA / MLA reduce what you store |
+Matches full recompute; no layer mixups; cost grows with new tokens; memory OK.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Matches full recompute (up to float noise) | Cache must not change meaning |
-| **Hard** | Append per layer, no drops | One store per layer |
-| **Soft** | Cost grows with **new** tokens, not full prefix each step | The win |
-| **Soft** | Memory acceptable | Then GQA / paging |
+GQA/MLA/paging/KV-quant cut memory; without cache only toy lengths work.
 
-### 5. What labs ship · what we do
+### 5. Industry · open models
 
-Every production decoder caches KV.  
-\`KVCache\` in \`arche/cache.py\`.
+Every production decoder caches KV (vLLM, TGI, llama.cpp…).
+
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep12_kv_cache.py
+\`\`\`
 
 ## Run
 
@@ -820,34 +817,33 @@ python chapters/01-inference/ep12_kv_cache.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
+After short-context from-zero training, products want 128K-class windows—**RoPE scaling** is a recipe extension, not casually stretching indices.
+
 ### 1. What it is for
 
-**RoPE scaling** adjusts rotations when context exceeds the training length—Llama 3 style: large \`rope_theta\` plus factor/low/high **wavelength smoothing**.
+Llama 3-style wavelength smoothing (large theta + factors) so long positions don’t wrap badly.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-RoPE angles were tuned for the train length. Naively huge positions distort relative distance. Products wanting 128K-class context often add a scaling schedule (and/or train longer) without inventing a new position system.
+Train at base length → enable checkpoint-matched scaling and/or continue long-data train → eval long context.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Path | Plain meaning |
-| --- | --- |
-| **Llama 3 wavelength smooth** | This lesson; HF-compatible |
-| NTK / YaRN / … | Other long-context recipes |
-| Train longer | Not formula-only |
+Match checkpoint config; near stable; far usable; long-bench OK.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Matches checkpoint scaling config | Wrong recipe → long-context junk |
-| **Soft** | Near distances still familiar | Don’t break short deps |
-| **Soft** | Far distances usable | Long-context evals |
+Wrong scaling breaks long (and maybe short) context; bigger windows raise KV cost; scaling ≠ free long-range knowledge.
 
-### 5. What labs ship · what we do
+### 5. Industry · open models
 
-Llama 3.2 official long-context schedule.  
-Scaling helpers in \`arche/rope.py\` + this script.
+Llama 3/3.2 official long-context; Qwen/DeepSeek own recipes; YaRN/NTK in open long-context work.
+
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep13_rope_scaling.py
+\`\`\`
 
 ## Run
 
@@ -871,38 +867,33 @@ python chapters/01-inference/ep13_rope_scaling.py
     estimatedMinutes: 15,
     markdown: `## Idea
 
+From zero, huge capacity at controlled compute often means **MoE**—sparse experts (Mixtral, DeepSeek-MoE, …).
+
 ### 1. What it is for
 
-**MoE** = many expert FFNs (here SwiGLU) + a **router**: each token runs only **top-k** experts—sparse compute for more capacity.
+Many SwiGLU experts + router; each token runs top-k only.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Dense MLPs charge every token full width. MoE aims for huge total params while each token pays for only a few experts (at the cost of harder train/serve).
+Pick E/top-k; experts + router; aux load-balance; sparse infer; shard experts in checkpoints. This lesson is an API primer.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Step | What happens |
-| --- | --- |
-| **1** | N experts + router |
-| **2** | Score tokens; pick top-k |
-| **3** | Run chosen experts; weighted merge |
-| **Train** | Often load-balancing aux losses |
+Valid routes; correct merge; balanced load; quality/capacity trade OK.
 
-This lesson is a teaching MoE API—not a full Mixtral stack.
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+More experts/k ⇒ capacity/compute; balance loss fights collapse; replacing dense FFN is architecture-level; multi-GPU expert parallel is the engineering cost.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Valid expert indices | No OOB routes |
-| **Hard** | top-k matches impl | Shapes/merge correct |
-| **Soft** | Load not extremely skewed | Critical in real training |
-| **Soft** | Quality vs compute trade | Product evals |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Mixtral top-2; DeepSeek-V3 large MoE; Qwen-MoE variants; Llama 3.2 1B specimen stays dense first.
 
-Mixtral-style top-k; shared-expert variants exist.  
-Primer in \`arche/moe.py\`.
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep14_moe.py
+\`\`\`
 
 ## Run
 
@@ -926,35 +917,33 @@ python chapters/01-inference/ep14_moe.py
     estimatedMinutes: 18,
     markdown: `## Idea
 
+From-zero long-context serving: after GQA, KV can still explode—**MLA** compresses cache with latents (DeepSeek line).
+
 ### 1. What it is for
 
-**MLA-style** attention caches a **low-rank latent** (often plus a small RoPE stream) instead of full per-head K/V, expanding when needed—less decode memory.
+Store low-rank latents (+ small RoPE stream), expand when needed.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-GQA already cuts KV heads; long context can still dominate VRAM. DeepSeek-like paths compress what you cache, with more implementation detail.
+Pick latent dim; train MLA forward; cache latents; this lesson is a shape primer, not bit-exact.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Idea | Role |
-| --- | --- |
-| GQA | Fewer KV heads |
-| **MLA** | Latent KV |
-| Paged KV | How memory is chunked |
+Smaller cache; consistent shapes; quality near full KV at product bar.
 
-Teaching shapes/API here—**not** a bit-exact DeepSeek port.
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Smaller latent ⇒ save memory / risk quality; composable with paging; architecture-level change.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Latent cache smaller than full KV | Compression real |
-| **Hard** | Forward runs; shapes consistent | Primer bar |
-| **Soft** | Quality near full attention | Product claim; not this lesson |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+DeepSeek-V2/V3 push MLA; Llama/Qwen stay GQA-mainline; engines add support over time.
 
-Primer in \`arche/mla.py\`.
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep15_mla.py
+\`\`\`
 
 ## Run
 

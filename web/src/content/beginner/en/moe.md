@@ -1,37 +1,32 @@
 ## Idea
 
+From zero, huge capacity at controlled compute often means **MoE**—sparse experts (Mixtral, DeepSeek-MoE, …).
+
 ### 1. What it is for
 
-**MoE** = many expert FFNs (here SwiGLU) + a **router**: each token runs only **top-k** experts—sparse compute for more capacity.
+Many SwiGLU experts + router; each token runs top-k only.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Dense MLPs charge every token full width. MoE aims for huge total params while each token pays for only a few experts (at the cost of harder train/serve).
+Pick E/top-k; experts + router; aux load-balance; sparse infer; shard experts in checkpoints. This lesson is an API primer.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Step | What happens |
-| --- | --- |
-| **1** | N experts + router |
-| **2** | Score tokens; pick top-k |
-| **3** | Run chosen experts; weighted merge |
-| **Train** | Often load-balancing aux losses |
+Valid routes; correct merge; balanced load; quality/capacity trade OK.
 
-This lesson is a teaching MoE API—not a full Mixtral stack.
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+More experts/k ⇒ capacity/compute; balance loss fights collapse; replacing dense FFN is architecture-level; multi-GPU expert parallel is the engineering cost.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Valid expert indices | No OOB routes |
-| **Hard** | top-k matches impl | Shapes/merge correct |
-| **Soft** | Load not extremely skewed | Critical in real training |
-| **Soft** | Quality vs compute trade | Product evals |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Mixtral top-2; DeepSeek-V3 large MoE; Qwen-MoE variants; Llama 3.2 1B specimen stays dense first.
 
-Mixtral-style top-k; shared-expert variants exist.  
-Primer in `arche/moe.py`.
+### 6. This course
+
+```bash
+python chapters/01-inference/ep14_moe.py
+```
 
 ## Run
 

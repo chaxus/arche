@@ -1,33 +1,32 @@
 ## Idea
 
+After short-context from-zero training, products want 128K-class windows—**RoPE scaling** is a recipe extension, not casually stretching indices.
+
 ### 1. What it is for
 
-**RoPE scaling** adjusts rotations when context exceeds the training length—Llama 3 style: large `rope_theta` plus factor/low/high **wavelength smoothing**.
+Llama 3-style wavelength smoothing (large theta + factors) so long positions don’t wrap badly.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-RoPE angles were tuned for the train length. Naively huge positions distort relative distance. Products wanting 128K-class context often add a scaling schedule (and/or train longer) without inventing a new position system.
+Train at base length → enable checkpoint-matched scaling and/or continue long-data train → eval long context.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Path | Plain meaning |
-| --- | --- |
-| **Llama 3 wavelength smooth** | This lesson; HF-compatible |
-| NTK / YaRN / … | Other long-context recipes |
-| Train longer | Not formula-only |
+Match checkpoint config; near stable; far usable; long-bench OK.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Matches checkpoint scaling config | Wrong recipe → long-context junk |
-| **Soft** | Near distances still familiar | Don’t break short deps |
-| **Soft** | Far distances usable | Long-context evals |
+Wrong scaling breaks long (and maybe short) context; bigger windows raise KV cost; scaling ≠ free long-range knowledge.
 
-### 5. What labs ship · what we do
+### 5. Industry · open models
 
-Llama 3.2 official long-context schedule.  
-Scaling helpers in `arche/rope.py` + this script.
+Llama 3/3.2 official long-context; Qwen/DeepSeek own recipes; YaRN/NTK in open long-context work.
+
+### 6. This course
+
+```bash
+python chapters/01-inference/ep13_rope_scaling.py
+```
 
 ## Run
 
