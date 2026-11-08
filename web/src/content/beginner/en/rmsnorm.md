@@ -45,4 +45,4 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## Next
 
-**RoPE** (`?c=rope`): write position into Q/K from zero.
+**RoPE** (`/rope/`): write position into Q/K from zero.

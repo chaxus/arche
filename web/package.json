@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "build": "tsc -p tsconfig.json --noEmit && vite build && node scripts/prerender.mjs",
     "lint:content": "node scripts/lint-content.mjs --strict-template",
+    "prerender": "node scripts/prerender.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

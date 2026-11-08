@@ -36,4 +36,4 @@ python chapters/01-inference/ep16_device_quant_chat.py
 
 ## Next
 
-**Continuous batching** (`?c=continuous-batching`).
+**Continuous batching** (`/continuous-batching/`).

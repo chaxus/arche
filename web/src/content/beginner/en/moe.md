@@ -36,4 +36,4 @@ python chapters/01-inference/ep14_moe.py
 
 ## Next
 
-**MLA** (`?c=mla`).
+**MLA** (`/mla/`).

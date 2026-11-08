@@ -55,4 +55,4 @@ python chapters/01-inference/ep10_load_weights.py
 
 ## 下一章
 
-**文本生成**（`?c=generate`）。
+**文本生成**（`/cn/generate/`）。

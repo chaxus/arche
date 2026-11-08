@@ -54,4 +54,4 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## 下一章
 
-**Transformer 块**（`?c=block`）。
+**Transformer 块**（`/cn/block/`）。

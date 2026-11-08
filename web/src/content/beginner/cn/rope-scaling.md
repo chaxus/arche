@@ -45,4 +45,4 @@ python chapters/01-inference/ep13_rope_scaling.py
 ## 下一章
 
 
-**设备 · INT8 · 对话**（`?c=device-quant-chat`）。
+**设备 · INT8 · 对话**（`/cn/device-quant-chat/`）。

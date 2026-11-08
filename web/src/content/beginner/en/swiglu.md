@@ -36,4 +36,4 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## Next
 
-**Transformer block** (`?c=block`).
+**Transformer block** (`/block/`).

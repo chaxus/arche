@@ -36,4 +36,4 @@ python chapters/01-inference/ep08_block.py
 
 ## Next
 
-**Stack + LM head** (`?c=stack`).
+**Stack + LM head** (`/stack/`).

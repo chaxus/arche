@@ -130,4 +130,4 @@ Official table: license / login / mirror. Teaching BPE needs no network.
 
 ## Next
 
-**Embedding** (`?c=embedding`): after the vocab is frozen, how to build the embedding table from zero, judge it, improve it, and what open models do.
+**Embedding** (`/embedding/`): after the vocab is frozen, how to build the embedding table from zero, judge it, improve it, and what open models do.

@@ -43,4 +43,4 @@ No weights/login → skip ≠ broken logic.
 ## Next
 
 
-**Pretrain** (`?c=pretrain`): write weights from zero (toy API).
+**Pretrain** (`/pretrain/`): write weights from zero (toy API).

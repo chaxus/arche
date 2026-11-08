@@ -56,4 +56,4 @@ python chapters/01-inference/ep01_overview.py
 
 ## 下一章
 
-**分词器**（`?c=tokenizer`）：从零生成分词表。
+**分词器**（`/cn/tokenizer/`）：从零生成分词表。

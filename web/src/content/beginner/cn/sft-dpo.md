@@ -46,4 +46,4 @@ python chapters/02-training/ep19_sft_dpo.py
 ## 下一章
 
 
-**KV 缓存**（`?c=kv-cache`）：生成要能服务，先把解码成本打下来。
+**KV 缓存**（`/cn/kv-cache/`）：生成要能服务，先把解码成本打下来。

@@ -37,4 +37,4 @@ python chapters/01-inference/ep11_generate.py
 ## Next
 
 
-**HF align** (`?c=hf-align`): verify the handwritten stack against HF.
+**HF align** (`/hf-align/`): verify the handwritten stack against HF.

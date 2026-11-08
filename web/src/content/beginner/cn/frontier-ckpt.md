@@ -40,4 +40,4 @@ python chapters/02-training/ep20_frontier_ckpt.py
 ## 下一章
 
 
-**分片 MoE / MLA**（`?c=sharded-frontier`）。
+**分片 MoE / MLA**（`/cn/sharded-frontier/`）。

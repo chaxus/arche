@@ -51,4 +51,4 @@ python chapters/02-training/ep18_pretrain.py
 
 ## 下一章
 
-**SFT · DPO**（`?c=sft-dpo`）。
+**SFT · DPO**（`/cn/sft-dpo/`）。

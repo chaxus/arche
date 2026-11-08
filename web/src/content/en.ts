@@ -60,7 +60,7 @@ python chapters/01-inference/ep01_overview.py
 
 ## Next
 
-**Tokenizer** (\`?c=tokenizer\`): generate the tokenizer table from zero.
+**Tokenizer** (\`/tokenizer/\`): generate the tokenizer table from zero.
 
 `,
   },
@@ -205,7 +205,7 @@ Official table: license / login / mirror. Teaching BPE needs no network.
 
 ## Next
 
-**Embedding** (\`?c=embedding\`): after the vocab is frozen, how to build the embedding table from zero, judge it, improve it, and what open models do.
+**Embedding** (\`/embedding/\`): after the vocab is frozen, how to build the embedding table from zero, judge it, improve it, and what open models do.
 
 `,
   },
@@ -329,7 +329,7 @@ python chapters/01-inference/ep03_embedding.py
 
 ## Next
 
-**RMSNorm** (\`?c=rmsnorm\`): how to steady scales after embedding—critical when training deep nets from zero.
+**RMSNorm** (\`/rmsnorm/\`): how to steady scales after embedding—critical when training deep nets from zero.
 
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',
@@ -389,7 +389,7 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## Next
 
-**RoPE** (\`?c=rope\`): write position into Q/K from zero.
+**RoPE** (\`/rope/\`): write position into Q/K from zero.
 
 `,
     latex:
@@ -442,7 +442,7 @@ python chapters/01-inference/ep05_rope.py
 
 ## Next
 
-**GQA** (\`?c=gqa\`): choose head counts from zero to save KV cache.
+**GQA** (\`/gqa/\`): choose head counts from zero to save KV cache.
 
 `,
     latex:
@@ -495,7 +495,7 @@ python chapters/01-inference/ep06_gqa.py
 
 ## Next
 
-**SwiGLU** (\`?c=swiglu\`): wire the FFN from zero.
+**SwiGLU** (\`/swiglu/\`): wire the FFN from zero.
 
 `,
   },
@@ -545,7 +545,7 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## Next
 
-**Transformer block** (\`?c=block\`).
+**Transformer block** (\`/block/\`).
 
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
@@ -596,7 +596,7 @@ python chapters/01-inference/ep08_block.py
 
 ## Next
 
-**Stack + LM head** (\`?c=stack\`).
+**Stack + LM head** (\`/stack/\`).
 
 `,
   },
@@ -646,7 +646,7 @@ python chapters/01-inference/ep09_stack.py
 
 ## Next
 
-**Load weights** (\`?c=weights\`).
+**Load weights** (\`/weights/\`).
 
 `,
   },
@@ -707,7 +707,7 @@ License, login, mirror—same as tokenizer.
 
 ## Next
 
-**Text generation** (\`?c=generate\`).
+**Text generation** (\`/generate/\`).
 
 `,
   },
@@ -758,7 +758,7 @@ python chapters/01-inference/ep11_generate.py
 ## Next
 
 
-**HF align** (\`?c=hf-align\`): verify the handwritten stack against HF.
+**HF align** (\`/hf-align/\`): verify the handwritten stack against HF.
 
 `,
   },
@@ -809,7 +809,7 @@ python chapters/01-inference/ep12_kv_cache.py
 
 ## Next
 
-**RoPE scaling** (\`?c=rope-scaling\`).
+**RoPE scaling** (\`/rope-scaling/\`).
 
 `,
   },
@@ -860,7 +860,7 @@ python chapters/01-inference/ep13_rope_scaling.py
 ## Next
 
 
-**Device · INT8 · chat** (\`?c=device-quant-chat\`).
+**Device · INT8 · chat** (\`/device-quant-chat/\`).
 
 `,
   },
@@ -910,7 +910,7 @@ python chapters/01-inference/ep14_moe.py
 
 ## Next
 
-**MLA** (\`?c=mla\`).
+**MLA** (\`/mla/\`).
 
 `,
   },
@@ -961,7 +961,7 @@ python chapters/01-inference/ep15_mla.py
 ## Next
 
 
-**Frontier checkpoints** (\`?c=frontier-ckpt\`).
+**Frontier checkpoints** (\`/frontier-ckpt/\`).
 
 `,
   },
@@ -1012,7 +1012,7 @@ python chapters/01-inference/ep16_device_quant_chat.py
 
 ## Next
 
-**Continuous batching** (\`?c=continuous-batching\`).
+**Continuous batching** (\`/continuous-batching/\`).
 
 `,
   },
@@ -1064,7 +1064,7 @@ python chapters/01-inference/ep17_continuous_batching.py
 ## Next
 
 
-**Paged KV · CUDA Graph** (\`?c=paged-cuda-graph\`).
+**Paged KV · CUDA Graph** (\`/paged-cuda-graph/\`).
 
 `,
   },
@@ -1115,7 +1115,7 @@ python chapters/02-training/ep18_pretrain.py
 
 ## Next
 
-**SFT · DPO** (\`?c=sft-dpo\`).
+**SFT · DPO** (\`/sft-dpo/\`).
 
 `,
   },
@@ -1167,7 +1167,7 @@ python chapters/02-training/ep19_sft_dpo.py
 ## Next
 
 
-**KV cache** (\`?c=kv-cache\`): make decode affordable before serving.
+**KV cache** (\`/kv-cache/\`): make decode affordable before serving.
 
 `,
   },
@@ -1218,7 +1218,7 @@ python chapters/02-training/ep20_frontier_ckpt.py
 ## Next
 
 
-**Sharded MoE / MLA** (\`?c=sharded-frontier\`).
+**Sharded MoE / MLA** (\`/sharded-frontier/\`).
 
 `,
   },
@@ -1275,7 +1275,7 @@ No weights/login → skip ≠ broken logic.
 ## Next
 
 
-**Pretrain** (\`?c=pretrain\`): write weights from zero (toy API).
+**Pretrain** (\`/pretrain/\`): write weights from zero (toy API).
 
 `,
   },
@@ -1377,7 +1377,7 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 ## Next
 
 
-**MoE** (\`?c=moe\`): frontier architectures.
+**MoE** (\`/moe/\`): frontier architectures.
 
 `,
   },

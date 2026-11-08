@@ -69,7 +69,7 @@ python chapters/01-inference/ep01_overview.py
 
 ## 下一章
 
-**分词器**（\`?c=tokenizer\`）：从零生成分词表。
+**分词器**（\`/cn/tokenizer/\`）：从零生成分词表。
 
 `,
   },
@@ -231,7 +231,7 @@ python chapters/01-inference/ep02_tokenizer.py
 
 ## 下一章
 
-**嵌入层**（\`?c=embedding\`）：词表冻结后，嵌入表如何从零生成、怎样算好、如何改进及开源怎么做。
+**嵌入层**（\`/cn/embedding/\`）：词表冻结后，嵌入表如何从零生成、怎样算好、如何改进及开源怎么做。
 
 `,
   },
@@ -371,7 +371,7 @@ python chapters/01-inference/ep03_embedding.py
 
 ## 下一章
 
-**RMSNorm**（\`?c=rmsnorm\`）：嵌入给出的小数进深网前，如何稳住尺度（从零训时的关键）。
+**RMSNorm**（\`/cn/rmsnorm/\`）：嵌入给出的小数进深网前，如何稳住尺度（从零训时的关键）。
 
 `,
     latex: 'X = \\mathrm{Embed}(t_{1:L}) \\in \\mathbb{R}^{L \\times d}',
@@ -444,7 +444,7 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## 下一章
 
-**RoPE**（\`?c=rope\`）：从零把位置写进 Q/K。
+**RoPE**（\`/cn/rope/\`）：从零把位置写进 Q/K。
 
 `,
     latex:
@@ -515,7 +515,7 @@ python chapters/01-inference/ep05_rope.py
 
 ## 下一章
 
-**GQA**（\`?c=gqa\`）：从零定头数，省 KV 缓存。
+**GQA**（\`/cn/gqa/\`）：从零定头数，省 KV 缓存。
 
 `,
     latex:
@@ -589,7 +589,7 @@ python chapters/01-inference/ep06_gqa.py
 
 ## 下一章
 
-**SwiGLU**（\`?c=swiglu\`）：从零接 FFN。
+**SwiGLU**（\`/cn/swiglu/\`）：从零接 FFN。
 
 `,
   },
@@ -657,7 +657,7 @@ python chapters/01-inference/ep07_swiglu.py
 
 ## 下一章
 
-**Transformer 块**（\`?c=block\`）。
+**Transformer 块**（\`/cn/block/\`）。
 
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
@@ -727,7 +727,7 @@ python chapters/01-inference/ep08_block.py
 
 ## 下一章
 
-**堆叠 + LM head**（\`?c=stack\`）。
+**堆叠 + LM head**（\`/cn/stack/\`）。
 
 `,
   },
@@ -787,7 +787,7 @@ python chapters/01-inference/ep09_stack.py
 
 ## 下一章
 
-**加载权重**（\`?c=weights\`）。
+**加载权重**（\`/cn/weights/\`）。
 
 `,
   },
@@ -856,7 +856,7 @@ python chapters/01-inference/ep10_load_weights.py
 
 ## 下一章
 
-**文本生成**（\`?c=generate\`）。
+**文本生成**（\`/cn/generate/\`）。
 
 `,
   },
@@ -920,7 +920,7 @@ python chapters/01-inference/ep11_generate.py
 ## 下一章
 
 
-**HF logits 对齐**（\`?c=hf-align\`）：对照官方实现，验收手写栈。
+**HF logits 对齐**（\`/cn/hf-align/\`）：对照官方实现，验收手写栈。
 
 `,
   },
@@ -984,7 +984,7 @@ python chapters/01-inference/ep12_kv_cache.py
 
 ## 下一章
 
-**RoPE 缩放**（\`?c=rope-scaling\`）。
+**RoPE 缩放**（\`/cn/rope-scaling/\`）。
 
 `,
   },
@@ -1043,7 +1043,7 @@ python chapters/01-inference/ep13_rope_scaling.py
 ## 下一章
 
 
-**设备 · INT8 · 对话**（\`?c=device-quant-chat\`）。
+**设备 · INT8 · 对话**（\`/cn/device-quant-chat/\`）。
 
 `,
   },
@@ -1113,7 +1113,7 @@ python chapters/01-inference/ep14_moe.py
 
 ## 下一章
 
-**MLA**（\`?c=mla\`）。
+**MLA**（\`/cn/mla/\`）。
 
 `,
   },
@@ -1172,7 +1172,7 @@ python chapters/01-inference/ep15_mla.py
 ## 下一章
 
 
-**前沿检查点**（\`?c=frontier-ckpt\`）。
+**前沿检查点**（\`/cn/frontier-ckpt/\`）。
 
 `,
   },
@@ -1233,7 +1233,7 @@ python chapters/01-inference/ep16_device_quant_chat.py
 
 ## 下一章
 
-**连续批处理**（\`?c=continuous-batching\`）。
+**连续批处理**（\`/cn/continuous-batching/\`）。
 
 `,
   },
@@ -1292,7 +1292,7 @@ python chapters/01-inference/ep17_continuous_batching.py
 ## 下一章
 
 
-**Paged KV · CUDA Graph**（\`?c=paged-cuda-graph\`）。
+**Paged KV · CUDA Graph**（\`/cn/paged-cuda-graph/\`）。
 
 `,
   },
@@ -1358,7 +1358,7 @@ python chapters/02-training/ep18_pretrain.py
 
 ## 下一章
 
-**SFT · DPO**（\`?c=sft-dpo\`）。
+**SFT · DPO**（\`/cn/sft-dpo/\`）。
 
 `,
   },
@@ -1419,7 +1419,7 @@ python chapters/02-training/ep19_sft_dpo.py
 ## 下一章
 
 
-**KV 缓存**（\`?c=kv-cache\`）：生成要能服务，先把解码成本打下来。
+**KV 缓存**（\`/cn/kv-cache/\`）：生成要能服务，先把解码成本打下来。
 
 `,
   },
@@ -1473,7 +1473,7 @@ python chapters/02-training/ep20_frontier_ckpt.py
 ## 下一章
 
 
-**分片 MoE / MLA**（\`?c=sharded-frontier\`）。
+**分片 MoE / MLA**（\`/cn/sharded-frontier/\`）。
 
 `,
   },
@@ -1533,7 +1533,7 @@ python chapters/01-inference/ep21_hf_align.py
 ## 下一章
 
 
-**预训练**（\`?c=pretrain\`）：从零写出权重（玩具 API）。
+**预训练**（\`/cn/pretrain/\`）：从零写出权重（玩具 API）。
 
 `,
   },
@@ -1646,7 +1646,7 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 ## 下一章
 
 
-**MoE**（\`?c=moe\`）：进入前沿结构。
+**MoE**（\`/cn/moe/\`）：进入前沿结构。
 
 `,
   },

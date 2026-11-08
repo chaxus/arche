@@ -147,4 +147,4 @@ python chapters/01-inference/ep02_tokenizer.py
 
 ## 下一章
 
-**嵌入层**（`?c=embedding`）：词表冻结后，嵌入表如何从零生成、怎样算好、如何改进及开源怎么做。
+**嵌入层**（`/cn/embedding/`）：词表冻结后，嵌入表如何从零生成、怎样算好、如何改进及开源怎么做。

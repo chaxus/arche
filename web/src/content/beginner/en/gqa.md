@@ -36,4 +36,4 @@ python chapters/01-inference/ep06_gqa.py
 
 ## Next
 
-**SwiGLU** (`?c=swiglu`): wire the FFN from zero.
+**SwiGLU** (`/swiglu/`): wire the FFN from zero.

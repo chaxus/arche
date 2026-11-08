@@ -36,4 +36,4 @@ python chapters/01-inference/ep09_stack.py
 
 ## Next
 
-**Load weights** (`?c=weights`).
+**Load weights** (`/weights/`).

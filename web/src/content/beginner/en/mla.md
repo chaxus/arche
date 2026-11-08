@@ -37,4 +37,4 @@ python chapters/01-inference/ep15_mla.py
 ## Next
 
 
-**Frontier checkpoints** (`?c=frontier-ckpt`).
+**Frontier checkpoints** (`/frontier-ckpt/`).

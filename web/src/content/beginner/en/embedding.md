@@ -109,4 +109,4 @@ python chapters/01-inference/ep03_embedding.py
 
 ## Next
 
-**RMSNorm** (`?c=rmsnorm`): how to steady scales after embedding—critical when training deep nets from zero.
+**RMSNorm** (`/rmsnorm/`): how to steady scales after embedding—critical when training deep nets from zero.

@@ -46,4 +46,4 @@ python chapters/01-inference/ep09_stack.py
 
 ## 下一章
 
-**加载权重**（`?c=weights`）。
+**加载权重**（`/cn/weights/`）。

@@ -55,4 +55,4 @@ python chapters/01-inference/ep08_block.py
 
 ## 下一章
 
-**堆叠 + LM head**（`?c=stack`）。
+**堆叠 + LM head**（`/cn/stack/`）。

@@ -47,4 +47,4 @@ python chapters/01-inference/ep01_overview.py
 
 ## Next
 
-**Tokenizer** (`?c=tokenizer`): generate the tokenizer table from zero.
+**Tokenizer** (`/tokenizer/`): generate the tokenizer table from zero.

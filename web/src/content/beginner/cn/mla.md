@@ -45,4 +45,4 @@ python chapters/01-inference/ep15_mla.py
 ## 下一章
 
 
-**前沿检查点**（`?c=frontier-ckpt`）。
+**前沿检查点**（`/cn/frontier-ckpt/`）。

@@ -58,4 +58,4 @@ python chapters/01-inference/ep04_rmsnorm.py
 
 ## 下一章
 
-**RoPE**（`?c=rope`）：从零把位置写进 Q/K。
+**RoPE**（`/cn/rope/`）：从零把位置写进 Q/K。

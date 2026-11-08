@@ -37,4 +37,4 @@ python chapters/02-training/ep20_frontier_ckpt.py
 ## Next
 
 
-**Sharded MoE / MLA** (`?c=sharded-frontier`).
+**Sharded MoE / MLA** (`/sharded-frontier/`).

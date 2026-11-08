@@ -36,4 +36,4 @@ python chapters/01-inference/ep12_kv_cache.py
 
 ## Next
 
-**RoPE scaling** (`?c=rope-scaling`).
+**RoPE scaling** (`/rope-scaling/`).

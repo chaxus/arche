@@ -37,7 +37,7 @@ Site: left nav; Previous / Next; Mark as read is local-only. Repo: [github.com/c
 
 ## Next
 
-**What an LLM does** (\`?c=start-llm-idea\`).
+**What an LLM does** (\`/start-llm-idea/\`).
 `,
   },
   {
@@ -70,7 +70,7 @@ flowchart LR
 
 ## Next
 
-**Set up your computer** (\`?c=start-setup\`).
+**Set up your computer** (\`/start-setup/\`).
 `,
   },
   {
@@ -103,7 +103,7 @@ Expect a final \`OK\` line. No \`git\`? Download the ZIP from GitHub instead.
 
 ## Next
 
-**Terminal survival** (\`?c=start-terminal\`).
+**Terminal survival** (\`/start-terminal/\`).
 `,
   },
   {
@@ -134,7 +134,7 @@ python chapters/01-inference/ep01_overview.py   # optional smoke
 
 ## Next
 
-**How to read a chapter script** (\`?c=start-reading-code\`).
+**How to read a chapter script** (\`/start-reading-code/\`).
 `,
   },
   {
@@ -156,7 +156,7 @@ In a script, spot: docstring → \`import\` → \`def main\` → \`print\` → \
 
 ## Next
 
-**Map of the journey** (\`?c=start-map\`).
+**Map of the journey** (\`/start-map/\`).
 `,
   },
   {
@@ -190,7 +190,7 @@ flowchart LR
 
 ## Next
 
-Part 1: **Overview** (\`?c=overview\`).
+Part 1: **Overview** (\`/overview/\`).
 `,
   },
 ];

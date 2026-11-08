@@ -37,4 +37,4 @@ python chapters/02-training/ep19_sft_dpo.py
 ## Next
 
 
-**KV cache** (`?c=kv-cache`): make decode affordable before serving.
+**KV cache** (`/kv-cache/`): make decode affordable before serving.

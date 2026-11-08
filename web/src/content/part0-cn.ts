@@ -37,7 +37,7 @@ export const PART0_CN: Chapter[] = [
 
 ## 下一章
 
-**大模型在干什么**（\`?c=start-llm-idea\`）。
+**大模型在干什么**（\`/cn/start-llm-idea/\`）。
 `,
   },
   {
@@ -70,7 +70,7 @@ flowchart LR
 
 ## 下一章
 
-**配置电脑**（\`?c=start-setup\`）。
+**配置电脑**（\`/cn/start-setup/\`）。
 `,
   },
   {
@@ -103,7 +103,7 @@ python chapters/00-start/ep00_check_setup.py
 
 ## 下一章
 
-**终端保命**（\`?c=start-terminal\`）。
+**终端保命**（\`/cn/start-terminal/\`）。
 `,
   },
   {
@@ -134,7 +134,7 @@ python chapters/01-inference/ep01_overview.py   # 可选
 
 ## 下一章
 
-**怎么读脚本**（\`?c=start-reading-code\`）。
+**怎么读脚本**（\`/cn/start-reading-code/\`）。
 `,
   },
   {
@@ -156,7 +156,7 @@ python chapters/01-inference/ep01_overview.py   # 可选
 
 ## 下一章
 
-**旅程地图**（\`?c=start-map\`）。
+**旅程地图**（\`/cn/start-map/\`）。
 `,
   },
   {
@@ -190,7 +190,7 @@ flowchart LR
 
 ## 下一章
 
-第 1 部分：**总览**（\`?c=overview\`）。
+第 1 部分：**总览**（\`/cn/overview/\`）。
 `,
   },
 ];

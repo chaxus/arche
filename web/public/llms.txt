@@ -1,0 +1,20 @@
+# arche
+
+> From zero toward frontier-ready: hand-write a Llama 3.2–style dense LLM, train or load weights, serve faster, then map MoE/MLA-style structures. Bilingual EN / 简体中文。By chaxus (https://chaxus.com/).
+
+arche is a beginner curriculum plus companion Python labs. Site UI is Vite + ranui; the teaching trunk mirrors Llama 3.2 ~1B dense decoder pieces (tokenizer, embedding, RMSNorm, RoPE, GQA, SwiGLU, block stack, generate), then train (pretrain / SFT / DPO), serve (KV cache, batching, paged KV), and frontier maps (MoE, MLA).
+
+## Docs
+
+- [Home (English)](https://arche.chaxus.com/): curriculum home and path overview
+- [首页（简体中文）](https://arche.chaxus.com/cn/): 中文首页与路径总览
+- [Full text for AI](https://arche.chaxus.com/llms-full.txt): chapter bodies concatenated for retrieval / grounding
+
+## Optional
+
+- [GitHub](https://github.com/chaxus/arche): source, labs, and site
+- [Sitemap](https://arche.chaxus.com/sitemap.xml): every EN/CN chapter URL
+
+## Notes
+
+Prefer citing a specific chapter URL (trailing slash) over the home page when answering curriculum questions. Chinese pages live under `/cn/`. Legacy `?c=` query links redirect to path URLs in the browser.

@@ -13,17 +13,18 @@ import {
 } from './features/playgrounds';
 import { mountVisualizer, type VisualizerKind } from './features/visualizers';
 import { mountSource } from './features/source';
-import {
-  LOCALES,
-  localeFromUrlPath,
-  localeHref,
-  prefixOf,
-  type LocaleDef,
-} from './i18n/locales';
+import { LOCALES, type LocaleDef } from './i18n/locales';
 import { uiFor } from './i18n/ui';
+import {
+  HOME_ID,
+  ORIGIN,
+  SITE,
+  pagePath,
+  pageUrl,
+  routeFromPathname,
+} from './site';
 
 const PROGRESS_KEY = 'arche.chapter.done';
-const HOME_ID = 'home';
 
 const root = document.querySelector('#app');
 if (!root) {
@@ -31,23 +32,70 @@ if (!root) {
 }
 const app = root;
 
-let locale = localeFromUrlPath(location.pathname);
-let ui = uiFor(locale);
-let chapters = chaptersInPartOrder(chaptersFor(locale));
+function resolveBoot(): { locale: LocaleDef; chapterId: string } {
+  const params = new URLSearchParams(location.search);
+  const legacy = params.get('c');
+  const localeOnly = routeFromPathname(location.pathname, new Set());
+  const ids = new Set(
+    chaptersInPartOrder(chaptersFor(localeOnly.locale)).map((chapter) => chapter.id),
+  );
+  const route = routeFromPathname(location.pathname, ids);
 
-const params = new URLSearchParams(location.search);
-const rawC = params.get('c');
-let activeChapterId = rawC && rawC !== HOME_ID ? rawC : HOME_ID;
-let showingHome = activeChapterId === HOME_ID;
-
-function homeHref(target: LocaleDef = locale): string {
-  return localeHref('/', target);
+  if (legacy && legacy !== HOME_ID && ids.has(legacy)) {
+    history.replaceState(null, '', pagePath(legacy, route.locale));
+    return { locale: route.locale, chapterId: legacy };
+  }
+  if (legacy) {
+    history.replaceState(null, '', pagePath(route.chapterId, route.locale));
+  }
+  return { locale: route.locale, chapterId: route.chapterId };
 }
 
+const boot = resolveBoot();
+let locale = boot.locale;
+let ui = uiFor(locale);
+let chapters = chaptersInPartOrder(chaptersFor(locale));
+let activeChapterId = boot.chapterId;
+let showingHome = activeChapterId === HOME_ID;
+
 function chapterUrl(id: string, target: LocaleDef = locale): string {
-  const url = new URL(homeHref(target), location.origin);
-  if (id !== HOME_ID) url.searchParams.set('c', id);
-  return `${url.pathname}${url.search}`;
+  return pagePath(id, target);
+}
+
+function syncHead(chapter: Chapter | null): void {
+  const title = chapter
+    ? `${chapter.title} — arche`
+    : locale.id === 'cn'
+      ? 'arche — 从零开始，亲手写出大模型'
+      : 'arche — build an LLM by hand, from zero';
+  const description = chapter
+    ? chapter.summary
+    : locale.id === 'cn'
+      ? SITE.descriptionCn
+      : SITE.descriptionEn;
+  document.title = title;
+
+  const setMeta = (selector: string, attr: string, value: string) => {
+    const el = document.querySelector(selector);
+    if (el) el.setAttribute(attr, value);
+  };
+  setMeta('meta[name="description"]', 'content', description);
+  setMeta('meta[property="og:title"]', 'content', title);
+  setMeta('meta[property="og:description"]', 'content', description);
+  setMeta('meta[property="og:url"]', 'content', pageUrl(activeChapterId, locale));
+  setMeta('link[rel="canonical"]', 'href', pageUrl(activeChapterId, locale));
+
+  for (const other of LOCALES) {
+    const hreflang = other.lang;
+    const link = document.querySelector(`link[rel="alternate"][hreflang="${hreflang}"]`);
+    if (link) link.setAttribute('href', pageUrl(activeChapterId, other));
+  }
+  const xDefault = document.querySelector('link[rel="alternate"][hreflang="x-default"]');
+  if (xDefault) {
+    const root = LOCALES.find((item) => item.dir === '') ?? locale;
+    xDefault.setAttribute('href', pageUrl(activeChapterId, root));
+  }
+  void ORIGIN;
 }
 
 function themeSwitchAttrs(): string {
@@ -141,7 +189,7 @@ function renderShell(): void {
   `;
 
   document.querySelector('#repo-link')?.addEventListener('click', () => {
-    window.open('https://github.com/chaxus/arche', '_blank', 'noopener,noreferrer');
+    window.open(SITE.github, '_blank', 'noopener,noreferrer');
   });
   document.querySelector('#brand-home')?.addEventListener('click', (event) => {
     event.preventDefault();
@@ -168,13 +216,16 @@ function renderNav(activeId: string): void {
   `;
   nav.append(progress);
 
-  const homeBtn = document.createElement('button');
-  homeBtn.type = 'button';
-  homeBtn.className = 'nav-link';
-  homeBtn.textContent = ui.homeNav;
-  if (showingHome) homeBtn.setAttribute('aria-current', 'page');
-  homeBtn.addEventListener('click', () => selectHome());
-  nav.append(homeBtn);
+  const homeLink = document.createElement('a');
+  homeLink.href = chapterUrl(HOME_ID);
+  homeLink.className = 'nav-link';
+  homeLink.textContent = ui.homeNav;
+  if (showingHome) homeLink.setAttribute('aria-current', 'page');
+  homeLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    selectHome();
+  });
+  nav.append(homeLink);
 
   const doneIds = readDone();
   let lastPart: PartId | null = null;
@@ -186,16 +237,19 @@ function renderNav(activeId: string): void {
       header.textContent = ui.partLabels[chapter.partId];
       nav.append(header);
     }
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'nav-link';
+    const link = document.createElement('a');
+    link.href = chapterUrl(chapter.id);
+    link.className = 'nav-link';
     const tick = doneIds.has(chapter.id) ? '<span class="nav-done" aria-hidden="true">✓</span>' : '';
-    btn.innerHTML = `${tick}<span class="nav-ep">${chapter.ep}</span>${chapter.title}`;
+    link.innerHTML = `${tick}<span class="nav-ep">${chapter.ep}</span>${chapter.title}`;
     if (!showingHome && chapter.id === activeId) {
-      btn.setAttribute('aria-current', 'page');
+      link.setAttribute('aria-current', 'page');
     }
-    btn.addEventListener('click', () => selectChapter(chapter.id));
-    nav.append(btn);
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      selectChapter(chapter.id);
+    });
+    nav.append(link);
   }
 }
 
@@ -338,7 +392,7 @@ function renderHome(): void {
           <strong>${ui.partLabels[current]}</strong>
           <span>${read}/${buffer.length} ${ui.homeDoneLabel} · ~${mins} ${ui.minutesLabel}</span>
         </div>
-        <button type="button" class="home-part-go" data-id="${buffer[0]!.id}">${buffer[0]!.title}</button>
+        <a class="home-part-go" href="${chapterUrl(buffer[0]!.id)}" data-id="${buffer[0]!.id}">${buffer[0]!.title}</a>
       </div>
     `);
   };
@@ -369,7 +423,8 @@ function renderHome(): void {
     selectChapter(target.id);
   });
   article.querySelectorAll('.home-part-go').forEach((node) => {
-    node.addEventListener('click', () => {
+    node.addEventListener('click', (event) => {
+      event.preventDefault();
       const id = (node as HTMLElement).dataset.id;
       if (id) selectChapter(id);
     });
@@ -442,7 +497,7 @@ function renderArticle(chapter: Chapter): void {
     </div>
     <p class="footer-note">
       ${scriptLine}${ui.siteLabel}:
-      <a href="https://arche.chaxus.com${prefixOf(locale) || '/'}">arche.chaxus.com${prefixOf(locale)}</a>
+      <a href="${pageUrl(chapter.id, locale)}">${ORIGIN.replace('https://', '')}${pagePath(chapter.id, locale)}</a>
     </p>
   `;
 
@@ -495,44 +550,52 @@ function renderArticle(chapter: Chapter): void {
 
 function applyDocumentLang(): void {
   document.documentElement.lang = locale.lang;
-  document.title =
-    locale.id === 'cn'
-      ? 'arche — 从零开始，亲手写出大模型'
-      : 'arche — build an LLM by hand, from zero';
 }
 
-function selectHome(): void {
+function selectHome(push = true): void {
   showingHome = true;
   activeChapterId = HOME_ID;
-  const url = new URL(chapterUrl(HOME_ID), location.origin);
-  history.replaceState(null, '', `${url.pathname}${url.search}`);
-  params.delete('c');
+  if (push) history.pushState(null, '', chapterUrl(HOME_ID));
+  else history.replaceState(null, '', chapterUrl(HOME_ID));
   renderNav(HOME_ID);
   renderHome();
+  syncHead(null);
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
 
-function selectChapter(id: string): void {
+function selectChapter(id: string, push = true): void {
   if (id === HOME_ID) {
-    selectHome();
+    selectHome(push);
     return;
   }
   const chapter = chapters.find((item) => item.id === id) ?? chapters[0];
   if (!chapter) return;
   showingHome = false;
   activeChapterId = chapter.id;
-  const url = new URL(chapterUrl(chapter.id), location.origin);
-  history.replaceState(null, '', `${url.pathname}${url.search}`);
-  params.set('c', chapter.id);
+  if (push) history.pushState(null, '', chapterUrl(chapter.id));
+  else history.replaceState(null, '', chapterUrl(chapter.id));
   renderNav(chapter.id);
   renderArticle(chapter);
+  syncHead(chapter);
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+
+function onPopState(): void {
+  const ids = new Set(chapters.map((chapter) => chapter.id));
+  const route = routeFromPathname(location.pathname, ids);
+  if (route.locale.id !== locale.id) {
+    location.assign(location.pathname);
+    return;
+  }
+  if (route.chapterId === HOME_ID) selectHome(false);
+  else selectChapter(route.chapterId, false);
 }
 
 applyDocumentLang();
 renderShell();
+window.addEventListener('popstate', onPopState);
 if (showingHome || !chapters.some((c) => c.id === activeChapterId)) {
-  selectHome();
+  selectHome(false);
 } else {
-  selectChapter(activeChapterId);
+  selectChapter(activeChapterId, false);
 }

@@ -49,4 +49,4 @@ python chapters/01-inference/ep12_kv_cache.py
 
 ## 下一章
 
-**RoPE 缩放**（`?c=rope-scaling`）。
+**RoPE 缩放**（`/cn/rope-scaling/`）。

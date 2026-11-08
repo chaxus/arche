@@ -37,4 +37,4 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 ## Next
 
 
-**MoE** (`?c=moe`): frontier architectures.
+**MoE** (`/moe/`): frontier architectures.

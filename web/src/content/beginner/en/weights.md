@@ -47,4 +47,4 @@ License, login, mirror—same as tokenizer.
 
 ## Next
 
-**Text generation** (`?c=generate`).
+**Text generation** (`/generate/`).

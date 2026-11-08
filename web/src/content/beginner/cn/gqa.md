@@ -57,4 +57,4 @@ python chapters/01-inference/ep06_gqa.py
 
 ## 下一章
 
-**SwiGLU**（`?c=swiglu`）：从零接 FFN。
+**SwiGLU**（`/cn/swiglu/`）：从零接 FFN。

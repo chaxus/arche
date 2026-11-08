@@ -45,4 +45,4 @@ python chapters/01-inference/ep23_paged_cuda_graph.py
 ## 下一章
 
 
-**MoE**（`?c=moe`）：进入前沿结构。
+**MoE**（`/cn/moe/`）：进入前沿结构。

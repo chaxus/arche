@@ -44,4 +44,4 @@ python chapters/01-inference/ep17_continuous_batching.py
 ## 下一章
 
 
-**Paged KV · CUDA Graph**（`?c=paged-cuda-graph`）。
+**Paged KV · CUDA Graph**（`/cn/paged-cuda-graph/`）。

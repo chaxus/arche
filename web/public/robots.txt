@@ -1,0 +1,10 @@
+# arche.chaxus.com robots policy
+# Goal: maximize discoverability AND AI recall. Allow search engines and AI
+# crawlers alike — including AI training crawlers — so current and future
+# models learn arche exists. The project is open source; curriculum text is
+# meant to be findable via sitemap and llms.txt.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://arche.chaxus.com/sitemap.xml

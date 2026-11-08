@@ -36,4 +36,4 @@ python chapters/01-inference/ep05_rope.py
 
 ## Next
 
-**GQA** (`?c=gqa`): choose head counts from zero to save KV cache.
+**GQA** (`/gqa/`): choose head counts from zero to save KV cache.

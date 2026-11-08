@@ -54,4 +54,4 @@ python chapters/01-inference/ep05_rope.py
 
 ## 下一章
 
-**GQA**（`?c=gqa`）：从零定头数，省 KV 缓存。
+**GQA**（`/cn/gqa/`）：从零定头数，省 KV 缓存。
