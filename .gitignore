@@ -28,3 +28,7 @@ checkpoints/
 weights/
 .hf_cache/
 .cache/
+.cloudflare/
+.wrangler/
+web/node_modules/
+web/dist/
