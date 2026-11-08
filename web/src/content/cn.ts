@@ -160,11 +160,37 @@ python chapters/01-inference/ep03_embedding.py
     script: 'chapters/01-inference/ep04_rmsnorm.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## 为什么是 RMSNorm
+    markdown: `## 一句话
+RMSNorm 让层输入保持合适的尺度，又不必像 LayerNorm 那样先减均值。
 
-比 LayerNorm 更便宜（不做减均值），在现代 LLM 上足够稳，也是 Llama / Qwen dense 堆叠的默认 pre-norm。
+## 开始之前
+- 嵌入章已完成。约 12 分钟。
 
-在每个 block 里，它出现在注意力**之前**与 MLP**之前**。
+## 用人话讲
+网络很深时，数字容易爆掉或消失。**RMSNorm** 用均方根大小去除尺度，再乘可学习增益；不做减均值，更便宜，对现代 LLM 也够稳。
+每个 block 里它出现在注意力**之前**和 MLP**之前**（pre-norm）。
+
+## 图或公式
+$$\\mathrm{RMSNorm}(x) = \\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}} \\odot \\gamma$$
+
+## 对应代码
+- \`arche/norms.py\`
+- \`chapters/01-inference/ep04_rmsnorm.py\`
+
+## 现在就做
+\`\`\`bash
+python chapters/01-inference/ep04_rmsnorm.py
+\`\`\`
+
+## 如果翻车了
+- 实验里出现 NaN：多半改了 epsilon——用 git 恢复脚本。
+
+## 先别深挖
+文献里所有 LayerNorm 变体。
+
+## 下一章
+**RoPE**（\`?c=rope\`）。
+
 `,
     latex:
       '\\mathrm{RMSNorm}(x) = \\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}} \\odot \\gamma',
@@ -177,11 +203,37 @@ python chapters/01-inference/ep03_embedding.py
     script: 'chapters/01-inference/ep05_rope.py',
     partId: 'trunk',
     estimatedMinutes: 15,
-    markdown: `## 旋转位置编码
+    markdown: `## 一句话
+RoPE 旋转 Q/K，让注意力带上相对位置——不需要绝对位置表。
 
-RoPE 按 token 位置给 query/key 的成对维度施加旋转角。相对偏移会从点积里自然出现——不需要绝对 PE 表。
+## 开始之前
+- 已读 RMSNorm。约 15 分钟。
 
-Llama 3.2 还使用很大的 \`rope_theta\`（\`500000\`），以及长上下文的 **scale factor**（留到后续章节）。
+## 用人话讲
+不靠「加一个位置向量」，**RoPE** 按 token 下标旋转成对维度；相对距离会从点积里出现。
+Llama 3.2 还有很大的 \`rope_theta\`，以及后面的长上下文 **scale**（单独一章）。
+
+## 图或公式
+$$q_m' = R_{\\Theta,m} q_m,\\quad k_n' = R_{\\Theta,n} k_n$$
+
+## 对应代码
+- \`arche/rope.py\`
+- \`chapters/01-inference/ep05_rope.py\`
+
+## 现在就做
+\`\`\`bash
+python chapters/01-inference/ep05_rope.py
+\`\`\`
+
+## 如果翻车了
+- head 维度为奇数会破坏成对旋转——请用脚本默认值。
+
+## 先别深挖
+所有 RoPE 变体；长上下文缩放到 ep13。
+
+## 下一章
+**GQA 注意力**（\`?c=gqa\`）。
+
 `,
     latex:
       'q_m^{\\prime} = R_{\\Theta,m} q_m,\\quad k_n^{\\prime} = R_{\\Theta,n} k_n',
@@ -194,13 +246,35 @@ Llama 3.2 还使用很大的 \`rope_theta\`（\`500000\`），以及长上下文
     script: 'chapters/01-inference/ep06_gqa.py',
     partId: 'trunk',
     estimatedMinutes: 18,
-    markdown: `## Grouped-Query Attention
+    markdown: `## 一句话
+GQA 让多个 query 头共享 KV 头，从而减小解码时的显存/内存。
 
-Llama 3.2 1B：**32** 个 query 头，**8** 个 KV 头 → 每个 KV 头被 4 个 query 头共享。
+## 开始之前
+- 理解 RoPE。约 18 分钟。
 
-收益主要在**解码**阶段：KV cache 变小，质量仍接近完整多头注意力。
+## 用人话讲
+经典多头：每个 query 头自带 K/V，准确但 **KV cache** 很大。
+**GQA** 减少 KV 头，一组 query 共用。Llama 3.2 1B：32 个 query 头、8 个 KV 头。
+流程：投影 → RoPE → 重复 KV → 因果注意力 → 输出投影。
 
-模块内流程：投影 Q/K/V → RoPE(Q,K) → 重复 KV → 因果 SDPA → 输出投影。
+## 对应代码
+- \`arche/attention.py\`
+- \`chapters/01-inference/ep06_gqa.py\`
+
+## 现在就做
+\`\`\`bash
+python chapters/01-inference/ep06_gqa.py
+\`\`\`
+
+## 如果翻车了
+- 必须满足 \`num_heads % num_kv_heads == 0\`。
+
+## 先别深挖
+FlashAttention；MLA 稍后讲。
+
+## 下一章
+**SwiGLU**（\`?c=swiglu\`）。
+
 `,
   },
   {
@@ -211,13 +285,37 @@ Llama 3.2 1B：**32** 个 query 头，**8** 个 KV 头 → 每个 KV 头被 4 �
     script: 'chapters/01-inference/ep07_swiglu.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## 现代 FFN
+    markdown: `## 一句话
+SwiGLU 是现代前馈块：gate × up，再 down——三条无偏置线性层。
 
-\`\`\`
-down(silu(gate(x)) * up(x))
+## 开始之前
+- GQA 已完成。约 12 分钟。
+
+## 用人话讲
+老教程常见 Linear → GELU → Linear。Llama 风格更常用：
+\`down(silu(gate(x)) * up(x))\`。
+
+## 图或公式
+$$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
+
+## 对应代码
+- \`arche/mlp.py\`
+- \`chapters/01-inference/ep07_swiglu.py\`
+
+## 现在就做
+\`\`\`bash
+python chapters/01-inference/ep07_swiglu.py
 \`\`\`
 
-这取代了旧的「一层 Linear → GELU → 一层 Linear」作为 Llama / Qwen dense 模型的默认 FFN。
+## 如果翻车了
+- 形状不对：检查 intermediate_dim 是否与三条线性层一致。
+
+## 先别深挖
+MoE（多专家）在第 2 部分。
+
+## 下一章
+**Transformer 块**（\`?c=block\`）。
+
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
   },
@@ -229,13 +327,36 @@ down(silu(gate(x)) * up(x))
     script: 'chapters/01-inference/ep08_block.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## 一个 block
+    markdown: `## 一句话
+一个 Transformer 块就是可堆叠的 pre-norm 残差三明治。
 
+## 开始之前
+- 注意力与 SwiGLU 已完成。约 12 分钟。
+
+## 用人话讲
 \`\`\`
 x → RMSNorm → Attn → +x → RMSNorm → SwiGLU → +x
 \`\`\`
+进出同形状，所以深度只是循环。Llama 3.2 1B 堆 16 次（3B：28）。
 
-Llama 3.2 1B 堆 **16** 次（3B：28 次）。进出租同形状——所以深度只是一个循环。
+## 对应代码
+- \`arche/block.py\`
+- \`chapters/01-inference/ep08_block.py\`
+
+## 现在就做
+\`\`\`bash
+python chapters/01-inference/ep08_block.py
+\`\`\`
+
+## 如果翻车了
+- 残差相加要求形状一致。
+
+## 先别深挖
+某些巨型模型的并行 Attention/MLP 布局。
+
+## 下一章
+**堆叠 + LM head**（\`?c=stack\`）。
+
 `,
   },
   {
@@ -246,19 +367,34 @@ Llama 3.2 1B 堆 **16** 次（3B：28 次）。进出租同形状——所以深
     script: 'chapters/01-inference/ep09_stack.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## 完整前向
+    markdown: `## 一句话
+Embed → N 个 block → 最终 RMSNorm → 线性到词表分数（常与嵌入绑权）。
 
-\`\`\`
-ids → Embedding → [Block × N] → RMSNorm → Linear(vocab)
-\`\`\`
+## 开始之前
+- block 章已完成。约 12 分钟。
 
-Llama 3.2 1B/3B 会把 \`lm_head.weight\` 与 \`embed_tokens.weight\` **绑在一起**。
+## 用人话讲
+\`ids → Embedding → [Block × N] → RMSNorm → Linear(vocab)\`。
+最后线性输出下一个 token 的分数（logits）。Llama 3.2 把 \`lm_head\` 与嵌入绑在一起。
 
-运行：
+## 对应代码
+- \`arche/model.py\`
+- \`chapters/01-inference/ep09_stack.py\`
 
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep09_stack.py
 \`\`\`
+
+## 如果翻车了
+- 词表大小不一致：用仓库提供的配置助手。
+
+## 先别深挖
+加载 Meta 权重（下一章）与采样技巧。
+
+## 下一章
+**加载权重**（\`?c=weights\`）。
+
 `,
   },
   {
@@ -269,16 +405,36 @@ python chapters/01-inference/ep09_stack.py
     script: 'chapters/01-inference/ep10_load_weights.py',
     partId: 'trunk',
     estimatedMinutes: 20,
-    markdown: `## 官方权重，手写计算图
+    markdown: `## 一句话
+把官方 Hugging Face Llama 3.2 张量映射进手写的 \`arche.Llama\`。
 
-\`from_pretrained\` 搭建我们的模块，下载 HF 权重，再按一小张 key 对照表拷贝张量（\`model.layers.*\` → \`layers.*\`）。
+## 开始之前
+- 堆叠章已完成。约 20 分钟。
+- 需要 HF 登录并接受协议（见第 0 部分地图）。
 
-需要通过门禁并登录：
+## 用人话讲
+模块建好后还是空的。\`from_pretrained\` 搭好我们的图，下载 HF 权重，再按 key 对照表拷贝。
 
+## 对应代码
+- \`arche/load_weights.py\`
+- \`chapters/01-inference/ep10_load_weights.py\`
+
+## 现在就做
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep10_load_weights.py
 \`\`\`
+
+## 如果翻车了
+- 门禁错误：接受协议并重新登录；网络问题可试镜像。
+- 磁盘/内存不够：关掉其它应用；目标是 1B。
+
+## 先别深挖
+量化部署格式、多卡分片。
+
+## 下一章
+**文本生成**（\`?c=generate\`）。
+
 `,
   },
   {
@@ -289,15 +445,34 @@ python chapters/01-inference/ep10_load_weights.py
     script: 'chapters/01-inference/ep11_generate.py',
     partId: 'trunk',
     estimatedMinutes: 15,
-    markdown: `## 解码循环
+    markdown: `## 一句话
+把 logits 变成 token：采样（或贪心）选出下一个 id，拼上，重复直到结束。
 
-反复取最后一步 logits，可选 top-k，采样（或贪心），拼到序列上，遇 EOS 停。
+## 开始之前
+- 理解权重章（即使下载延后）。约 15 分钟。
 
+## 用人话讲
+每步看最后位置的分数。**temperature** 调节尖锐程度；**top-k** 只保留前 k 个。拼上 id；遇到 EOS 或长度上限就停。
+
+## 对应代码
+- \`arche/generate.py\`
+- \`chapters/01-inference/ep11_generate.py\`
+
+## 现在就做
 \`\`\`bash
 python chapters/01-inference/ep11_generate.py
 \`\`\`
+没有权重时，小 demo 仍能展示循环形状。
 
-能力来自加载的 1B 权重；代码路径仍全部是我们自己的。
+## 如果翻车了
+- 随机权重输出乱码是正常的——流畅性来自 1B 权重。
+
+## 先别深挖
+KV cache（下一部分）与 chat template（更后）。
+
+## 下一章
+第 2 部分开始：**KV 缓存**（\`?c=kv-cache\`）。
+
 `,
   },
   {

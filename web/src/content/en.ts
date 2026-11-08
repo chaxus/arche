@@ -160,11 +160,38 @@ How embeddings are trained, or fancy token types (segment ids).
     script: 'chapters/01-inference/ep04_rmsnorm.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## Why RMSNorm
+    markdown: `## In one sentence
+RMSNorm keeps layer inputs well-scaled without the extra mean-centering of LayerNorm.
 
-Cheaper than LayerNorm (no mean subtraction), stable enough for modern LLMs, and the default pre-norm in Llama / Qwen dense stacks.
+## Before you start
+- Embedding done. Time: ~12 minutes.
 
-Applied **before** attention and **before** the MLP inside each block.
+## The idea (plain language)
+Deep stacks multiply numbers again and again. Without normalization, values can explode or vanish.
+**RMSNorm** divides by a root-mean-square size, then scales with a learned gain. It skips subtracting the mean—cheaper, still stable enough for modern LLMs.
+Inside each block it runs **before** attention and **before** the MLP (pre-norm).
+
+## Picture / formula
+$$\\mathrm{RMSNorm}(x) = \\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}} \\odot \\gamma$$
+
+## In the code
+- \`arche/norms.py\`
+- \`chapters/01-inference/ep04_rmsnorm.py\`
+
+## Do this now
+\`\`\`bash
+python chapters/01-inference/ep04_rmsnorm.py
+\`\`\`
+
+## If something breaks
+- NaNs in experiments usually mean epsilon or inputs were edited—restore the script.
+
+## Don't worry about yet
+Every LayerNorm variant in the literature.
+
+## Next
+**RoPE** (\`?c=rope\`).
+
 `,
     latex:
       '\\mathrm{RMSNorm}(x) = \\frac{x}{\\sqrt{\\mathrm{mean}(x^2)+\\varepsilon}} \\odot \\gamma',
@@ -177,11 +204,37 @@ Applied **before** attention and **before** the MLP inside each block.
     script: 'chapters/01-inference/ep05_rope.py',
     partId: 'trunk',
     estimatedMinutes: 15,
-    markdown: `## Rotary positions
+    markdown: `## In one sentence
+RoPE rotates query/key vectors so attention “knows” relative positions—no absolute position table required.
 
-RoPE rotates pairs of dimensions in query/key vectors by an angle that depends on token position. Relative offsets fall out of the dot product — no absolute PE table required.
+## Before you start
+- RMSNorm done. Time: ~15 minutes.
 
-Llama 3.2 also uses a large \`rope_theta\` (\`500000\`) and a long-context **scale factor** (deferred to a later chapter).
+## The idea (plain language)
+Instead of adding a position vector, **RoPE** rotates pairs of dimensions by an angle that depends on token index. Relative distance falls out of the dot product.
+Llama 3.2 also uses a large \`rope_theta\` and later a long-context **scale**—that scale is its own chapter.
+
+## Picture / formula
+$$q_m' = R_{\\Theta,m} q_m,\\quad k_n' = R_{\\Theta,n} k_n$$
+
+## In the code
+- \`arche/rope.py\`
+- \`chapters/01-inference/ep05_rope.py\`
+
+## Do this now
+\`\`\`bash
+python chapters/01-inference/ep05_rope.py
+\`\`\`
+
+## If something breaks
+- Odd head dimensions break pair rotation—use the script’s defaults.
+
+## Don't worry about yet
+Every RoPE paper variant; long-context scaling waits for ep13.
+
+## Next
+**GQA attention** (\`?c=gqa\`).
+
 `,
     latex:
       'q_m^{\\prime} = R_{\\Theta,m} q_m,\\quad k_n^{\\prime} = R_{\\Theta,n} k_n',
@@ -194,13 +247,35 @@ Llama 3.2 also uses a large \`rope_theta\` (\`500000\`) and a long-context **sca
     script: 'chapters/01-inference/ep06_gqa.py',
     partId: 'trunk',
     estimatedMinutes: 18,
-    markdown: `## Grouped-Query Attention
+    markdown: `## In one sentence
+Grouped-Query Attention shares key/value heads across several query heads to shrink decode-time memory.
 
-Llama 3.2 1B: **32** query heads, **8** KV heads → each KV head is shared by 4 query heads.
+## Before you start
+- RoPE idea clear. Time: ~18 minutes.
 
-Benefits show up at **decode** time: the KV cache shrinks while quality stays close to full multi-head attention.
+## The idea (plain language)
+Classic multi-head attention gives every query head its own K/V. That is accurate but the **KV cache** gets large while generating.
+**GQA** uses fewer KV heads; each KV head is shared by a group of query heads. Llama 3.2 1B: 32 query heads, 8 KV heads.
+Flow: project Q/K/V → RoPE(Q,K) → repeat KV → causal attention → output projection.
 
-Flow inside the module: project Q/K/V → RoPE(Q,K) → repeat KV → causal SDPA → output projection.
+## In the code
+- \`arche/attention.py\`
+- \`chapters/01-inference/ep06_gqa.py\`
+
+## Do this now
+\`\`\`bash
+python chapters/01-inference/ep06_gqa.py
+\`\`\`
+
+## If something breaks
+- Assert \`num_heads % num_kv_heads == 0\`—groups must divide evenly.
+
+## Don't worry about yet
+FlashAttention kernels or MLA (comes later).
+
+## Next
+**SwiGLU** (\`?c=swiglu\`).
+
 `,
   },
   {
@@ -211,13 +286,38 @@ Flow inside the module: project Q/K/V → RoPE(Q,K) → repeat KV → causal SDP
     script: 'chapters/01-inference/ep07_swiglu.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## Modern FFN
+    markdown: `## In one sentence
+SwiGLU is the modern feed-forward block: gate × up, then down—three bias-free linears.
 
-\`\`\`
-down(silu(gate(x)) * up(x))
+## Before you start
+- GQA done. Time: ~12 minutes.
+
+## The idea (plain language)
+Old tutorials often show Linear → GELU → Linear. Llama-style models prefer:
+\`down(silu(gate(x)) * up(x))\`.
+The **gate** decides what to pass; **up** proposes values; **down** returns to model width.
+
+## Picture / formula
+$$\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)$$
+
+## In the code
+- \`arche/mlp.py\`
+- \`chapters/01-inference/ep07_swiglu.py\`
+
+## Do this now
+\`\`\`bash
+python chapters/01-inference/ep07_swiglu.py
 \`\`\`
 
-This replaces the older “one Linear → GELU → Linear” story as the default in Llama / Qwen dense models.
+## If something breaks
+- Shape mismatch → intermediate_dim must match the three linears in the demo.
+
+## Don't worry about yet
+MoE (many experts)—that is Part 2.
+
+## Next
+**Transformer block** (\`?c=block\`).
+
 `,
     latex: '\\mathrm{FFN}(x)=W_d\\big(\\mathrm{SiLU}(W_g x)\\odot W_u x\\big)',
   },
@@ -229,13 +329,36 @@ This replaces the older “one Linear → GELU → Linear” story as the defaul
     script: 'chapters/01-inference/ep08_block.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## One block
+    markdown: `## In one sentence
+One transformer block is a pre-norm residual sandwich you can stack.
 
+## Before you start
+- Attention + SwiGLU done. Time: ~12 minutes.
+
+## The idea (plain language)
 \`\`\`
 x → RMSNorm → Attn → +x → RMSNorm → SwiGLU → +x
 \`\`\`
+Same shape in, same shape out—so depth is a loop. Llama 3.2 1B stacks this 16 times (3B: 28).
 
-Llama 3.2 1B stacks this **16** times (3B: 28). Same shape in, same shape out — that is why depth is just a loop.
+## In the code
+- \`arche/block.py\`
+- \`chapters/01-inference/ep08_block.py\`
+
+## Do this now
+\`\`\`bash
+python chapters/01-inference/ep08_block.py
+\`\`\`
+
+## If something breaks
+- Residual add requires matching shapes—don’t change only one branch in experiments.
+
+## Don't worry about yet
+Parallel attention/MLP layouts in some giant models.
+
+## Next
+**Stack + LM head** (\`?c=stack\`).
+
 `,
   },
   {
@@ -246,19 +369,35 @@ Llama 3.2 1B stacks this **16** times (3B: 28). Same shape in, same shape out �
     script: 'chapters/01-inference/ep09_stack.py',
     partId: 'trunk',
     estimatedMinutes: 12,
-    markdown: `## Full forward
+    markdown: `## In one sentence
+Embed → N blocks → final RMSNorm → linear to vocabulary scores (often weight-tied).
 
-\`\`\`
-ids → Embedding → [Block × N] → RMSNorm → Linear(vocab)
-\`\`\`
+## Before you start
+- Block done. Time: ~12 minutes.
 
-Llama 3.2 1B/3B **tie** \`lm_head.weight\` with \`embed_tokens.weight\`.
+## The idea (plain language)
+Glue the pieces:
+\`ids → Embedding → [Block × N] → RMSNorm → Linear(vocab)\`.
+The last linear’s scores are logits for the next token. Llama 3.2 ties \`lm_head\` to embeddings.
 
-Run:
+## In the code
+- \`arche/model.py\`
+- \`chapters/01-inference/ep09_stack.py\`
 
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep09_stack.py
 \`\`\`
+
+## If something breaks
+- Vocab size mismatches between embedding and head → use the provided config helpers.
+
+## Don't worry about yet
+Loading real Meta weights (next chapter) or sampling tricks.
+
+## Next
+**Load weights** (\`?c=weights\`).
+
 `,
   },
   {
@@ -269,16 +408,36 @@ python chapters/01-inference/ep09_stack.py
     script: 'chapters/01-inference/ep10_load_weights.py',
     partId: 'trunk',
     estimatedMinutes: 20,
-    markdown: `## Official weights, hand-written graph
+    markdown: `## In one sentence
+Map official Hugging Face Llama 3.2 tensors into the hand-written \`arche.Llama\` graph.
 
-\`from_pretrained\` builds our modules, downloads HF weights, and copies tensors by a small key map (\`model.layers.*\` → \`layers.*\`).
+## Before you start
+- Stack chapter done. Time: ~20 minutes.
+- Needs Hugging Face login + license acceptance (see Part 0 map).
 
-Needs a gated HF login:
+## The idea (plain language)
+Your modules are empty until filled. \`from_pretrained\` builds our graph, downloads HF weights, and copies tensors with a small key map (\`model.layers.*\` → \`layers.*\`).
 
+## In the code
+- \`arche/load_weights.py\`
+- \`chapters/01-inference/ep10_load_weights.py\`
+
+## Do this now
 \`\`\`bash
 huggingface-cli login
 python chapters/01-inference/ep10_load_weights.py
 \`\`\`
+
+## If something breaks
+- Gated errors → accept license, re-login; try \`HF_ENDPOINT=https://hf-mirror.com\` if needed.
+- Out of disk/RAM → close other apps; 1B is the intended size.
+
+## Don't worry about yet
+Quantized serving formats or multi-GPU sharding.
+
+## Next
+**Text generation** (\`?c=generate\`).
+
 `,
   },
   {
@@ -289,15 +448,34 @@ python chapters/01-inference/ep10_load_weights.py
     script: 'chapters/01-inference/ep11_generate.py',
     partId: 'trunk',
     estimatedMinutes: 15,
-    markdown: `## Decode loop
+    markdown: `## In one sentence
+Turn logits into tokens: sample (or greedily pick) the next id, append, repeat until stop.
 
-Repeatedly take the last-step logits, optionally filter top-k, sample (or greedy), append, stop on EOS.
+## Before you start
+- Weights chapter understood (even if download deferred). Time: ~15 minutes.
 
+## The idea (plain language)
+Each step looks at the last position’s scores. Optional **temperature** sharpens/softens; **top-k** keeps only the best k options. Append the chosen id; stop on EOS or length limit.
+
+## In the code
+- \`arche/generate.py\`
+- \`chapters/01-inference/ep11_generate.py\`
+
+## Do this now
 \`\`\`bash
 python chapters/01-inference/ep11_generate.py
 \`\`\`
+Without weights the tiny demo still shows the loop shape.
 
-Capability now comes from the loaded 1B weights; the code path is still entirely ours.
+## If something breaks
+- Empty/gibberish text with random weights is expected—real fluency needs loaded 1B weights.
+
+## Don't worry about yet
+KV cache speedups (next part) or chat templates (later).
+
+## Next
+Part 2 begins: **KV cache** (\`?c=kv-cache\`).
+
 `,
   },
   {

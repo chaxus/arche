@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
-    "lint:content": "node scripts/lint-content.mjs",
+    "lint:content": "node scripts/lint-content.mjs --strict-template",
     "preview": "vite preview"
   },
   "dependencies": {
