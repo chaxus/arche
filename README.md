@@ -21,15 +21,16 @@ In-course = runnable principles + a map into tip papers and engines. Full produc
 
 ## Why Llama 3.2 ~1B as the example
 
-One path needs one recipe. Llama 3.2 ~1B is picked because it is:
+**Frontier dense architecture, teachable scale.**
 
-1. **Open + downloadable** — HF checkpoint and official tokenizer; load and HF-align work  
-2. **Small enough to hold in your head** — ~1B keeps depth / heads / `D=2048` countable  
-3. **Production-like dense** — RMSNorm, RoPE, GQA, SwiGLU, byte BPE (not GPT-2 archaeology)  
-4. **Finished pair** — tokenizer and weights ship together, so handwritten vs official is fair  
-5. **Dense first** — MoE / MLA stay later primers on the same spine  
+Llama 3.2 is the small open sibling of Meta’s **Llama 3** line—the same brick set used at larger scales and echoed across today’s open dense stacks: **RMSNorm, RoPE, GQA, SwiGLU, byte BPE**. You are not learning a classroom toy net.
 
-Not “best chatbot” and not “train a frontier model on a laptop”—so from-zero writing and industry-shaped reading share one recipe.
+- **Architecture** = current frontier-shaped dense trunk (what you will recognize in bigger Llama / Qwen-class models and serving code)  
+- **Scale ~1B** = finishable, downloadable, numbers still fit in your head  
+- **Official tokenizer + weights** = fair handwritten vs industry check  
+- **Dense first** = MoE / MLA come later as primers, not day-one complexity  
+
+Not “best chatbot,” not “train 70B at home”—one recipe for from-zero writing and industry-shaped reading.
 
 ## Quick start
 

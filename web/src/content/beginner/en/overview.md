@@ -8,17 +8,18 @@ You hand-write a **Llama 3.2-style** next-token stack—tokenize → embed → b
 
 ### 2. Why Llama 3.2 ~1B as the example
 
-We needed **one** concrete model to pin config numbers (V, D, depth, heads) and brick names. Criteria → pick:
+**Headline:** learn on a **frontier dense architecture**, at a size you can actually finish.
 
-| Need | Why Llama 3.2 ~1B fits |
+Llama 3.2 is the small open release of Meta’s **Llama 3** line—the same recipe family used in larger Llama (and echoed across Qwen-class dense stacks): **RMSNorm + RoPE + GQA + SwiGLU + byte-level BPE**. That is today’s mainstream open dense trunk, not a simplified “course-only” net. MoE / MLA and bigger engines come later as primers on top of this trunk.
+
+| Why this pick | Plain meaning |
 | --- | --- |
-| **Open + downloadable** | HF checkpoint + official tokenizer; you can load and HF-align |
-| **Small enough to hold in your head** | ~1B: depth/heads/`D=2048` stay countable—not a 70B wall of configs |
-| **Production-like dense** | RMSNorm, RoPE, GQA, SwiGLU, byte BPE—still what 2024+ dense stacks use (not GPT-2 archaeology) |
-| **Finished pair available** | Tokenizer and weights ship together, so “handwritten vs official” is a fair check |
-| **Dense first** | MoE/MLA stay later primers; the example itself stays a plain dense decoder |
+| **Frontier-shaped bricks** | Same module names and contracts you meet in current open dense models and serving stacks |
+| **One family, teachable scale** | ~1B keeps V / D / depth / heads countable and HF-downloadable—architecture stays Llama 3, size is for learning |
+| **Open finished pair** | Official tokenizer + checkpoint so handwritten vs industry is a real check |
+| **Dense first** | Master the dense decoder before MoE/MLA maps; don’t start on a museum GPT-2 |
 
-Not chosen for “best chatbot” or “train a frontier model on a laptop.” Chosen so **from-zero writing** and **industry-shaped reading** share one recipe.
+So: **architecture = current frontier dense; scale = ~1B so from-zero is finishable.** Not “the smartest chatbot,” and not “train 70B at home.”
 
 ### 3. From zero: how you “generate” this path
 
