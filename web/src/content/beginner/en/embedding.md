@@ -32,6 +32,12 @@ Ids `[7, 3, 7]` → three rows: row 7, then row 3, then row 7 again. **No formul
 
 One line: **tokenizer numbers tokens; embedding gives each number a trainable vector the rest of the net can compute on.** Bad table ⇒ later layers train on noise; wrong pairing with the tokenizer ⇒ the pipeline is junk.
 
+**Where do those floats come from?**  
+At first they are **random** (almost no meaning). Then the whole net trains on next-token prediction; wrong guesses backprop and **rewrite rows that showed up**—frequent tokens move most. Results are saved in the checkpoint; inference only loads and gathers. This course can also load Llama’s already-trained rows.
+
+**Why a float row per token at all?**  
+Later layers are continuous math (matmul, add, nonlinearities). Integer ids are not valid inputs for that; float rows are. Training tends to push co-occurring / similar-role tokens into vectors that help “guess the next token”—a side effect of the objective, not hand-drawn word maps.
+
 The playground on this page is exactly “gather by id.”
 
 ```mermaid
