@@ -1,41 +1,32 @@
 ## Idea
 
+From zero: one block isn’t an LM—you need **embed + N blocks + final norm + LM head**.
+
 ### 1. What it is for
 
-The **stack** wires embed → `N` blocks → final RMSNorm → LM head into a full next-token model:
+`ids → embed → Block×N → final RMSNorm → Linear(V) → logits`. Small Llamas often **tie** head↔embed.
 
-`ids → embed → Block×N → final RMSNorm → Linear(vocab) → logits`
+### 2. From zero: how you build it
 
-Last-dim scores are next-token **logits**. Small Llamas often **tie** LM head ↔ embedding.
+Build shell from V/D/N/heads; wire stack; choose tying; init then load or pretrain.
 
-### 2. Why the LLM pipeline needs it
+### 3. What “good” means
 
-One block isn’t a LM. Depth mixes context; the LM head maps hidden states back to **the same vocab** as the tokenizer so you can sample the next id.
+Logits `(B,T,V)`; config matches weights; tying consistent; quality after load/train.
 
-### 3. Where it comes from · how you build it
+### 4. Improve · whole-model impact
 
-| Part | Role |
-| --- | --- |
-| Embed | id → vector |
-| Blocks × N | mix + transform |
-| Final norm | steady before the head |
-| LM head | vector → vocab scores (maybe tied) |
+Depth/width/tie/V are architecture-level—retrain or careful migration. Optimize modules + training, not “stack alone.”
 
-Config sets depth/dim/heads; random weights mean a correct graph but nonsense outputs (next chapter loads).
+### 5. Industry · open models
 
-### 4. Standards · what “good” means
+Llama/Qwen dense share this skeleton; MoE swaps FFN for experts inside blocks.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | logits `(B, T, vocab)` | Align with vocab |
-| **Hard** | Tying matches claim | Shared params if tied |
-| **Hard** | Depth/dim match config | Else official weights won’t fit |
-| **Soft** | Coherent text after load | Full-model quality |
+### 6. This course
 
-### 5. What labs ship · what we do
-
-Llama-style dense end-to-end.  
-`Llama` in `arche/model.py`.
+```bash
+python chapters/01-inference/ep09_stack.py
+```
 
 ## Run
 

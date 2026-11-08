@@ -560,35 +560,33 @@ python chapters/01-inference/ep07_swiglu.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
+From zero: parts become one **repeatable layer** so you can stack depth.
+
 ### 1. What it is for
 
-A **Transformer block** is one repeatable sandwich: RMSNorm → attention → residual → RMSNorm → SwiGLU → residual. Same shape in/out so you can stack \`N\` times.
+Pre-norm sandwich: RMSNorm→attn→res→RMSNorm→SwiGLU→res. Same shape in/out.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Parts alone aren’t a deep LM. The block is the unit of depth: residuals keep a path for the original signal; pre-norm keeps scales sane at each entry.
+Wire the sandwich; per-block weights; pick depth N (Llama 3.2 1B = **16**); stack and train.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Stage | What happens |
-| --- | --- |
-| **Wire** | Sandwich above; attention may take a KV cache |
-| **Depth** | Llama 3.2 1B: **16** blocks |
-| **Train** | Each block has its own weights |
+Residuals add; pre-norm placement; isolated caches; still trainable when deep.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Residual shapes match | Can add |
-| **Hard** | Pre-norm placement | Llama contract |
-| **Hard** | Per-layer cache if used | No cross-talk / missing layers |
-| **Soft** | Still trainable when deep | Residuals + norms |
+Deeper N ⇒ capability/cost; post→pre-norm enables deep from-zero training; parallel attn∥MLP isn’t Llama’s main line.
 
-### 5. What labs ship · what we do
+### 5. Industry · open models
 
-Llama-style pre-norm blocks.  
-\`TransformerBlock\` in \`arche/block.py\`.
+Llama/Qwen: repeat pre-norm blocks. DeepSeek variants change insides; block boundary remains.
+
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep08_block.py
+\`\`\`
 
 ## Run
 
@@ -612,42 +610,33 @@ python chapters/01-inference/ep08_block.py
     estimatedMinutes: 12,
     markdown: `## Idea
 
+From zero: one block isn’t an LM—you need **embed + N blocks + final norm + LM head**.
+
 ### 1. What it is for
 
-The **stack** wires embed → \`N\` blocks → final RMSNorm → LM head into a full next-token model:
+\`ids → embed → Block×N → final RMSNorm → Linear(V) → logits\`. Small Llamas often **tie** head↔embed.
 
-\`ids → embed → Block×N → final RMSNorm → Linear(vocab) → logits\`
+### 2. From zero: how you build it
 
-Last-dim scores are next-token **logits**. Small Llamas often **tie** LM head ↔ embedding.
+Build shell from V/D/N/heads; wire stack; choose tying; init then load or pretrain.
 
-### 2. Why the LLM pipeline needs it
+### 3. What “good” means
 
-One block isn’t a LM. Depth mixes context; the LM head maps hidden states back to **the same vocab** as the tokenizer so you can sample the next id.
+Logits \`(B,T,V)\`; config matches weights; tying consistent; quality after load/train.
 
-### 3. Where it comes from · how you build it
+### 4. Improve · whole-model impact
 
-| Part | Role |
-| --- | --- |
-| Embed | id → vector |
-| Blocks × N | mix + transform |
-| Final norm | steady before the head |
-| LM head | vector → vocab scores (maybe tied) |
+Depth/width/tie/V are architecture-level—retrain or careful migration. Optimize modules + training, not “stack alone.”
 
-Config sets depth/dim/heads; random weights mean a correct graph but nonsense outputs (next chapter loads).
+### 5. Industry · open models
 
-### 4. Standards · what “good” means
+Llama/Qwen dense share this skeleton; MoE swaps FFN for experts inside blocks.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | logits \`(B, T, vocab)\` | Align with vocab |
-| **Hard** | Tying matches claim | Shared params if tied |
-| **Hard** | Depth/dim match config | Else official weights won’t fit |
-| **Soft** | Coherent text after load | Full-model quality |
+### 6. This course
 
-### 5. What labs ship · what we do
-
-Llama-style dense end-to-end.  
-\`Llama\` in \`arche/model.py\`.
+\`\`\`bash
+python chapters/01-inference/ep09_stack.py
+\`\`\`
 
 ## Run
 
@@ -671,36 +660,34 @@ python chapters/01-inference/ep09_stack.py
     estimatedMinutes: 20,
     markdown: `## Idea
 
+From zero, two paths meet: **(A) write your own checkpoint via pretrain**; **(B) load an open checkpoint**. Bad loads waste the handwritten stack.
+
 ### 1. What it is for
 
-**Loading weights** copies trained tensors into the modules you built. A correct graph with random params is nonsense; official Llama 3.2 weights make the same forward a language model.
+Copy tensors via a key map. Random weights are a correct graph with nonsense outputs.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you do it
 
-“Knowledge” lives in the checkpoint. Infer / align / fine-tune all start from a **correct load**. Wrong keys, tokenizer, or dtype → silent junk or crashes.
+Self-train: save state_dict + tokenizer version. Open load: license→download→key map→official tokenizer→validate.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Step | What happens |
-| --- | --- |
-| **1** | Build empty modules from config |
-| **2** | Download HF Llama 3.2 (license + login) |
-| **3** | Copy tensors via a **key map** into arche names |
-| **4** | Use the matching official tokenizer |
+Shapes/counts; full map; tokenizer pair; optional HF logit align.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Param count / shapes match | Missing layers or wrong dims |
-| **Hard** | Key map covers every tensor | Unmapped = still random |
-| **Hard** | Tokenizer pairing | See tokenizer / embedding |
-| **Soft** | Logits close to HF on a short prompt | Alignment chapter |
+Fix maps; dtype; resume carefully; wrong tokenizer destroys meaning.
 
-### 5. What labs ship · what we do
+### 5. Industry · open models
 
-Official HF Llama 3.2 checkpoints.  
-\`arche/load_weights.py\` + this episode’s script.
+HF + safetensors standard; Llama/Qwen/DeepSeek ship that way; engines consume the same.
+
+### 6. This course
+
+\`\`\`bash
+huggingface-cli login
+python chapters/01-inference/ep10_load_weights.py
+\`\`\`
 
 ## Run
 
@@ -711,7 +698,7 @@ python chapters/01-inference/ep10_load_weights.py
 
 ## Fix
 
-Same as tokenizer: license, login, mirror.
+License, login, mirror—same as tokenizer.
 
 ## Next
 
@@ -729,38 +716,33 @@ Same as tokenizer: license, login, mirror.
     estimatedMinutes: 15,
     markdown: `## Idea
 
+From zero: logits aren’t generation until you **loop sample**. Products differ in stopping/sampling, not in having a loop.
+
 ### 1. What it is for
 
-**Generation** loops “one forward → next id”: last-position logits → optional temperature / top-k → greedy or sample → append → stop on EOS or length.
+Last-position logits → optional temperature/top-k → greedy/sample → append → stop on EOS/length.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-One forward only yields the **next-token** distribution, not a full reply. Chat, completion, tools all sit on this loop; products differ in stopping, sampling, and templates.
+Forward→sample→stop; add KV cache next; chat templates later.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Step | What happens |
-| --- | --- |
-| **1** | Prefill / forward → logits |
-| **2** | Last position; optional temperature, top-k |
-| **3** | argmax or sample a new id |
-| **4** | Append; stop on EOS or max length |
+Stops; past-only; valid ids; sensible sampling; coherence with real weights.
 
-KV cache (next) makes step 1 cheap after prefill; the **loop** stays the same.
+### 4. Improve · whole-model impact
 
-### 4. Standards · what “good” means
+Sampling knobs don’t change weights; stop rules shape UX; constrained decoding for structure; without KV the loop is correct but too slow.
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Stops cleanly | EOS / max length work |
-| **Hard** | Only past prefix | No future tokens |
-| **Soft** | Temperature / top-k behave | 0 greedier; higher more random |
-| **Soft** | Coherent text with real weights | Full model + sampling |
+### 5. Industry · open models
 
-### 5. What labs ship · what we do
+Every chat stack loops; vLLM/TGI speed cache/batching. Llama/Qwen APIs expose sampling.
 
-Every chat stack uses this loop shape.  
-\`generate\` in \`arche/generate.py\`.
+### 6. This course
+
+\`\`\`bash
+python chapters/01-inference/ep11_generate.py
+\`\`\`
 
 ## Run
 

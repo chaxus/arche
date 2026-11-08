@@ -1,34 +1,32 @@
 ## Idea
 
+From zero: parts become one **repeatable layer** so you can stack depth.
+
 ### 1. What it is for
 
-A **Transformer block** is one repeatable sandwich: RMSNorm → attention → residual → RMSNorm → SwiGLU → residual. Same shape in/out so you can stack `N` times.
+Pre-norm sandwich: RMSNorm→attn→res→RMSNorm→SwiGLU→res. Same shape in/out.
 
-### 2. Why the LLM pipeline needs it
+### 2. From zero: how you build it
 
-Parts alone aren’t a deep LM. The block is the unit of depth: residuals keep a path for the original signal; pre-norm keeps scales sane at each entry.
+Wire the sandwich; per-block weights; pick depth N (Llama 3.2 1B = **16**); stack and train.
 
-### 3. Where it comes from · how you build it
+### 3. What “good” means
 
-| Stage | What happens |
-| --- | --- |
-| **Wire** | Sandwich above; attention may take a KV cache |
-| **Depth** | Llama 3.2 1B: **16** blocks |
-| **Train** | Each block has its own weights |
+Residuals add; pre-norm placement; isolated caches; still trainable when deep.
 
-### 4. Standards · what “good” means
+### 4. Improve · whole-model impact
 
-| Kind | Check | Plain meaning |
-| --- | --- | --- |
-| **Hard** | Residual shapes match | Can add |
-| **Hard** | Pre-norm placement | Llama contract |
-| **Hard** | Per-layer cache if used | No cross-talk / missing layers |
-| **Soft** | Still trainable when deep | Residuals + norms |
+Deeper N ⇒ capability/cost; post→pre-norm enables deep from-zero training; parallel attn∥MLP isn’t Llama’s main line.
 
-### 5. What labs ship · what we do
+### 5. Industry · open models
 
-Llama-style pre-norm blocks.  
-`TransformerBlock` in `arche/block.py`.
+Llama/Qwen: repeat pre-norm blocks. DeepSeek variants change insides; block boundary remains.
+
+### 6. This course
+
+```bash
+python chapters/01-inference/ep08_block.py
+```
 
 ## Run
 
