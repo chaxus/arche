@@ -25,3 +25,6 @@ include = ["arche*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "integration: needs gated Hugging Face Llama 3.2 weights",
+]
