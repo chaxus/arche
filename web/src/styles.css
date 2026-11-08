@@ -32,9 +32,15 @@
   --ran-color-border: color-mix(in srgb, var(--arche-ink) 14%, transparent);
   --ran-color-link: var(--arche-teal);
   --ran-color-brand: var(--arche-teal);
+  --ran-color-primary: var(--arche-teal);
+  --ran-color-primary-hover: color-mix(in srgb, var(--arche-teal) 82%, var(--arche-ink));
+  --ran-color-primary-active: color-mix(in srgb, var(--arche-teal) 70%, var(--arche-ink));
+  --ran-color-primary-text: #fff;
 }
 
-html[data-theme='dark'] {
+/* ranui writes data-ran-theme / theme, not data-theme */
+html[data-ran-theme='dark'],
+html[theme='dark'] {
   --arche-ink: #e6ebe8;
   --arche-paper: #121614;
   --arche-paper-deep: #1a1f1c;

@@ -805,7 +805,7 @@ function renderArticle(chapter: Chapter): void {
     renderNav(chapter.id);
     window.setTimeout(() => {
       renderArticle(chapter);
-    }, 220);
+    }, 450);
   });
   document.querySelector('#prev-chapter')?.addEventListener('click', () => {
     if (prev) selectChapter(prev.id);
