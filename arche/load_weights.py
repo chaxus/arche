@@ -76,11 +76,20 @@ def load_hf_state_dict_into_llama(
 def from_pretrained(
     model_id: str = DEFAULT_MODEL_ID,
     *,
-    device: str | torch.device = "cpu",
+    device: str | torch.device | None = None,
     dtype: torch.dtype | None = torch.float32,
 ) -> Llama:
     """Build our ``Llama`` and fill it from a Hugging Face checkpoint."""
     from transformers import AutoModelForCausalLM
+
+    from arche.device import pick_device
+
+    if device is None:
+        target = pick_device()
+    elif isinstance(device, str):
+        target = pick_device(device)
+    else:
+        target = device
 
     cfg = config_for_model_id(model_id)
     model = Llama(cfg)
@@ -91,7 +100,7 @@ def from_pretrained(
     )
     load_hf_state_dict_into_llama(model, hf.state_dict(), strict=True)
     del hf
-    model.to(device=device)
+    model.to(device=target)
     if dtype is not None:
         model.to(dtype=dtype)
     model.eval()
