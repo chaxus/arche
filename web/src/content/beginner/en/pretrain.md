@@ -1,76 +1,121 @@
 ## Idea
 
-This is the **core of from-zero**: **next-token training** (pretrain). It is how embedding rows and almost all trunk weights stop being random. Without it you only have a shell—or you load someone else’s finished floats (the Llama example later).
+**What:** *Causal language modeling* / **next-token pretraining** — given tokens to the left, score every vocab id as “what comes next,” then train so the true next id gets high probability.
 
-### 1. What it is for
+**Why it matters:** This single self-supervised objective is what **writes** embedding rows and almost all trunk weights. Without it you have a random shell (or you load someone else’s floats, like the Llama example later).
 
-On huge text, force the model to **guess the next id** given the previous ones. Wrong guesses → loss → backprop → rewrite parameters (including embeddings). That is the main author of the numbers you looked up in the embedding chapter.
+**How (one line):** tokenize text → embed → forward → **shift** so position `t` predicts id `t+1` → cross-entropy → backward → optimizer step. Repeat on huge corpora.
 
-### 2. Inference guess vs training guess
+Industry names the same thing: nanoGPT’s `X,Y` windows, Hugging Face “causal LM”, Llama 3 / DeepSeek “pretrain then align.”
 
-| | **Inference** (chat) | **Training** (this chapter) |
+### 1. What — the objective
+
+For a token sequence \(x_1,\ldots,x_T\):
+
+\[
+p(x_1,\ldots,x_T)=\prod_t p(x_t \mid x_{<t})
+\]
+
+Training minimizes average **negative log-likelihood** = token-level **cross-entropy**. Labels come from the text itself (self-supervised)—no human “answer” column.
+
+| Name | Meaning |
+| --- | --- |
+| **logits** | Raw scores `(batch, time, V)` before softmax |
+| **next-token CE** | At each time, punish low probability on the true next id |
+| **causal** | Position `t` must not see tokens after `t` (mask / decoder stack) |
+
+### 2. Why — why this design
+
+| Choice | Why |
+| --- | --- |
+| Predict **next** id | Turns any raw text into infinite training signal |
+| One forward → many positions | Length-`T` sequence yields ~`T-1` supervised guesses (causal mask makes each legal) |
+| CE on vocab | Matches “pick a discrete token”; differentiable via softmax |
+| Update **embeds + all bricks** | Embedding chapter’s floats are not hand-filled—they move here |
+| Pretrain **before** SFT/DPO | Align steers an already next-token-capable net; it does not invent the base skill |
+
+Inference vs training:
+
+| | Inference | Training (this chapter) |
 | --- | --- | --- |
-| True next token | Unknown—you pick from scores | **Known** from the dataset |
-| After scores | argmax / sample → append | Compare to the true id → **loss** |
-| Parameters | Frozen (usually) | **Updated** every step |
+| True next id | Unknown | Known from the batch |
+| After logits | sample / argmax | CE vs true id |
+| Weights | usually frozen | updated every step |
 
-Same forward shape; training adds the teacher signal and the rewrite.
+### 3. How — shift, loss, one step (real code)
 
-### 3. From zero: the loop (plain steps)
+Tiny example ids `[10, 20, 30]` (“The cat sat” style, fake ids):
 
-Tiny sentence after tokenize, say ids `[10, 20, 30]` for `The cat sat` (fake ids):
-
-| Position | Context ids | True next id |
+| Position | Sees (conceptually) | Must predict |
 | --- | --- | --- |
-| 0 | `[10]` | `20` (`cat`) |
-| 1 | `[10, 20]` | `30` (`sat`) |
+| 0 | `10` | `20` |
+| 1 | `10,20` | `30` |
 
-What one train step does:
+**Implementation in this repo** ([`arche/train/pretrain.py`](https://github.com/chaxus/arche/blob/main/arche/train/pretrain.py)):
 
-1. **Batch text** → tokenizer → id tensor  
-2. **Embed** = gather float rows for those ids  
-3. **Forward** through the stack → **logits** shape roughly `(batch, time, V)` — a score per vocab id at each position  
-4. **Shift**: at position `t` predict id at `t+1` (never “cheat” with the answer in the input for that slot)  
-5. **Loss** = cross-entropy between logits and the true next ids (average over positions)  
-6. **Backward** = gradients flow into every used embed row and every brick weight  
-7. **Optimizer** (e.g. AdamW) takes a small step; repeat for billions of tokens in real runs  
+```python
+def lm_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    """Predict token t+1 from positions 0..T-1."""
+    return F.cross_entropy(
+        logits[:, :-1].reshape(-1, logits.size(-1)),  # drop last time
+        targets[:, 1:].reshape(-1),                   # drop first id
+    )
+```
+
+Same batch tensor is both input and label source: logits at `t` align with `targets[t+1]`.
+
+Full micro-step:
+
+```python
+opt.zero_grad(set_to_none=True)
+logits, _ = model(batch)       # (B, T, V)
+loss = lm_loss(logits, batch)
+loss.backward()
+opt.step()
+```
+
+Lab driver ([`chapters/02-training/ep18_pretrain.py`](https://github.com/chaxus/arche/blob/main/chapters/02-training/ep18_pretrain.py)): tiny `Llama` + random id batches + `train_pretrain_steps` → print loss start→end.
+
+**HF pitfall:** `DataCollatorForLanguageModeling(mlm=False)` often sets `labels = input_ids` **unshifted**; Transformers CausalLM shifts **inside** `forward`. Hand-written loops (ours / nanoGPT) shift explicitly. **Do not shift twice.**
 
 ```mermaid
 flowchart LR
-  data[text_batch] --> tok[tokenize]
-  tok --> emb[embed_gather]
-  emb --> fwd[forward_stack]
-  fwd --> logits[logits]
-  logits --> ce[cross_entropy_vs_next_id]
-  ce --> bwd[backprop]
-  bwd --> upd[update_rows_and_weights]
+  batch[ids_BT] --> fwd[model_forward]
+  fwd --> logits[logits_BTV]
+  logits --> shift[logits_tm1_vs_ids_t]
+  shift --> ce[cross_entropy]
+  ce --> bwd[backward]
+  bwd --> adam[AdamW_step]
 ```
 
-Init embeds are random lockers; **this loop writes the useful numbers.** Later chapters hand-write RMSNorm / RoPE / … so the forward in step 3 is *your* stack—not a mystery box.
+Sanity: at random init, loss ≈ `log(V)` (uniform over vocab).
 
 ### 4. What “good” means
 
 | Kind | Check |
 | --- | --- |
-| **Hard** | Objective is really next-token; shift is correct; grads hit embeds + trunk |
-| **Hard** | No NaN; loss defined on the right positions |
-| **Soft** | Loss trends down; probes / samples get less nonsense |
-| **Soft** | Stable lr / grad clip so a long run can finish |
+| **Hard** | Shift is one token; causal (no future leak) |
+| **Hard** | Grads reach embed rows + trunk; no NaN |
+| **Soft** | Loss falls; samples less nonsense |
+| **Soft** | Matches published recipe at scale (later chapters) |
 
 ### 5. Improve · whole-model impact
 
 | Lever | Impact |
 | --- | --- |
-| Data mix & quality | Main ceiling of capability |
-| Scale (params × tokens) | Scaling laws |
-| Stability (norm, lr, clip) | Whether you finish at all |
+| More / better tokens | Main capability ceiling |
+| Correct shift / mask | Silent wrong objective if broken |
+| LR / clip / accum | Finishability (next chapter) |
 | Under-train | Weak embeds **and** deep layers |
 
-SFT / DPO (next part) steer an already next-token-capable net; they do not replace this base loop.
+Next lessons split **data windows**, **optimizers**, and **frontier scale recipes** so this chapter stays the objective + one step.
 
-### 6. Industry · open models
+### 6. Industry pointers
 
-Llama / Qwen / DeepSeek all tell a **pretrain → then align** story. Real stacks: Megatron / DeepSpeed / torchtitan-style. This lesson is a **toy API + playground**—feel the shape, not a cluster run.
+- Raschka FAQ: constructing input/target windows  
+- nanoGPT `train.py`: readable full loop  
+- HF LLM Course ch7.6: causal LM from scratch  
+- Llama 3 / DeepSeek reports: same family of objective, different scale & architecture  
 
 ### 7. This course
 
@@ -78,7 +123,7 @@ Llama / Qwen / DeepSeek all tell a **pretrain → then align** story. Real stack
 python chapters/02-training/ep18_pretrain.py
 ```
 
-Use the page playground to drag lr / steps. Then go build the bricks that sit between embed and logits.
+Page playground: drag lr / steps. Forward stack details come in RMSNorm→… after the data/optim primers.
 
 ## Run
 
@@ -88,4 +133,4 @@ python chapters/02-training/ep18_pretrain.py
 
 ## Next
 
-**RMSNorm** (`/rmsnorm/`): steady scales after embedding so deep next-token training can survive.
+**Pretrain data** (`/pretrain-data/`): how batches and sliding windows are built.

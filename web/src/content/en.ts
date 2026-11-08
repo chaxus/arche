@@ -398,77 +398,122 @@ python chapters/01-inference/ep03_embedding.py
     demo: 'pretrain',
     markdown: `## Idea
 
-This is the **core of from-zero**: **next-token training** (pretrain). It is how embedding rows and almost all trunk weights stop being random. Without it you only have a shell—or you load someone else’s finished floats (the Llama example later).
+**What:** *Causal language modeling* / **next-token pretraining** — given tokens to the left, score every vocab id as “what comes next,” then train so the true next id gets high probability.
 
-### 1. What it is for
+**Why it matters:** This single self-supervised objective is what **writes** embedding rows and almost all trunk weights. Without it you have a random shell (or you load someone else’s floats, like the Llama example later).
 
-On huge text, force the model to **guess the next id** given the previous ones. Wrong guesses → loss → backprop → rewrite parameters (including embeddings). That is the main author of the numbers you looked up in the embedding chapter.
+**How (one line):** tokenize text → embed → forward → **shift** so position \`t\` predicts id \`t+1\` → cross-entropy → backward → optimizer step. Repeat on huge corpora.
 
-### 2. Inference guess vs training guess
+Industry names the same thing: nanoGPT’s \`X,Y\` windows, Hugging Face “causal LM”, Llama 3 / DeepSeek “pretrain then align.”
 
-| | **Inference** (chat) | **Training** (this chapter) |
+### 1. What — the objective
+
+For a token sequence \\(x_1,\\ldots,x_T\\):
+
+\\[
+p(x_1,\\ldots,x_T)=\\prod_t p(x_t \\mid x_{<t})
+\\]
+
+Training minimizes average **negative log-likelihood** = token-level **cross-entropy**. Labels come from the text itself (self-supervised)—no human “answer” column.
+
+| Name | Meaning |
+| --- | --- |
+| **logits** | Raw scores \`(batch, time, V)\` before softmax |
+| **next-token CE** | At each time, punish low probability on the true next id |
+| **causal** | Position \`t\` must not see tokens after \`t\` (mask / decoder stack) |
+
+### 2. Why — why this design
+
+| Choice | Why |
+| --- | --- |
+| Predict **next** id | Turns any raw text into infinite training signal |
+| One forward → many positions | Length-\`T\` sequence yields ~\`T-1\` supervised guesses (causal mask makes each legal) |
+| CE on vocab | Matches “pick a discrete token”; differentiable via softmax |
+| Update **embeds + all bricks** | Embedding chapter’s floats are not hand-filled—they move here |
+| Pretrain **before** SFT/DPO | Align steers an already next-token-capable net; it does not invent the base skill |
+
+Inference vs training:
+
+| | Inference | Training (this chapter) |
 | --- | --- | --- |
-| True next token | Unknown—you pick from scores | **Known** from the dataset |
-| After scores | argmax / sample → append | Compare to the true id → **loss** |
-| Parameters | Frozen (usually) | **Updated** every step |
+| True next id | Unknown | Known from the batch |
+| After logits | sample / argmax | CE vs true id |
+| Weights | usually frozen | updated every step |
 
-Same forward shape; training adds the teacher signal and the rewrite.
+### 3. How — shift, loss, one step (real code)
 
-### 3. From zero: the loop (plain steps)
+Tiny example ids \`[10, 20, 30]\` (“The cat sat” style, fake ids):
 
-Tiny sentence after tokenize, say ids \`[10, 20, 30]\` for \`The cat sat\` (fake ids):
-
-| Position | Context ids | True next id |
+| Position | Sees (conceptually) | Must predict |
 | --- | --- | --- |
-| 0 | \`[10]\` | \`20\` (\`cat\`) |
-| 1 | \`[10, 20]\` | \`30\` (\`sat\`) |
+| 0 | \`10\` | \`20\` |
+| 1 | \`10,20\` | \`30\` |
 
-What one train step does:
+**Implementation in this repo** ([\`arche/train/pretrain.py\`](https://github.com/chaxus/arche/blob/main/arche/train/pretrain.py)):
 
-1. **Batch text** → tokenizer → id tensor  
-2. **Embed** = gather float rows for those ids  
-3. **Forward** through the stack → **logits** shape roughly \`(batch, time, V)\` — a score per vocab id at each position  
-4. **Shift**: at position \`t\` predict id at \`t+1\` (never “cheat” with the answer in the input for that slot)  
-5. **Loss** = cross-entropy between logits and the true next ids (average over positions)  
-6. **Backward** = gradients flow into every used embed row and every brick weight  
-7. **Optimizer** (e.g. AdamW) takes a small step; repeat for billions of tokens in real runs  
+\`\`\`python
+def lm_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    """Predict token t+1 from positions 0..T-1."""
+    return F.cross_entropy(
+        logits[:, :-1].reshape(-1, logits.size(-1)),  # drop last time
+        targets[:, 1:].reshape(-1),                   # drop first id
+    )
+\`\`\`
+
+Same batch tensor is both input and label source: logits at \`t\` align with \`targets[t+1]\`.
+
+Full micro-step:
+
+\`\`\`python
+opt.zero_grad(set_to_none=True)
+logits, _ = model(batch)       # (B, T, V)
+loss = lm_loss(logits, batch)
+loss.backward()
+opt.step()
+\`\`\`
+
+Lab driver ([\`chapters/02-training/ep18_pretrain.py\`](https://github.com/chaxus/arche/blob/main/chapters/02-training/ep18_pretrain.py)): tiny \`Llama\` + random id batches + \`train_pretrain_steps\` → print loss start→end.
+
+**HF pitfall:** \`DataCollatorForLanguageModeling(mlm=False)\` often sets \`labels = input_ids\` **unshifted**; Transformers CausalLM shifts **inside** \`forward\`. Hand-written loops (ours / nanoGPT) shift explicitly. **Do not shift twice.**
 
 \`\`\`mermaid
 flowchart LR
-  data[text_batch] --> tok[tokenize]
-  tok --> emb[embed_gather]
-  emb --> fwd[forward_stack]
-  fwd --> logits[logits]
-  logits --> ce[cross_entropy_vs_next_id]
-  ce --> bwd[backprop]
-  bwd --> upd[update_rows_and_weights]
+  batch[ids_BT] --> fwd[model_forward]
+  fwd --> logits[logits_BTV]
+  logits --> shift[logits_tm1_vs_ids_t]
+  shift --> ce[cross_entropy]
+  ce --> bwd[backward]
+  bwd --> adam[AdamW_step]
 \`\`\`
 
-Init embeds are random lockers; **this loop writes the useful numbers.** Later chapters hand-write RMSNorm / RoPE / … so the forward in step 3 is *your* stack—not a mystery box.
+Sanity: at random init, loss ≈ \`log(V)\` (uniform over vocab).
 
 ### 4. What “good” means
 
 | Kind | Check |
 | --- | --- |
-| **Hard** | Objective is really next-token; shift is correct; grads hit embeds + trunk |
-| **Hard** | No NaN; loss defined on the right positions |
-| **Soft** | Loss trends down; probes / samples get less nonsense |
-| **Soft** | Stable lr / grad clip so a long run can finish |
+| **Hard** | Shift is one token; causal (no future leak) |
+| **Hard** | Grads reach embed rows + trunk; no NaN |
+| **Soft** | Loss falls; samples less nonsense |
+| **Soft** | Matches published recipe at scale (later chapters) |
 
 ### 5. Improve · whole-model impact
 
 | Lever | Impact |
 | --- | --- |
-| Data mix & quality | Main ceiling of capability |
-| Scale (params × tokens) | Scaling laws |
-| Stability (norm, lr, clip) | Whether you finish at all |
+| More / better tokens | Main capability ceiling |
+| Correct shift / mask | Silent wrong objective if broken |
+| LR / clip / accum | Finishability (next chapter) |
 | Under-train | Weak embeds **and** deep layers |
 
-SFT / DPO (next part) steer an already next-token-capable net; they do not replace this base loop.
+Next lessons split **data windows**, **optimizers**, and **frontier scale recipes** so this chapter stays the objective + one step.
 
-### 6. Industry · open models
+### 6. Industry pointers
 
-Llama / Qwen / DeepSeek all tell a **pretrain → then align** story. Real stacks: Megatron / DeepSpeed / torchtitan-style. This lesson is a **toy API + playground**—feel the shape, not a cluster run.
+- Raschka FAQ: constructing input/target windows  
+- nanoGPT \`train.py\`: readable full loop  
+- HF LLM Course ch7.6: causal LM from scratch  
+- Llama 3 / DeepSeek reports: same family of objective, different scale & architecture  
 
 ### 7. This course
 
@@ -476,7 +521,7 @@ Llama / Qwen / DeepSeek all tell a **pretrain → then align** story. Real stack
 python chapters/02-training/ep18_pretrain.py
 \`\`\`
 
-Use the page playground to drag lr / steps. Then go build the bricks that sit between embed and logits.
+Page playground: drag lr / steps. Forward stack details come in RMSNorm→… after the data/optim primers.
 
 ## Run
 
@@ -486,7 +531,324 @@ python chapters/02-training/ep18_pretrain.py
 
 ## Next
 
-**RMSNorm** (\`/rmsnorm/\`): steady scales after embedding so deep next-token training can survive.
+**Pretrain data** (\`/pretrain-data/\`): how batches and sliding windows are built.
+
+`,
+  },
+{
+    id: 'pretrain-data',
+    ep: '18b',
+    title: 'Pretrain data',
+    summary: 'Windows, packing, batches—how text becomes (B, T) for the CE loop.',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
+    markdown: `## Idea
+
+**What:** How pretraining turns raw text into **\`(batch, time)\` id tensors** the loss can eat—document → tokenize → pack/cut windows → batch → (optional) pad/mask.
+
+**Why:** The objective in *Pretrain* is fixed; **data shape** decides what signal each step sees. Wrong windows (empty pads as labels, leaked future, broken packing) silently waste or corrupt training.
+
+**How:** Build fixed-length contexts (or pack many docs into one stream), form batches, keep **labels aligned with the same shift rule** as your loss.
+
+### 1. What — pieces of a batch
+
+| Piece | Role |
+| --- | --- |
+| **document** | Raw text (web, books, code, …) |
+| **token ids** | Tokenizer output (BPE etc.) |
+| **window / block** | Length-\`T\` slice the model sees at once (\`T\` ≈ context) |
+| **batch** | Stack \`B\` windows → shape \`(B, T)\` |
+| **labels** | Same ids, interpreted with shift (or HF’s internal shift) |
+
+Two common layouts:
+
+| Layout | Idea |
+| --- | --- |
+| **Sliding / chunked** | Cut long token streams into non-overlap or stride-\`T\` blocks (nanoGPT style) |
+| **Packed** | Concatenate many short docs with separators / attention boundaries so GPUs stay full |
+
+### 2. Why — design pressure
+
+| Pressure | Consequence |
+| --- | --- |
+| GPU likes dense \`(B,T)\` | Prefer packing over tiny ragged sequences |
+| Context length \`T\` | Caps how far “next token” can look back |
+| Pad tokens | Must **not** train as if they were real next words (mask or ignore_index) |
+| Doc boundaries | Blind concat can invent fake “next tokens” across unrelated docs unless you mask |
+
+### 3. How — toy window (matches this repo)
+
+Lab batches are random ids for teaching the **loop**, not real corpora:
+
+\`\`\`python
+# ep18-style: B windows of length T, vocab V
+batch = torch.randint(0, V, (B, T))
+logits, _ = model(batch)
+loss = lm_loss(logits, batch)  # uses batch[:, 1:] as targets
+\`\`\`
+
+Production sketch (conceptual, nanoGPT-like):
+
+\`\`\`python
+# tokens: 1D long stream of ids
+ix = torch.randint(0, len(tokens) - T, (B,))
+x = torch.stack([tokens[i : i + T] for i in ix])
+y = torch.stack([tokens[i + 1 : i + T + 1] for i in ix])
+# then CE(model(x), y)  — y already shifted; don't shift again
+\`\`\`
+
+**HF:** if collator leaves \`labels == input_ids\`, the **model** shifts; if you build \`y\` yourself, your CE must **not** shift again.
+
+\`\`\`mermaid
+flowchart TD
+  docs[raw_docs] --> tok[tokenizer]
+  tok --> stream[id_stream]
+  stream --> win[cut_or_pack_windows]
+  win --> bat[stack_batch_BT]
+  bat --> loss[same_shift_as_lm_loss]
+\`\`\`
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | Every supervised position has a real next id (or masked) |
+| **Hard** | Label/input shift matches the loss implementation |
+| **Soft** | High token utilization (little pure padding) |
+| **Soft** | Mix covers the domains you care about |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Cleaner / more tokens | Stronger base model |
+| Longer \`T\` | Better long-range next-token skill (cost ↑) |
+| Packing quality | Throughput and effective updates/day |
+| Domain mix | What the model becomes “fluent” at |
+
+### 6. This course
+
+No separate script yet—reuse:
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+Treat random batches as “fake windows.” Real dataloaders appear when you leave the toy spine.
+
+## Run
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+## Next
+
+**Pretrain optim** (\`/pretrain-optim/\`): AdamW, lr, grad clip, accumulation.
+
+`,
+  },
+{
+    id: 'pretrain-optim',
+    ep: '18c',
+    title: 'Pretrain optim',
+    summary: 'AdamW, lr, clip, accumulation—making the CE step stable.',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
+    markdown: `## Idea
+
+**What:** The **optimizer side** of one pretrain step—AdamW, learning rate (and schedules), gradient clipping, and gradient accumulation—so the CE objective actually moves weights stably.
+
+**Why:** Correct loss + bad optim → NaNs, divergence, or “loss stuck.” At any scale past toys, **how you step** decides whether a run finishes.
+
+**How:** \`zero_grad\` → forward → loss → \`backward\` → (optional clip) → \`optimizer.step\` → (optional lr schedule). Accumulate grads over micro-batches when \`B\` must stay small.
+
+### 1. What — knobs
+
+| Knob | Role |
+| --- | --- |
+| **AdamW** | Adaptive moments + **decoupled weight decay** (default in Llama/nanoGPT-style recipes) |
+| **lr** | Step size; too high → explode; too low → crawl |
+| **schedule** | Warmup then decay (cosine / WSD / …) so early steps don’t thrash random embeds |
+| **grad clip** | Cap global grad norm (e.g. 1.0) against spikes |
+| **grad accum** | Sum grads over \`K\` micro-batches ≈ larger effective batch |
+
+This repo’s toy loop ([\`train_pretrain_steps\`](https://github.com/chaxus/arche/blob/main/arche/train/pretrain.py)):
+
+\`\`\`python
+opt = torch.optim.AdamW(model.parameters(), lr=lr)
+for batch in batches:
+    opt.zero_grad(set_to_none=True)
+    logits, _ = model(batch)
+    loss = lm_loss(logits, batch)
+    loss.backward()
+    opt.step()
+\`\`\`
+
+No schedule/clip yet—on purpose. Production adds them around the same skeleton.
+
+### 2. Why — each piece
+
+| Choice | Why |
+| --- | --- |
+| AdamW over plain SGD | Sparse-ish token grads + many params; adaptive scales help |
+| Weight decay | Mild regularization; AdamW’s form matches LLM practice |
+| Warmup | Early CE is huge (\`~log V\`); blunt lr shreds init |
+| Clip | One bad batch shouldn’t blow FP math |
+| Accum | Fit long \`T\` / big models on limited VRAM while keeping effective batch |
+
+### 3. How — accumulation sketch
+
+\`\`\`python
+opt.zero_grad(set_to_none=True)
+for micro in micro_batches:
+    loss = lm_loss(*model_and_shift(micro)) / K
+    loss.backward()          # grads accumulate
+torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+opt.step()
+# scheduler.step()  # if any
+\`\`\`
+
+\`\`\`mermaid
+flowchart LR
+  mb[micro_batches] --> bwd[backward_x_K]
+  bwd --> clip[clip_grad_norm]
+  clip --> step[AdamW_step]
+  step --> sch[lr_schedule]
+\`\`\`
+
+### 4. What “good” means
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | No NaN/Inf in loss or grads after clip |
+| **Hard** | \`zero_grad\` each **optimizer** step (not forgotten under accum) |
+| **Soft** | Loss trends down over a sensible window |
+| **Soft** | lr schedule matches a known recipe when you scale up |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| lr / warmup | Trainability of deep stacks + embeds |
+| effective batch (B×accum×world) | Noise vs stability of updates |
+| clip threshold | Spike survival vs under-updating |
+| Wrong decay | Over-shrink or under-regularize weights |
+
+### 6. This course
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+Page demo: try higher lr until loss misbehaves—that’s the optim lesson in miniature.
+
+## Run
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+## Next
+
+**Pretrain scale** (\`/pretrain-scale/\`): how frontier recipes stretch the same loop.
+
+`,
+  },
+{
+    id: 'pretrain-scale',
+    ep: '18d',
+    title: 'Pretrain scale',
+    summary: 'Same next-token loop at frontier scale: tokens, stages, parallelism.',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'trunk',
+    estimatedMinutes: 10,
+    markdown: `## Idea
+
+**What:** A **primer** on scaling the same next-token loop—more tokens, stages, parallelism—without leaving the beginner spine for a full systems course.
+
+**Why:** Llama 3.2 ~1B and frontier runs share **objective + step**; they differ in **data volume, staged recipes, cluster math, and (sometimes) architecture** (dense vs MoE). Knowing the map prevents “my toy loss went down, so I’m done.”
+
+**How:** Read published recipes as *extensions* of chapters you already have: same CE, harder data/optim/engineering.
+
+### 1. What — scale axes
+
+| Axis | Toy (this course) | Frontier-shaped |
+| --- | --- | --- |
+| **Tokens** | A few random batches | Trillions of real tokens |
+| **Steps / stages** | One flat loop | Multi-stage LR, data mixes, context lengthening |
+| **Batch** | Tiny \`B,T\` | Huge effective batch via accum + data parallel |
+| **Model** | Tiny dense \`Llama\` | Dense 1B–70B+ or MoE (DeepSeek) with MLA/experts |
+| **Hardware** | One process | Megatron/FSDP/pipeline-style sharding |
+
+Llama 3-style public reports: long pretrain on curated mixes, then shorter high-quality anneal / long-context phases—still next-token at heart.
+
+DeepSeek-V2/V3: **same causal LM family**, different **block** (MLA + MoE)—see Frontier chapters; training still CE + big-data optim.
+
+### 2. Why — why not stop at ep18
+
+| Illusion | Reality |
+| --- | --- |
+| “Loss fell on random ids” | Proves the **loop**, not language skill |
+| “Copy AdamW defaults” | Defaults need warmup/schedule/clip at scale |
+| “Bigger model only” | Data quality × tokens often dominate |
+| “SFT will fix a bad base” | Align edits style; weak pretrain stays weak |
+
+### 3. How — read a recipe in four lines
+
+When you open Llama / DeepSeek / Megatron writeups, map:
+
+1. **Objective** → still next-token CE (Pretrain)  
+2. **Data** → mixes, packing, context schedule (Pretrain data)  
+3. **Optim** → AdamW, lr shape, clip, effective batch (Pretrain optim)  
+4. **Systems** → parallel strategy, precision, checkpointing (later / ops)
+
+\`\`\`mermaid
+flowchart TD
+  obj[same_CE_objective] --> data[more_better_tokens]
+  data --> opt[stable_large_batch_optim]
+  opt --> sys[multi_GPU_sharding]
+  sys --> align[then_SFT_DPO]
+\`\`\`
+
+### 4. What “good” means (beginner bar)
+
+| Kind | Check |
+| --- | --- |
+| **Hard** | You can point to which axis a paper changed |
+| **Soft** | You don’t confuse MoE **architecture** with a different **loss** |
+| **Soft** | You expect engineering chapters before “reproduce Llama” |
+
+### 5. Improve · whole-model impact
+
+| Lever | Impact |
+| --- | --- |
+| Token budget | Primary capability driver |
+| Staged data / LR | Stability + late quality |
+| Parallel efficiency | Whether the budget is usable |
+| Arch (GQA/MoE/MLA) | Cost per token & memory—not a new objective |
+
+### 6. This course
+
+Still the toy entry:
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+Next in the spine: dense **bricks** (RMSNorm→…) so the forward behind \`model(batch)\` is no longer a black box—then HF weight align, then **SFT/DPO**.
+
+## Run
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+## Next
+
+**RMSNorm** (\`/rmsnorm/\`): first trunk brick inside the forward you just trained.
 
 `,
   },

@@ -1,76 +1,121 @@
 ## 要点
 
-这是从零的**核心**：**猜下一个词的训练**（预训练）。嵌入行和几乎全部主干权重，都是这样从随机变成有用的。没有它，你只有空壳——或者只能加载别人训好的小数（后面的 Llama 例子）。
+**是什么（What）：** *因果语言建模* / **下一个 token 预训练**——只看左边的 token，给词表每个 id 打「下一个是谁」的分，再训练让**真的下一个 id**概率变高。
 
-### 1. 有什么作用
+**为什么（Why）：** 这一个自监督目标，就是**写出**嵌入行和几乎全部主干权重的作者。没有它只有随机空壳（或只能加载别人的小数，如后面的 Llama 例子）。
 
-在海量文本上，迫使模型根据前面的 id **猜下一个 id**。猜错 → 损失 → 反传 → 改参数（**含嵌入**）。嵌入章里「柜子里的小数」的主要作者，就是这个回路。
+**怎么做（How，一句话）：** 文本分词 → 嵌入 → 前向 → **错位（shift）**让位置 `t` 预测 id `t+1` → 交叉熵 → 反传 → 优化器一步。在海量语料上重复。
 
-### 2. 推理猜词 vs 训练猜词
+业界同名事物：nanoGPT 的 `X,Y` 窗、Hugging Face「causal LM」、Llama 3 / DeepSeek 的「先 pretrain 再 align」。
 
-| | **推理**（聊天） | **训练**（本章） |
+### 1. What — 训练目标
+
+对序列 \(x_1,\ldots,x_T\)：
+
+\[
+p(x_1,\ldots,x_T)=\prod_t p(x_t \mid x_{<t})
+\]
+
+训练最小化平均**负对数似然** = 逐 token **交叉熵**。标签来自文本自己（自监督）。
+
+| 名字 | 含义 |
+| --- | --- |
+| **logits** | softmax 前的分数，形状 `(batch, time, V)` |
+| **next-token CE** | 每个时间步惩罚「真下一 id」概率过低 |
+| **因果** | 位置 `t` 不能看见 `t` 之后的 token |
+
+### 2. Why — 为什么要这样设计
+
+| 选择 | 原因 |
+| --- | --- |
+| 预测**下一个** id | 任意原文都能变成训练信号 |
+| 一次前向、多位置监督 | 长 `T` 的序列约贡献 `T-1` 个合法猜题（靠因果 mask） |
+| 词表上的 CE | 对应「离散选词」；经 softmax 可反传 |
+| 更新**嵌入 + 全部积木** | 嵌入章的小数不是手填的——在这里被改写 |
+| 先 pretrain 再 SFT/DPO | 对齐是转向，不是从零发明「会猜词」 |
+
+推理 vs 训练：
+
+| | 推理 | 训练（本章） |
 | --- | --- | --- |
-| 真正的下一个 token | 不知道——从分数里选 | 数据里**已经有** |
-| 打分之后 | argmax / 采样 → 拼上 | 和真 id 比 → **算损失** |
-| 参数 | 通常冻住 | **每步更新** |
+| 真下一 id | 不知道 | batch 里已知 |
+| logits 之后 | 采样 / argmax | 与真 id 做 CE |
+| 权重 | 通常冻住 | 每步更新 |
 
-前向形状一样；训练多了「老师信号」和「改写权重」。
+### 3. How — 错位、损失、一步（仓库真码）
 
-### 3. 从零：回路怎么走（人话步骤）
+假 ids `[10, 20, 30]`：
 
-假想句子分词后 ids 是 `[10, 20, 30]`（对应 `The cat sat` 一类，编号是假的）：
-
-| 位置 | 上下文 ids | 真正的下一个 id |
+| 位置 | 概念上看到的 | 要预测 |
 | --- | --- | --- |
-| 0 | `[10]` | `20`（cat） |
-| 1 | `[10, 20]` | `30`（sat） |
+| 0 | `10` | `20` |
+| 1 | `10,20` | `30` |
 
-一步训练在干什么：
+**本仓库实现**（[`arche/train/pretrain.py`](https://github.com/chaxus/arche/blob/main/arche/train/pretrain.py)）：
 
-1. **文本 batch** → 分词 → id 张量  
-2. **嵌入** = 按 id 取出小数行  
-3. **前向**过主干 → **logits**，形状大约 `(batch, 时间, V)`——每个位置对词表里每个 id 打分  
-4. **错位（shift）**：用位置 `t` 的上下文去预测位置 `t+1` 的 id（不能把答案漏进该步输入）  
-5. **损失** = logits 与真下一 id 的交叉熵（对位置平均）  
-6. **反向** = 梯度流回用过的嵌入行和每一块权重  
-7. **优化器**（如 AdamW）走一小步；真跑会重复到海量 token  
+```python
+def lm_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    """用位置 0..T-1 预测 token t+1。"""
+    return F.cross_entropy(
+        logits[:, :-1].reshape(-1, logits.size(-1)),  # 去掉最后时刻
+        targets[:, 1:].reshape(-1),                   # 去掉第一个 id
+    )
+```
+
+同一份 `batch` 既当输入，又当标签来源：`logits[t]` 对齐 `targets[t+1]`。
+
+一步：
+
+```python
+opt.zero_grad(set_to_none=True)
+logits, _ = model(batch)       # (B, T, V)
+loss = lm_loss(logits, batch)
+loss.backward()
+opt.step()
+```
+
+实验脚本（[`ep18_pretrain.py`](https://github.com/chaxus/arche/blob/main/chapters/02-training/ep18_pretrain.py)）：玩具 `Llama` + 随机 id batch + `train_pretrain_steps` → 打印 loss 起止。
+
+**HF 坑：** `DataCollatorForLanguageModeling(mlm=False)` 常把 `labels = input_ids` **不预先错位**；Transformers 的 CausalLM 在 `forward` **内部** shift。手写回路（本课 / nanoGPT）是显式 shift。**不要 shift 两次。**
 
 ```mermaid
 flowchart LR
-  data[文本batch] --> tok[分词]
-  tok --> emb[嵌入取行]
-  emb --> fwd[前向主干]
-  fwd --> logits[logits]
-  logits --> ce[与下一id交叉熵]
+  batch[ids_BT] --> fwd[model前向]
+  fwd --> logits[logits_BTV]
+  logits --> shift[错位对齐]
+  shift --> ce[交叉熵]
   ce --> bwd[反传]
-  bwd --> upd[更新嵌入行与权重]
+  bwd --> adam[AdamW一步]
 ```
 
-初始嵌入是随机柜壁；**有用的小数是这个回路写进去的。** 后面各章手写 RMSNorm / RoPE / …，就是为了让第 3 步的前向变成*你的*栈，而不是黑盒。
+随机初始化时，loss 大约 `log(V)`（均匀猜词表）。
 
 ### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 目标真是下一 token；shift 正确；梯度打到嵌入 + 主干 |
-| **硬** | 无 NaN；损失算在该算的位置 |
-| **软** | loss 趋势下降；抽样不那么胡说 |
-| **软** | lr / 裁剪稳住，长跑能跑完 |
+| **硬** | 只错一位；因果（不漏未来） |
+| **硬** | 梯度打到嵌入行 + 主干；无 NaN |
+| **软** | loss 下降；抽样不那么胡说 |
+| **软** | 大规模时对齐公开菜谱（后章） |
 
 ### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 数据质量与配比 | 能力上限主因 |
-| 规模（参数 × token） | 缩放律 |
-| 稳定性（norm、lr、裁剪） | 能不能训完 |
-| 训练不足 | 嵌入**和**深层都欠拟合 |
+| 更多/更好的 token | 能力上限主因 |
+| shift / mask 正确 | 错了会静默训歪 |
+| lr / 裁剪 / 累积 | 能不能跑完（下一章） |
+| 训练不足 | 嵌入**和**深层都弱 |
 
-下一部分的 SFT / DPO 是在「已经会猜词」之上再转向；**不能代替**这个基础回路。
+后面把**数据窗**、**优化器**、**前沿规模菜谱**拆开，本章专注「目标 + 一步」。
 
-### 6. 业界 · 开源
+### 6. 业界指针
 
-Llama / Qwen / DeepSeek 都是 **先预训练，再对齐**。真栈：Megatron / DeepSpeed / torchtitan 一类。本课是**玩具 API + 页内 playground**——感受形状，不是集群实跑。
+- Raschka：input/target 窗怎么切  
+- nanoGPT `train.py`：可读完整环  
+- HF LLM Course ch7.6：从零因果 LM  
+- Llama 3 / DeepSeek 报告：目标同族，规模与结构不同  
 
 ### 7. 本课
 
@@ -78,7 +123,7 @@ Llama / Qwen / DeepSeek 都是 **先预训练，再对齐**。真栈：Megatron 
 python chapters/02-training/ep18_pretrain.py
 ```
 
-页内可拖 lr / 步数。然后去写夹在「嵌入」和「logits」之间的那些积木。
+页内可拖 lr / 步数。前向积木细节在数据/优化引物之后的 RMSNorm→…。
 
 ## 动手
 
@@ -88,4 +133,4 @@ python chapters/02-training/ep18_pretrain.py
 
 ## 下一章
 
-**RMSNorm**（`/cn/rmsnorm/`）：嵌入之后稳住尺度，深度猜词训练才跑得下去。
+**预训练数据**（`/cn/pretrain-data/`）：batch 与滑窗怎么来。

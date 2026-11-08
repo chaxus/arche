@@ -440,77 +440,122 @@ python chapters/01-inference/ep03_embedding.py
     demo: 'pretrain',
     markdown: `## 要点
 
-这是从零的**核心**：**猜下一个词的训练**（预训练）。嵌入行和几乎全部主干权重，都是这样从随机变成有用的。没有它，你只有空壳——或者只能加载别人训好的小数（后面的 Llama 例子）。
+**是什么（What）：** *因果语言建模* / **下一个 token 预训练**——只看左边的 token，给词表每个 id 打「下一个是谁」的分，再训练让**真的下一个 id**概率变高。
 
-### 1. 有什么作用
+**为什么（Why）：** 这一个自监督目标，就是**写出**嵌入行和几乎全部主干权重的作者。没有它只有随机空壳（或只能加载别人的小数，如后面的 Llama 例子）。
 
-在海量文本上，迫使模型根据前面的 id **猜下一个 id**。猜错 → 损失 → 反传 → 改参数（**含嵌入**）。嵌入章里「柜子里的小数」的主要作者，就是这个回路。
+**怎么做（How，一句话）：** 文本分词 → 嵌入 → 前向 → **错位（shift）**让位置 \`t\` 预测 id \`t+1\` → 交叉熵 → 反传 → 优化器一步。在海量语料上重复。
 
-### 2. 推理猜词 vs 训练猜词
+业界同名事物：nanoGPT 的 \`X,Y\` 窗、Hugging Face「causal LM」、Llama 3 / DeepSeek 的「先 pretrain 再 align」。
 
-| | **推理**（聊天） | **训练**（本章） |
+### 1. What — 训练目标
+
+对序列 \\(x_1,\\ldots,x_T\\)：
+
+\\[
+p(x_1,\\ldots,x_T)=\\prod_t p(x_t \\mid x_{<t})
+\\]
+
+训练最小化平均**负对数似然** = 逐 token **交叉熵**。标签来自文本自己（自监督）。
+
+| 名字 | 含义 |
+| --- | --- |
+| **logits** | softmax 前的分数，形状 \`(batch, time, V)\` |
+| **next-token CE** | 每个时间步惩罚「真下一 id」概率过低 |
+| **因果** | 位置 \`t\` 不能看见 \`t\` 之后的 token |
+
+### 2. Why — 为什么要这样设计
+
+| 选择 | 原因 |
+| --- | --- |
+| 预测**下一个** id | 任意原文都能变成训练信号 |
+| 一次前向、多位置监督 | 长 \`T\` 的序列约贡献 \`T-1\` 个合法猜题（靠因果 mask） |
+| 词表上的 CE | 对应「离散选词」；经 softmax 可反传 |
+| 更新**嵌入 + 全部积木** | 嵌入章的小数不是手填的——在这里被改写 |
+| 先 pretrain 再 SFT/DPO | 对齐是转向，不是从零发明「会猜词」 |
+
+推理 vs 训练：
+
+| | 推理 | 训练（本章） |
 | --- | --- | --- |
-| 真正的下一个 token | 不知道——从分数里选 | 数据里**已经有** |
-| 打分之后 | argmax / 采样 → 拼上 | 和真 id 比 → **算损失** |
-| 参数 | 通常冻住 | **每步更新** |
+| 真下一 id | 不知道 | batch 里已知 |
+| logits 之后 | 采样 / argmax | 与真 id 做 CE |
+| 权重 | 通常冻住 | 每步更新 |
 
-前向形状一样；训练多了「老师信号」和「改写权重」。
+### 3. How — 错位、损失、一步（仓库真码）
 
-### 3. 从零：回路怎么走（人话步骤）
+假 ids \`[10, 20, 30]\`：
 
-假想句子分词后 ids 是 \`[10, 20, 30]\`（对应 \`The cat sat\` 一类，编号是假的）：
-
-| 位置 | 上下文 ids | 真正的下一个 id |
+| 位置 | 概念上看到的 | 要预测 |
 | --- | --- | --- |
-| 0 | \`[10]\` | \`20\`（cat） |
-| 1 | \`[10, 20]\` | \`30\`（sat） |
+| 0 | \`10\` | \`20\` |
+| 1 | \`10,20\` | \`30\` |
 
-一步训练在干什么：
+**本仓库实现**（[\`arche/train/pretrain.py\`](https://github.com/chaxus/arche/blob/main/arche/train/pretrain.py)）：
 
-1. **文本 batch** → 分词 → id 张量  
-2. **嵌入** = 按 id 取出小数行  
-3. **前向**过主干 → **logits**，形状大约 \`(batch, 时间，V)\`——每个位置对词表里每个 id 打分  
-4. **错位（shift）**：用位置 \`t\` 的上下文去预测位置 \`t+1\` 的 id（不能把答案漏进该步输入）  
-5. **损失** = logits 与真下一 id 的交叉熵（对位置平均）  
-6. **反向** = 梯度流回用过的嵌入行和每一块权重  
-7. **优化器**（如 AdamW）走一小步；真跑会重复到海量 token  
+\`\`\`python
+def lm_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    """用位置 0..T-1 预测 token t+1。"""
+    return F.cross_entropy(
+        logits[:, :-1].reshape(-1, logits.size(-1)),  # 去掉最后时刻
+        targets[:, 1:].reshape(-1),                   # 去掉第一个 id
+    )
+\`\`\`
+
+同一份 \`batch\` 既当输入，又当标签来源：\`logits[t]\` 对齐 \`targets[t+1]\`。
+
+一步：
+
+\`\`\`python
+opt.zero_grad(set_to_none=True)
+logits, _ = model(batch)       # (B, T, V)
+loss = lm_loss(logits, batch)
+loss.backward()
+opt.step()
+\`\`\`
+
+实验脚本（[\`ep18_pretrain.py\`](https://github.com/chaxus/arche/blob/main/chapters/02-training/ep18_pretrain.py)）：玩具 \`Llama\` + 随机 id batch + \`train_pretrain_steps\` → 打印 loss 起止。
+
+**HF 坑：** \`DataCollatorForLanguageModeling(mlm=False)\` 常把 \`labels = input_ids\` **不预先错位**；Transformers 的 CausalLM 在 \`forward\` **内部** shift。手写回路（本课 / nanoGPT）是显式 shift。**不要 shift 两次。**
 
 \`\`\`mermaid
 flowchart LR
-  data[文本 batch] --> tok[分词]
-  tok --> emb[嵌入取行]
-  emb --> fwd[前向主干]
-  fwd --> logits[logits]
-  logits --> ce[与下一 id 交叉熵]
+  batch[ids_BT] --> fwd[model前向]
+  fwd --> logits[logits_BTV]
+  logits --> shift[错位对齐]
+  shift --> ce[交叉熵]
   ce --> bwd[反传]
-  bwd --> upd[更新嵌入行与权重]
+  bwd --> adam[AdamW一步]
 \`\`\`
 
-初始嵌入是随机柜壁；**有用的小数是这个回路写进去的。** 后面各章手写 RMSNorm / RoPE / …，就是为了让第 3 步的前向变成*你的*栈，而不是黑盒。
+随机初始化时，loss 大约 \`log(V)\`（均匀猜词表）。
 
 ### 4. 怎么样算好
 
 | 类型 | 标准 |
 | --- | --- |
-| **硬** | 目标真是下一 token；shift 正确；梯度打到嵌入 + 主干 |
-| **硬** | 无 NaN；损失算在该算的位置 |
-| **软** | loss 趋势下降；抽样不那么胡说 |
-| **软** | lr / 裁剪稳住，长跑能跑完 |
+| **硬** | 只错一位；因果（不漏未来） |
+| **硬** | 梯度打到嵌入行 + 主干；无 NaN |
+| **软** | loss 下降；抽样不那么胡说 |
+| **软** | 大规模时对齐公开菜谱（后章） |
 
 ### 5. 如何改进 · 对整模影响
 
 | 杠杆 | 影响 |
 | --- | --- |
-| 数据质量与配比 | 能力上限主因 |
-| 规模（参数 × token） | 缩放律 |
-| 稳定性（norm、lr、裁剪） | 能不能训完 |
-| 训练不足 | 嵌入**和**深层都欠拟合 |
+| 更多/更好的 token | 能力上限主因 |
+| shift / mask 正确 | 错了会静默训歪 |
+| lr / 裁剪 / 累积 | 能不能跑完（下一章） |
+| 训练不足 | 嵌入**和**深层都弱 |
 
-下一部分的 SFT / DPO 是在「已经会猜词」之上再转向；**不能代替**这个基础回路。
+后面把**数据窗**、**优化器**、**前沿规模菜谱**拆开，本章专注「目标 + 一步」。
 
-### 6. 业界 · 开源
+### 6. 业界指针
 
-Llama / Qwen / DeepSeek 都是 **先预训练，再对齐**。真栈：Megatron / DeepSpeed / torchtitan 一类。本课是**玩具 API + 页内 playground**——感受形状，不是集群实跑。
+- Raschka：input/target 窗怎么切  
+- nanoGPT \`train.py\`：可读完整环  
+- HF LLM Course ch7.6：从零因果 LM  
+- Llama 3 / DeepSeek 报告：目标同族，规模与结构不同  
 
 ### 7. 本课
 
@@ -518,7 +563,7 @@ Llama / Qwen / DeepSeek 都是 **先预训练，再对齐**。真栈：Megatron 
 python chapters/02-training/ep18_pretrain.py
 \`\`\`
 
-页内可拖 lr / 步数。然后去写夹在「嵌入」和「logits」之间的那些积木。
+页内可拖 lr / 步数。前向积木细节在数据/优化引物之后的 RMSNorm→…。
 
 ## 动手
 
@@ -528,7 +573,323 @@ python chapters/02-training/ep18_pretrain.py
 
 ## 下一章
 
-**RMSNorm**（\`/cn/rmsnorm/\`）：嵌入之后稳住尺度，深度猜词训练才跑得下去。
+**预训练数据**（\`/cn/pretrain-data/\`）：batch 与滑窗怎么来。
+
+`,
+  },
+{
+    id: 'pretrain-data',
+    ep: '18b',
+    title: '预训练数据',
+    summary: '切窗、打包、组 batch——文本如何变成 CE 能吃的 (B, T)。',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
+    markdown: `## 要点
+
+**是什么（What）：** 预训练如何把原文变成损失能吃的 **\`(batch, time)\` id 张量**——文档 → 分词 → 切窗/打包 → 组 batch →（可选）pad/mask。
+
+**为什么（Why）：** *预训练*章的目标是固定的；**数据形状**决定每步看见什么信号。窗切错（pad 当标签、漏未来、乱拼接）会静默浪费或训歪。
+
+**怎么做（How）：** 固定长度上下文（或把多文档打进一条流），组成 batch，并保证 **labels 的错位规则与损失一致**。
+
+### 1. What — batch 由什么组成
+
+| 零件 | 作用 |
+| --- | --- |
+| **文档** | 原文（网页、书、代码…） |
+| **token ids** | 分词器输出（BPE 等） |
+| **窗 / block** | 模型一次看见的长度 \`T\`（上下文） |
+| **batch** | \`B\` 个窗叠成 \`(B, T)\` |
+| **labels** | 同一串 ids，按 shift（或 HF 内部 shift）解释 |
+
+两种常见布局：
+
+| 布局 | 想法 |
+| --- | --- |
+| **滑窗 / 切块** | 长 id 流切成不重叠或步长 \`T\` 的块（nanoGPT 风格） |
+| **打包 packing** | 多篇短文拼进一条，用分隔/注意力边界，GPU 更满 |
+
+### 2. Why — 设计压力
+
+| 压力 | 后果 |
+| --- | --- |
+| GPU 喜欢密实 \`(B,T)\` | 倾向 packing，而不是碎短序列 |
+| 上下文 \`T\` | 限制「下一个 token」能回看多远 |
+| pad | **不能**当真词来训（mask 或 ignore_index） |
+| 文档边界 | 盲拼接会跨无关文档造假「下一词」，除非 mask |
+
+### 3. How — 玩具窗（对齐本仓库）
+
+实验 batch 是随机 id，教**回路**，不是真语料：
+
+\`\`\`python
+batch = torch.randint(0, V, (B, T))
+logits, _ = model(batch)
+loss = lm_loss(logits, batch)  # 用 batch[:, 1:] 作目标
+\`\`\`
+
+生产草图（概念，类 nanoGPT）：
+
+\`\`\`python
+# tokens: 一维长 id 流
+ix = torch.randint(0, len(tokens) - T, (B,))
+x = torch.stack([tokens[i : i + T] for i in ix])
+y = torch.stack([tokens[i + 1 : i + T + 1] for i in ix])
+# 再 CE(model(x), y) —— y 已错位；不要再 shift
+\`\`\`
+
+**HF：** collator 若 \`labels == input_ids\`，**模型内部** shift；若你自己造 \`y\`，CE **不要**再 shift。
+
+\`\`\`mermaid
+flowchart TD
+  docs[原文] --> tok[分词]
+  tok --> stream[id流]
+  stream --> win[切窗或打包]
+  win --> bat[叠成_BT]
+  bat --> loss[与lm_loss同一套错位]
+\`\`\`
+
+### 4. 怎么样算好
+
+| 类型 | 标准 |
+| --- | --- |
+| **硬** | 每个监督位置有真下一 id（或被 mask） |
+| **硬** | label/输入错位与损失实现一致 |
+| **软** | token 利用率高（少纯 padding） |
+| **软** | 领域混合覆盖你关心的场景 |
+
+### 5. 如何改进 · 对整模影响
+
+| 杠杆 | 影响 |
+| --- | --- |
+| 更干净/更多 token | 底座更强 |
+| 更长 \`T\` | 长程猜词更好（成本↑） |
+| packing 质量 | 吞吐与每天有效更新 |
+| 领域配比 | 模型「流利」在哪些域 |
+
+### 6. 本课
+
+暂无同一脚本：
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+把随机 batch 当成「假窗」。真 DataLoader 离开玩具脊柱后再接。
+
+## 动手
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+## 下一章
+
+**预训练优化**（\`/cn/pretrain-optim/\`）：AdamW、学习率、梯度裁剪、累积。
+
+`,
+  },
+{
+    id: 'pretrain-optim',
+    ep: '18c',
+    title: '预训练优化',
+    summary: 'AdamW、学习率、裁剪、累积——让 CE 一步跑得稳。',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'trunk',
+    estimatedMinutes: 12,
+    markdown: `## 要点
+
+**是什么（What）：** 预训练一步的**优化器一侧**——AdamW、学习率（与日程）、梯度裁剪、梯度累积——让 CE 目标能稳定改写权重。
+
+**为什么（Why）：** 损失写对了、优化器写烂 → NaN、发散或 loss 卡死。离开玩具规模后，**怎么迈步**决定跑得完跑不完。
+
+**怎么做（How）：** \`zero_grad\` → 前向 → loss → \`backward\` →（可选 clip）→ \`optimizer.step\` →（可选 lr schedule）。\`B\` 必须很小时，用微 batch **累积梯度**。
+
+### 1. What — 旋钮
+
+| 旋钮 | 作用 |
+| --- | --- |
+| **AdamW** | 自适应动量 + **解耦 weight decay**（Llama/nanoGPT 类菜谱默认） |
+| **lr** | 步长；太大易炸，太小爬行 |
+| **schedule** | 先 warmup 再衰减（cosine / WSD / …），避免早期撕碎随机嵌入 |
+| **grad clip** | 限制全局梯度范数（如 1.0）抗尖峰 |
+| **grad accum** | \`K\` 个微 batch 累加梯度 ≈ 更大有效 batch |
+
+本仓库玩具环（[\`train_pretrain_steps\`](https://github.com/chaxus/arche/blob/main/arche/train/pretrain.py)）：
+
+\`\`\`python
+opt = torch.optim.AdamW(model.parameters(), lr=lr)
+for batch in batches:
+    opt.zero_grad(set_to_none=True)
+    logits, _ = model(batch)
+    loss = lm_loss(logits, batch)
+    loss.backward()
+    opt.step()
+\`\`\`
+
+尚无 schedule/clip——刻意如此。生产在同一骨架外包一层。
+
+### 2. Why — 各自的理由
+
+| 选择 | 原因 |
+| --- | --- |
+| AdamW 而非纯 SGD | token 梯度偏稀疏 + 参数极多；自适应步长更稳 |
+| Weight decay | 轻度正则；AdamW 形式对齐业界 LLM 实践 |
+| Warmup | 早期 CE 很大（\`~log V\`）；硬 lr 会打烂初始化 |
+| Clip | 一个坏 batch 不该炸掉浮点 |
+| 累积 | 显存不够时仍保持有效 batch |
+
+### 3. How — 累积草图
+
+\`\`\`python
+opt.zero_grad(set_to_none=True)
+for micro in micro_batches:
+    loss = lm_loss(*model_and_shift(micro)) / K
+    loss.backward()          # 梯度累加
+torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+opt.step()
+# scheduler.step()  # 若有
+\`\`\`
+
+\`\`\`mermaid
+flowchart LR
+  mb[微batch] --> bwd[反传_x_K]
+  bwd --> clip[梯度裁剪]
+  clip --> step[AdamW一步]
+  step --> sch[lr日程]
+\`\`\`
+
+### 4. 怎么样算好
+
+| 类型 | 标准 |
+| --- | --- |
+| **硬** | loss/梯度无 NaN/Inf（clip 后） |
+| **硬** | 每个**优化器**步才 \`zero_grad\`（累积时别清早了） |
+| **软** | 合理窗口内 loss 下行 |
+| **软** | 放大时 lr 日程对齐已知菜谱 |
+
+### 5. 如何改进 · 对整模影响
+
+| 杠杆 | 影响 |
+| --- | --- |
+| lr / warmup | 深层 + 嵌入是否训得动 |
+| 有效 batch（B×accum×卡数） | 更新噪声 vs 稳定 |
+| clip 阈值 | 扛尖峰 vs 更新过弱 |
+| decay 设错 | 过度收缩或正则不足 |
+
+### 6. 本课
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+页内把 lr 拧高到 loss 发疯——就是缩小版的优化课。
+
+## 动手
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+## 下一章
+
+**预训练规模**（\`/cn/pretrain-scale/\`）：前沿菜谱如何拉长同一条环。
+
+`,
+  },
+{
+    id: 'pretrain-scale',
+    ep: '18d',
+    title: '预训练规模',
+    summary: '同一条 next-token 环如何放大到前沿：token、阶段、并行。',
+    script: 'chapters/02-training/ep18_pretrain.py',
+    partId: 'trunk',
+    estimatedMinutes: 10,
+    markdown: `## 要点
+
+**是什么（What）：** 把同一条 next-token 环**放大**的入门图——更多 token、分阶段、并行——先不离开初学者脊柱去做完整系统课。
+
+**为什么（Why）：** Llama 3.2 ~1B 与前沿大跑共享 **目标 + 一步**；差别在 **数据量、分阶段菜谱、集群账、以及（有时）结构**（稠密 vs MoE）。有这张地图，才不会「玩具 loss 降了就毕业」。
+
+**怎么做（How）：** 把公开菜谱读成你已有章节的*扩展*：还是 CE，更难的是数据 / 优化 / 工程。
+
+### 1. What — 放大的轴
+
+| 轴 | 玩具（本课） | 前沿形态 |
+| --- | --- | --- |
+| **Tokens** | 几个随机 batch | 万亿级真 token |
+| **步数 / 阶段** | 一条平坦环 | 多段 lr、数据配比、加长上下文 |
+| **Batch** | 很小的 \`B,T\` | 累积 + 数据并行撑起巨大有效 batch |
+| **模型** | 极小稠密 \`Llama\` | 稠密 1B–70B+ 或 MoE（DeepSeek）+ MLA |
+| **硬件** | 单进程 | Megatron/FSDP/流水线式切分 |
+
+Llama 3 类公开报告：长 pretrain + 短高质量 anneal / 长上下文阶段——心里仍是 next-token。
+
+DeepSeek-V2/V3：**同一族因果 LM**，不同的是**块**（MLA + MoE）——见 Frontier；训练仍是 CE + 大数据优化。
+
+### 2. Why — 为什么不能停在 ep18
+
+| 错觉 | 现实 |
+| --- | --- |
+| 「随机 id 上 loss 降了」 | 只证明**回路**，不是语言能力 |
+| 「抄 AdamW 默认就行」 | 放大后要 warmup/日程/clip |
+| 「只把模型变大」 | 数据质量 × token 量往往更关键 |
+| 「SFT 能救烂底座」 | 对齐改风格；弱 pretrain 仍然弱 |
+
+### 3. How — 四行读懂一篇菜谱
+
+打开 Llama / DeepSeek / Megatron 文时，对照：
+
+1. **目标** → 仍是 next-token CE（预训练）  
+2. **数据** → 配比、packing、上下文日程（预训练数据）  
+3. **优化** → AdamW、lr 形状、clip、有效 batch（预训练优化）  
+4. **系统** → 并行、精度、checkpoint（更后 / 运维）
+
+\`\`\`mermaid
+flowchart TD
+  obj[同一CE目标] --> data[更多更好的token]
+  data --> opt[稳定的大batch优化]
+  opt --> sys[多卡切分]
+  sys --> align[再SFT_DPO]
+\`\`\`
+
+### 4. 怎么样算好（初学者条）
+
+| 类型 | 标准 |
+| --- | --- |
+| **硬** | 能指出论文动的是哪一根轴 |
+| **软** | 不把 MoE**结构**误当成另一种**损失** |
+| **软** | 知道「复现 Llama」前还有工程章 |
+
+### 5. 如何改进 · 对整模影响
+
+| 杠杆 | 影响 |
+| --- | --- |
+| Token 预算 | 能力主因 |
+| 分阶段数据 / LR | 稳定与末期质量 |
+| 并行效率 | 预算是否用得起来 |
+| 结构（GQA/MoE/MLA） | 每 token 成本与显存——不是新目标 |
+
+### 6. 本课
+
+入口仍是：
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+脊柱下一步：稠密**积木**（RMSNorm→…），让 \`model(batch)\` 背后的前向不再是黑盒——再 HF 对齐权重，再 **SFT/DPO**。
+
+## 动手
+
+\`\`\`bash
+python chapters/02-training/ep18_pretrain.py
+\`\`\`
+
+## 下一章
+
+**RMSNorm**（\`/cn/rmsnorm/\`）：你刚在训的那次前向里的第一块积木。
 
 `,
   },

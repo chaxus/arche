@@ -8,7 +8,7 @@
 
 | Plain path | What’s inside |
 | --- | --- |
-| **1 Tables, next-token train, dense bricks** | Tokenizer → embedding → **pretrain loop** → RMSNorm…stack → load/generate → HF check |
+| **1 Tables, next-token train, dense bricks** | Tokenizer → embedding → **objective → data → optim → scale** → RMSNorm…stack → load/generate → HF check |
 | **2 Align** | SFT / DPO — steer after the base next-token skill |
 | **3 Generate & serve faster** | KV cache, RoPE scaling, device/quant/chat, continuous batching, paged KV / CUDA Graph |
 | **4 Frontier structures** | MoE, MLA, frontier checkpoints, sharded loads |

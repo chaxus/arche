@@ -21,7 +21,7 @@ export const PART0_EN: Chapter[] = [
 | Stage | In plain words | Names you will meet later |
 | --- | --- | --- |
 | **0 Start** | Set up; learn to read a chapter and run one command | — |
-| **1 Tables + next-token train + dense bricks** | Tokenizer → embedding → **how guess-next training writes floats** → RMSNorm…stack → load/generate → HF check | dense decoder, pretrain |
+| **1 Tables + next-token train + dense bricks** | Tokenizer → embedding → **objective → data → optim → scale** → RMSNorm…stack → load/generate → HF check | dense decoder, pretrain |
 | **2 Align** | SFT / DPO after the base next-token skill | SFT, DPO |
 | **3 Generate & serve faster** | KV cache, long context, device/quant, continuous batch, paging | KV, RoPE scaling, paged KV… |
 | **4 Frontier structures** | MoE + MLA map (DeepSeek-V3-shaped open stack), checkpoints | MoE, MLA, shards |
@@ -51,7 +51,7 @@ At **inference**, an LLM repeatedly guesses the **next little text chunk** from 
 2. Pick one (argmax or sample).
 3. Append it; repeat.
 
-At **training** (the important half), the dataset already knows the true next chunk. The model still scores every id; you measure the miss (**cross-entropy**), then **backprop** so embedding rows and later weights move. Huge text × many steps = how random floats become a language model. Full loop after embedding: [\`/pretrain/\`](/pretrain/).
+At **training** (the important half), the dataset already knows the true next chunk. The model still scores every id; you measure the miss (**cross-entropy**), then **backprop** so embedding rows and later weights move. Huge text × many steps = how random floats become a language model. After embedding the spine splits that loop: [\`/pretrain/\`](/pretrain/) (objective) → data → optim → scale primer → then dense bricks.
 
 Three names: **token** = chunk; **embedding** = float row for an id; **logits** = next-chunk scores.
 
@@ -177,7 +177,7 @@ flowchart LR
 **One path:** tokenizer → embedding → **next-token train** → dense bricks → load/check Llama → align → serve → frontier map.
 
 - **Running example:** Llama 3.2 ~1B.  
-- **Core idea early:** pretrain is how embedding rows and trunk weights get written.  
+- **Core idea early:** next-token pretrain (objective → data → optim → scale) is how embedding rows and trunk weights get written.  
 - **HF login** when you load or align against official Llama files; teach-BPE and most shape labs need no login.
 
 ## Next
