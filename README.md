@@ -59,9 +59,11 @@ export HF_ENDPOINT=https://hf-mirror.com
 
 ## Learning site
 
-Browse chapters with ranui (`r-theme-switch`, `r-card`, `r-markdown`, `r-math`):
+Browse chapters with ranui (`r-theme-switch`, `r-card`, `r-markdown`, `r-math`).
+Locales follow the same URL shape as [ran.chaxus.com](https://ran.chaxus.com): English at `/`, Chinese under `/cn/`.
 
-- Production: https://arche.chaxus.com
+- English: https://arche.chaxus.com/
+- 简体中文：https://arche.chaxus.com/cn/
 - Local:
 
 ```bash
@@ -76,6 +78,7 @@ Deploy (Cloudflare Pages project `arche`):
 cd web && npm run build
 npx wrangler pages deploy dist --project-name=arche --branch=main
 ```
+
 
 ## Roadmap
 

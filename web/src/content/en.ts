@@ -1,13 +1,6 @@
-export type Chapter = {
-  id: string;
-  ep: string;
-  title: string;
-  summary: string;
-  markdown: string;
-  latex?: string;
-};
+import type { Chapter } from './types';
 
-export const CHAPTERS: Chapter[] = [
+export const CHAPTERS_EN: Chapter[] = [
   {
     id: 'overview',
     ep: '01',

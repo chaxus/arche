@@ -1,0 +1,4 @@
+# SPA fallback so /cn/ keeps the same app shell (ran-style locale prefix).
+/cn /index.html 200
+/cn/ /index.html 200
+/cn/* /index.html 200
