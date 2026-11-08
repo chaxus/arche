@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "ranui": "^0.5.4"
+    "ranui": "^0.5.5"
   },
   "devDependencies": {
     "typescript": "^5.8.2",

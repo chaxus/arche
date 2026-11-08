@@ -11,10 +11,12 @@ type Labels = {
   tokens: string;
   ids: string;
   decoded: string;
+  fertility: string;
   lr: string;
   steps: string;
   train: string;
   lossTitle: string;
+  shiftTitle: string;
 };
 
 type EmbLabels = {
@@ -26,6 +28,7 @@ type EmbLabels = {
   table: string;
   gathered: string;
   shape: string;
+  trainPulse: string;
 };
 
 const LABELS: Record<
@@ -35,17 +38,19 @@ const LABELS: Record<
   en: {
     tokenizer: {
       heading: 'Try it here',
-      hint: 'Type text → split with a tiny teaching BPE → see tokens and ids. The lab script below still uses official Llama 3.2.',
+      hint: 'Type text → split with a tiny teaching BPE → see tokens, ids, and fertility. The lab script below still uses official Llama 3.2.',
       encode: 'Encode',
       note: 'UTF-8 bytes + a few English merges (teaching table ≠ Llama). Encode then decode should match your input.',
       inputPh: 'The cat sat on the mat.',
       tokens: 'Tokens',
       ids: 'Ids',
       decoded: 'Decoded',
+      fertility: 'Fertility',
       lr: 'Learning rate',
       steps: 'Steps',
       train: 'Train',
       lossTitle: 'Loss',
+      shiftTitle: 'Shift',
     },
     embedding: {
       heading: 'Try it here',
@@ -56,36 +61,41 @@ const LABELS: Record<
       table: 'Locker wall (number → slip inside)',
       gathered: 'Slips you took out',
       shape: 'What changed',
+      trainPulse: 'Training would write this row',
     },
     pretrain: {
       heading: 'Try it here',
-      hint: 'Tiny next-token model in the browser. Drag learning rate and steps, then train — watch loss move.',
+      hint: 'Tiny next-token model in the browser. Drag learning rate and steps — watch the shift target and loss curve.',
       encode: '',
       note: 'Toy vocab=32, dim=8, one embed + linear. Same API shape as the chapter script, not a real 1B run.',
       inputPh: '',
       tokens: '',
       ids: '',
       decoded: '',
+      fertility: '',
       lr: 'Learning rate',
       steps: 'Steps',
       train: 'Train',
       lossTitle: 'Loss curve',
+      shiftTitle: 'Input → next-token target (shift)',
     },
   },
   cn: {
     tokenizer: {
       heading: '在页面上试',
-      hint: '输入文字 → 用教学用小 BPE 切开 → 看 token 和 id。下方实验脚本仍用官方 Llama 3.2。',
+      hint: '输入文字 → 用教学用小 BPE 切开 → 看 token、id 和 fertility。下方实验脚本仍用官方 Llama 3.2。',
       encode: '编码',
       note: '按 UTF-8 字节起步 + 少量英文合并（教学表 ≠ Llama）。编码再解码应能还原原文。',
       inputPh: 'The cat sat on the mat.',
       tokens: 'Tokens',
       ids: '编号',
       decoded: '解码回来',
+      fertility: 'Fertility',
       lr: '学习率',
       steps: '步数',
       train: '训练',
       lossTitle: '损失',
+      shiftTitle: 'Shift',
     },
     embedding: {
       heading: '在页面上试',
@@ -96,20 +106,23 @@ const LABELS: Record<
       table: '柜壁（格号 → 格子里的纸条）',
       gathered: '你取出的纸条',
       shape: '前后对比',
+      trainPulse: '训练时会写这一行',
     },
     pretrain: {
       heading: '在页面上试',
-      hint: '浏览器里的玩具 next-token 模型。拖学习率和步数，点训练，看 loss 变化。',
+      hint: '浏览器里的玩具 next-token 模型。拖学习率和步数，看 shift 目标和 loss 曲线。',
       encode: '',
       note: '词表 32、维度 8、一层嵌入 + 线性。和章节脚本同一类 API，不是真训 1B。',
       inputPh: '',
       tokens: '',
       ids: '',
       decoded: '',
+      fertility: '',
       lr: '学习率',
       steps: '步数',
       train: '训练',
       lossTitle: 'Loss 曲线',
+      shiftTitle: '输入 → 下一个词目标（shift）',
     },
   },
 };
@@ -263,6 +276,7 @@ export function mountTokenizerPlayground(host: HTMLElement, locale: PlaygroundLo
         <r-button type="primary" id="pg-tok-run">${escapeHtml(L.encode)}</r-button>
       </div>
       <p class="pg-note">${escapeHtml(L.note)}</p>
+      <div class="pg-meta" id="pg-tok-fert"></div>
       <div class="pg-block"><strong>${escapeHtml(L.tokens)}</strong><div class="pg-chips" id="pg-tok-chips"></div></div>
       <div class="pg-block"><strong>${escapeHtml(L.ids)}</strong><pre class="demo-out" id="pg-tok-ids"></pre></div>
       <div class="pg-block"><strong>${escapeHtml(L.decoded)}</strong><pre class="demo-out" id="pg-tok-dec"></pre></div>
@@ -272,15 +286,23 @@ export function mountTokenizerPlayground(host: HTMLElement, locale: PlaygroundLo
   const paint = () => {
     const text = (host.querySelector('#pg-tok-in') as HTMLTextAreaElement).value;
     const { tokens, ids } = teachBpeEncode(text);
+    const chars = [...text].length || 1;
+    const fertility = ids.length / chars;
     const chips = host.querySelector('#pg-tok-chips')!;
     chips.innerHTML = tokens
       .map((t) => `<span class="pg-chip">${escapeHtml(showToken(t))}</span>`)
       .join('');
+    (host.querySelector('#pg-tok-fert') as HTMLElement).innerHTML = `
+      <span class="pg-pill pg-pill-token">${escapeHtml(L.fertility)}</span>
+      <strong>${fertility.toFixed(2)}</strong>
+      <span class="pg-meta-sub">${ids.length} tokens / ${chars} chars</span>
+    `;
     (host.querySelector('#pg-tok-ids') as HTMLElement).textContent = `[${ids.join(', ')}]  (${ids.length})`;
     (host.querySelector('#pg-tok-dec') as HTMLElement).textContent = JSON.stringify(teachBpeDecode(ids));
   };
 
   host.querySelector('#pg-tok-run')?.addEventListener('click', paint);
+  host.querySelector('#pg-tok-in')?.addEventListener('input', paint);
   paint();
 }
 
@@ -344,7 +366,7 @@ export function mountEmbeddingPlayground(host: HTMLElement, locale: PlaygroundLo
     const body = TEACH_EMB.map((row, i) => {
       const cls = active.has(i) ? ' class="pg-emb-hit"' : '';
       const cells = row.map((v) => `<td>${v.toFixed(2)}</td>`).join('');
-      return `<tr${cls}><th>${i}</th>${cells}</tr>`;
+      return `<tr${cls} data-row="${i}"><th>${i}</th>${cells}</tr>`;
     }).join('');
     host.querySelector('#pg-emb-table')!.innerHTML = head + body;
 
@@ -378,6 +400,16 @@ export function mountEmbeddingPlayground(host: HTMLElement, locale: PlaygroundLo
           : `open locker ${id} → slip ${t + 1}: [${row}]`;
       })
       .join('\n');
+
+    // Micro-animation: pulse the first gathered row as “training writes a row”.
+    const first = ids[0];
+    if (first != null) {
+      const row = host.querySelector(`.pg-emb-table tr[data-row="${first}"]`);
+      row?.classList.remove('pg-emb-write');
+      void (row as HTMLElement | null)?.offsetWidth;
+      row?.classList.add('pg-emb-write');
+      row?.setAttribute('title', L.trainPulse);
+    }
   };
 
   host.querySelector('#pg-emb-run')?.addEventListener('click', paint);
@@ -460,15 +492,27 @@ function sparkline(values: number[]): string {
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(' ');
-  return `<svg class="pg-spark" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img"><polyline fill="none" stroke="currentColor" stroke-width="2" points="${pts}"/></svg>`;
+  return `<svg class="pg-spark" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img"><polyline class="pg-spark-line" fill="none" stroke="var(--arche-score)" stroke-width="2" points="${pts}"/></svg>`;
 }
+
+const SHIFT_DEMO = ['the', 'cat', 'sat', 'on', 'mat'];
 
 export function mountPretrainPlayground(host: HTMLElement, locale: PlaygroundLocale): void {
   const L = LABELS[locale].pretrain;
+  const shiftPairs = SHIFT_DEMO.slice(0, -1)
+    .map((tok, i) => {
+      const next = SHIFT_DEMO[i + 1]!;
+      return `<span class="pg-shift-pair"><code>${escapeHtml(tok)}</code><span aria-hidden="true">→</span><code class="pg-shift-target">${escapeHtml(next)}</code></span>`;
+    })
+    .join('');
   host.hidden = false;
   host.innerHTML = `
     <r-card heading="${escapeHtml(L.heading)}" description="pretrain">
       <p class="demo-hint">${escapeHtml(L.hint)}</p>
+      <div class="pg-block">
+        <strong>${escapeHtml(L.shiftTitle)}</strong>
+        <div class="pg-shift" id="pg-shift">${shiftPairs}</div>
+      </div>
       <div class="pg-controls">
         <label class="pg-label">${escapeHtml(L.lr)}
           <input type="range" id="pg-lr" min="0.01" max="1" step="0.01" value="0.2" />
@@ -503,7 +547,11 @@ export function mountPretrainPlayground(host: HTMLElement, locale: PlaygroundLoc
     const lr = Number(lrEl.value);
     const steps = Number(stepsEl.value);
     const losses = runTinyPretrain(lr, steps, 42);
-    (host.querySelector('#pg-spark') as HTMLElement).innerHTML = sparkline(losses);
+    const spark = host.querySelector('#pg-spark') as HTMLElement;
+    spark.innerHTML = sparkline(losses);
+    spark.classList.remove('pg-spark-anim');
+    void spark.offsetWidth;
+    spark.classList.add('pg-spark-anim');
     const first = losses[0]!.toFixed(4);
     const last = losses[losses.length - 1]!.toFixed(4);
     const mid = losses[Math.floor(losses.length / 2)]!.toFixed(4);

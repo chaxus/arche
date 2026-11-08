@@ -38,6 +38,15 @@ export type UiCopy = {
   continueStart: string;
   homePartsHeading: string;
   homeDoneLabel: string;
+  homeBrand: string;
+  homePathLabel: string;
+  searchOpen: string;
+  searchPlaceholder: string;
+  searchEmpty: string;
+  searchHint: string;
+  codeCopy: string;
+  codeCopied: string;
+  railReadingOnly: string;
 };
 
 const EN: UiCopy = {
@@ -84,6 +93,15 @@ const EN: UiCopy = {
   continueStart: 'Start Part 0',
   homePartsHeading: 'Path',
   homeDoneLabel: 'read',
+  homeBrand: 'ἀρχή',
+  homePathLabel: 'One path',
+  searchOpen: 'Search chapters',
+  searchPlaceholder: 'Jump to a chapter…',
+  searchEmpty: 'No chapters match.',
+  searchHint: '↑↓ navigate · Enter open · Esc close',
+  codeCopy: 'Copy',
+  codeCopied: 'Copied',
+  railReadingOnly: 'This chapter is mostly reading — instruments stay quiet.',
 };
 
 const CN: UiCopy = {
@@ -130,6 +148,15 @@ const CN: UiCopy = {
   continueStart: '开始第 0 部分',
   homePartsHeading: '路径',
   homeDoneLabel: '已读',
+  homeBrand: 'ἀρχή',
+  homePathLabel: '一条路',
+  searchOpen: '搜索章节',
+  searchPlaceholder: '跳转到章节…',
+  searchEmpty: '没有匹配的章节。',
+  searchHint: '↑↓ 选择 · Enter 打开 · Esc 关闭',
+  codeCopy: '复制',
+  codeCopied: '已复制',
+  railReadingOnly: '本章以阅读为主，仪器台暂时空着。',
 };
 
 export const uiFor = (locale: LocaleDef): UiCopy => (locale.id === 'cn' ? CN : EN);

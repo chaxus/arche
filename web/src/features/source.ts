@@ -150,6 +150,13 @@ export type SourceLabels = {
   labTab: string;
   empty: string;
   github: string;
+  copy: string;
+  copied: string;
+};
+
+export type MountedSource = {
+  calloutLines: number[];
+  setActiveCallout: (line: number | null) => void;
 };
 
 export function mountSource(
@@ -158,7 +165,7 @@ export function mountSource(
   labScript: string,
   localeId: string,
   labels: SourceLabels,
-): void {
+): MountedSource | null {
   const meta = CHAPTER_SOURCES[chapterId];
   const libraryPath = meta?.library;
   const labPath = labScript || '';
@@ -168,7 +175,7 @@ export function mountSource(
   if (!libraryText && !labText) {
     host.hidden = true;
     host.replaceChildren();
-    return;
+    return null;
   }
 
   host.hidden = false;
@@ -177,20 +184,26 @@ export function mountSource(
   const callouts = meta?.callouts ?? [];
 
   host.innerHTML = `
-    <r-card heading="${escapeHtml(labels.heading)}" description="${escapeHtml(activePath)}">
-      <div class="src-tabs" role="tablist">
-        ${
-          libraryText
-            ? `<button type="button" class="src-tab${defaultTab === 'library' ? ' is-active' : ''}" data-tab="library" role="tab">${escapeHtml(labels.libraryTab)}</button>`
-            : ''
-        }
-        ${
-          labText
-            ? `<button type="button" class="src-tab${defaultTab === 'lab' ? ' is-active' : ''}" data-tab="lab" role="tab">${escapeHtml(labels.labTab)}</button>`
-            : ''
-        }
+    <r-card heading="${escapeHtml(labels.heading)}">
+      <div class="src-chrome">
+        <div class="src-chrome-bar">
+          <div class="src-tabs" role="tablist">
+            ${
+              libraryText
+                ? `<button type="button" class="src-tab${defaultTab === 'library' ? ' is-active' : ''}" data-tab="library" role="tab">${escapeHtml(labels.libraryTab)}</button>`
+                : ''
+            }
+            ${
+              labText
+                ? `<button type="button" class="src-tab${defaultTab === 'lab' ? ' is-active' : ''}" data-tab="lab" role="tab">${escapeHtml(labels.labTab)}</button>`
+                : ''
+            }
+          </div>
+          <span class="src-chrome-path" id="src-path">${escapeHtml(activePath)}</span>
+          <button type="button" class="src-copy" id="src-copy">${escapeHtml(labels.copy)}</button>
+        </div>
+        <div class="src-body" id="src-body"></div>
       </div>
-      <div class="src-body" id="src-body"></div>
       <p class="src-github">
         <a href="https://github.com/chaxus/arche/blob/main/${escapeHtml(activePath)}" target="_blank" rel="noopener">${escapeHtml(labels.github)}</a>
       </p>
@@ -198,20 +211,24 @@ export function mountSource(
   `;
 
   const body = host.querySelector('#src-body') as HTMLElement;
-  const card = host.querySelector('r-card') as HTMLElement & { description?: string };
+  const pathEl = host.querySelector('#src-path') as HTMLElement;
+  const copyBtn = host.querySelector('#src-copy') as HTMLButtonElement;
+  let currentText = '';
 
   const paint = (tab: 'library' | 'lab') => {
     const path = tab === 'library' ? libraryPath : labPath;
     const text = tab === 'library' ? libraryText : labText;
     if (!path || text == null) return;
+    currentText = text;
     const showCallouts = tab === 'library' ? callouts : [];
     body.innerHTML = renderCode(text, showCallouts, localeId);
-    if (card) card.setAttribute('description', path);
+    pathEl.textContent = path;
     const link = host.querySelector('.src-github a') as HTMLAnchorElement | null;
     if (link) link.href = `https://github.com/chaxus/arche/blob/main/${path}`;
     host.querySelectorAll('.src-tab').forEach((btn) => {
       btn.classList.toggle('is-active', (btn as HTMLElement).dataset.tab === tab);
     });
+    copyBtn.textContent = labels.copy;
   };
 
   paint(defaultTab === 'library' ? 'library' : 'lab');
@@ -222,6 +239,34 @@ export function mountSource(
       paint(tab);
     });
   });
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(currentText);
+      copyBtn.textContent = labels.copied;
+      window.setTimeout(() => {
+        copyBtn.textContent = labels.copy;
+      }, 1400);
+    } catch {
+      copyBtn.textContent = labels.copy;
+    }
+  });
+
+  const setActiveCallout = (line: number | null) => {
+    body.querySelectorAll('.wt-line.is-callout').forEach((node) => {
+      const el = node as HTMLElement;
+      const n = Number(el.dataset.line);
+      el.classList.toggle('is-active', line != null && n === line);
+    });
+    if (line == null) return;
+    const target = body.querySelector(`.wt-line[data-line="${line}"]`) as HTMLElement | null;
+    target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+
+  return {
+    calloutLines: callouts.map((c) => c.line),
+    setActiveCallout,
+  };
 }
 
 function renderCode(text: string, callouts: SourceCallout[], localeId: string): string {

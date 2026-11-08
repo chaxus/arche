@@ -168,6 +168,10 @@ function renderShell(): void {
           <p class="brand-tagline">${ui.brandTagline}</p>
         </div>
         <div class="topbar-actions">
+          <button type="button" class="search-trigger" id="search-open" aria-label="${ui.searchOpen}">
+            <span>${ui.searchOpen}</span>
+            <kbd>${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd>
+          </button>
           <r-select
             id="locale-select"
             class="locale-select"
@@ -189,6 +193,20 @@ function renderShell(): void {
         <main class="article" id="article"></main>
       </div>
     </div>
+    <div class="cmdk" id="cmdk" hidden>
+      <div class="cmdk-panel" role="dialog" aria-modal="true" aria-label="${ui.searchOpen}">
+        <input
+          class="cmdk-input"
+          id="cmdk-input"
+          type="search"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="${ui.searchPlaceholder}"
+        />
+        <div class="cmdk-list" id="cmdk-list" role="listbox"></div>
+        <p class="cmdk-hint">${ui.searchHint}</p>
+      </div>
+    </div>
   `;
 
   syncNavDrawerOpen();
@@ -199,7 +217,143 @@ function renderShell(): void {
     event.preventDefault();
     selectHome();
   });
+  document.querySelector('#search-open')?.addEventListener('click', () => openCmdk());
+  document.querySelector('#cmdk')?.addEventListener('click', (event) => {
+    if (event.target === document.querySelector('#cmdk')) closeCmdk();
+  });
   wireLocaleSelect();
+}
+
+function stackFigureSvg(): string {
+  return `
+    <svg class="home-stack" viewBox="0 0 360 260" role="img" aria-hidden="true">
+      <defs>
+        <linearGradient id="stackFill" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="var(--arche-teal-soft)"/>
+          <stop offset="100%" stop-color="var(--arche-paper-deep)"/>
+        </linearGradient>
+      </defs>
+      <rect x="28" y="28" width="304" height="204" rx="18" fill="url(#stackFill)" stroke="var(--arche-ink)" stroke-opacity="0.12"/>
+      <g font-family="IBM Plex Sans, sans-serif" font-size="11" fill="var(--arche-ink)">
+        <rect x="52" y="48" width="256" height="28" rx="7" fill="var(--arche-paper)" stroke="var(--arche-teal)" stroke-opacity="0.45"/>
+        <text x="66" y="66">embed · vocab × d</text>
+        <rect x="52" y="88" width="256" height="36" rx="7" fill="var(--arche-paper)" stroke="var(--arche-ink)" stroke-opacity="0.18"/>
+        <text x="66" y="110">block × N · RMSNorm · GQA · SwiGLU</text>
+        <rect x="52" y="136" width="256" height="28" rx="7" fill="var(--arche-paper)" stroke="var(--arche-ink)" stroke-opacity="0.18"/>
+        <text x="66" y="154">RoPE · relative angles on Q/K</text>
+        <rect x="52" y="176" width="256" height="28" rx="7" fill="color-mix(in srgb, var(--arche-teal) 16%, var(--arche-paper))" stroke="var(--arche-teal)" stroke-opacity="0.55"/>
+        <text x="66" y="194">LM head · next-token logits</text>
+      </g>
+      <path d="M18 78h18M18 130h18M18 182h18" stroke="var(--arche-teal)" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  `;
+}
+
+type CmdkState = { open: boolean; query: string; active: number; results: Chapter[] };
+const cmdkState: CmdkState = { open: false, query: '', active: 0, results: [] };
+
+function filterChapters(query: string): Chapter[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return chapters;
+  return chapters.filter((chapter) => {
+    const hay = `${chapter.ep} ${chapter.title} ${chapter.summary} ${chapter.id}`.toLowerCase();
+    return hay.includes(q) || chapter.ep.includes(q);
+  });
+}
+
+function paintCmdkList(): void {
+  const list = document.querySelector('#cmdk-list') as HTMLElement | null;
+  if (!list) return;
+  cmdkState.results = filterChapters(cmdkState.query);
+  if (cmdkState.results.length === 0) {
+    list.innerHTML = `<p class="cmdk-empty">${ui.searchEmpty}</p>`;
+    return;
+  }
+  if (cmdkState.active >= cmdkState.results.length) cmdkState.active = 0;
+  list.innerHTML = cmdkState.results
+    .map((chapter, idx) => {
+      const active = idx === cmdkState.active ? ' is-active' : '';
+      return `
+        <button type="button" class="cmdk-item${active}" role="option" data-id="${chapter.id}" aria-selected="${idx === cmdkState.active}">
+          <span class="cmdk-ep">${chapter.ep}</span>
+          <span>
+            <span class="cmdk-title">${chapter.title}</span>
+            <span class="cmdk-summary">${chapter.summary}</span>
+          </span>
+        </button>
+      `;
+    })
+    .join('');
+  list.querySelectorAll('.cmdk-item').forEach((node) => {
+    node.addEventListener('click', () => {
+      const id = (node as HTMLElement).dataset.id;
+      if (id) {
+        closeCmdk();
+        selectChapter(id);
+      }
+    });
+  });
+  const activeEl = list.querySelector('.cmdk-item.is-active') as HTMLElement | null;
+  activeEl?.scrollIntoView({ block: 'nearest' });
+}
+
+function openCmdk(): void {
+  const overlay = document.querySelector('#cmdk') as HTMLElement | null;
+  const input = document.querySelector('#cmdk-input') as HTMLInputElement | null;
+  if (!overlay || !input) return;
+  cmdkState.open = true;
+  cmdkState.query = '';
+  cmdkState.active = 0;
+  overlay.hidden = false;
+  input.value = '';
+  paintCmdkList();
+  window.requestAnimationFrame(() => input.focus());
+}
+
+function closeCmdk(): void {
+  const overlay = document.querySelector('#cmdk') as HTMLElement | null;
+  if (!overlay) return;
+  cmdkState.open = false;
+  overlay.hidden = true;
+}
+
+function onCmdkKeydown(event: KeyboardEvent): void {
+  const metaK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
+  if (metaK) {
+    event.preventDefault();
+    if (cmdkState.open) closeCmdk();
+    else openCmdk();
+    return;
+  }
+  if (!cmdkState.open) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeCmdk();
+    return;
+  }
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    if (cmdkState.results.length === 0) return;
+    cmdkState.active = (cmdkState.active + 1) % cmdkState.results.length;
+    paintCmdkList();
+    return;
+  }
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (cmdkState.results.length === 0) return;
+    cmdkState.active =
+      (cmdkState.active - 1 + cmdkState.results.length) % cmdkState.results.length;
+    paintCmdkList();
+    return;
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const target = cmdkState.results[cmdkState.active];
+    if (target) {
+      closeCmdk();
+      selectChapter(target.id);
+    }
+  }
 }
 
 function isDesktopNav(): boolean {
@@ -427,15 +581,22 @@ function renderHome(): void {
   flush();
 
   article.innerHTML = `
-    <p class="part-eyebrow">${ui.homeNav}</p>
-    <h1>${ui.homeTitle}</h1>
-    <p class="lede">${ui.homeLede}</p>
-    <div class="home-continue">
-      <r-button type="primary" id="continue-btn">${continueText}</r-button>
-      <span class="home-progress-meta">${doneCount}/${total}</span>
-    </div>
-    <h2 class="home-parts-title">${ui.homePartsHeading}</h2>
-    <div class="home-parts">${partBlocks.join('')}</div>
+    <section class="home-hero">
+      <div class="home-hero-copy">
+        <p class="home-brand">${ui.homeBrand}</p>
+        <h1>${ui.homeTitle}</h1>
+        <p class="lede">${ui.homeLede}</p>
+        <div class="home-continue">
+          <r-button type="primary" id="continue-btn">${continueText}</r-button>
+          <span class="home-progress-meta">${doneCount}/${total} · ${ui.homePathLabel}</span>
+        </div>
+      </div>
+      <div class="home-figure">${stackFigureSvg()}</div>
+    </section>
+    <section class="home-path">
+      <h2 class="home-parts-title">${ui.homePartsHeading}</h2>
+      <div class="home-parts">${partBlocks.join('')}</div>
+    </section>
   `;
 
   document.querySelector('#continue-btn')?.addEventListener('click', () => {
@@ -495,29 +656,36 @@ function renderArticle(chapter: Chapter): void {
       }</r-button>
     </div>
     <p class="lede">${chapter.summary}</p>
-    <r-card heading="${ui.lessonHeading}" description="ep${chapter.ep}">
-      <div class="panel" id="md-host"></div>
-    </r-card>
-    <div class="src-wrap" id="src-host" hidden></div>
-    <div class="demo-wrap" id="demo-host" hidden></div>
-    <div class="math-wrap" id="math-host" hidden></div>
-    ${
-      fixMd
-        ? `<details class="fix-box"><summary>${ui.fixHeading}</summary><div class="panel" id="fix-host"></div></details>`
-        : ''
-    }
-    <div class="chapter-nav">
-      <r-button id="prev-chapter" type="text" ${prev ? '' : 'disabled'}>${ui.prevChapter}${
-        prev ? `: ${prev.title}` : ''
-      }</r-button>
-      <r-button id="next-chapter" type="primary" ${next ? '' : 'disabled'}>${ui.nextChapter}${
-        next ? `: ${next.title}` : ''
-      }</r-button>
+    <div class="lesson-layout">
+      <div class="lesson-copy">
+        <r-card heading="${ui.lessonHeading}" description="ep${chapter.ep}">
+          <div class="panel" id="md-host"></div>
+        </r-card>
+        ${
+          fixMd
+            ? `<details class="fix-box"><summary>${ui.fixHeading}</summary><div class="panel" id="fix-host"></div></details>`
+            : ''
+        }
+        <div class="chapter-nav">
+          <r-button id="prev-chapter" type="text" ${prev ? '' : 'disabled'}>${ui.prevChapter}${
+            prev ? `: ${prev.title}` : ''
+          }</r-button>
+          <r-button id="next-chapter" type="primary" ${next ? '' : 'disabled'}>${ui.nextChapter}${
+            next ? `: ${next.title}` : ''
+          }</r-button>
+        </div>
+        <p class="footer-note">
+          ${scriptLine}${ui.siteLabel}:
+          <a href="${pageUrl(chapter.id, locale)}">${ORIGIN.replace('https://', '')}${pagePath(chapter.id, locale)}</a>
+        </p>
+      </div>
+      <aside class="instrument-rail" id="instrument-rail" aria-label="${ui.sourceHeading}">
+        <div class="src-wrap" id="src-host" hidden></div>
+        <div class="demo-wrap" id="demo-host" hidden></div>
+        <div class="math-wrap" id="math-host" hidden></div>
+        <p class="rail-empty" id="rail-empty" hidden>${ui.railReadingOnly}</p>
+      </aside>
     </div>
-    <p class="footer-note">
-      ${scriptLine}${ui.siteLabel}:
-      <a href="${pageUrl(chapter.id, locale)}">${ORIGIN.replace('https://', '')}${pagePath(chapter.id, locale)}</a>
-    </p>
   `;
 
   const md = document.createElement('r-markdown');
@@ -533,13 +701,16 @@ function renderArticle(chapter: Chapter): void {
   }
 
   const srcHost = document.querySelector('#src-host') as HTMLElement | null;
+  let mountedSource: ReturnType<typeof mountSource> = null;
   if (srcHost) {
-    mountSource(srcHost, chapter.id, chapter.script, locale.id, {
+    mountedSource = mountSource(srcHost, chapter.id, chapter.script, locale.id, {
       heading: ui.sourceHeading,
       libraryTab: ui.sourceLibraryTab,
       labTab: ui.sourceLabTab,
       empty: ui.sourceEmpty,
       github: ui.sourceGithub,
+      copy: ui.codeCopy,
+      copied: ui.codeCopied,
     });
   }
 
@@ -554,6 +725,15 @@ function renderArticle(chapter: Chapter): void {
   const demoHost = document.querySelector('#demo-host') as HTMLElement | null;
   if (demoHost) mountDemo(chapter, demoHost);
 
+  const railEmpty = document.querySelector('#rail-empty') as HTMLElement | null;
+  const hasInstrument =
+    Boolean(srcHost && !srcHost.hidden) ||
+    Boolean(demoHost && !demoHost.hidden) ||
+    Boolean(mathHost && !mathHost.hidden);
+  if (railEmpty) railEmpty.hidden = hasInstrument;
+
+  wireLessonCalloutSync(mountedSource);
+
   document.querySelector('#mark-done')?.addEventListener('click', () => {
     markDone(chapter.id);
     renderNav(chapter.id);
@@ -565,6 +745,40 @@ function renderArticle(chapter: Chapter): void {
   document.querySelector('#next-chapter')?.addEventListener('click', () => {
     if (next) selectChapter(next.id);
   });
+}
+
+let calloutSyncCleanup: (() => void) | null = null;
+
+function wireLessonCalloutSync(
+  mounted: ReturnType<typeof mountSource>,
+): void {
+  calloutSyncCleanup?.();
+  calloutSyncCleanup = null;
+  if (!mounted || mounted.calloutLines.length === 0) return;
+
+  const copy = document.querySelector('.lesson-copy') as HTMLElement | null;
+  const mdHost = document.querySelector('#md-host') as HTMLElement | null;
+  if (!copy || !mdHost) return;
+
+  const lines = mounted.calloutLines;
+  let last = -1;
+  const onScroll = () => {
+    const rect = mdHost.getBoundingClientRect();
+    const view = Math.min(window.innerHeight * 0.35, 280);
+    const span = Math.max(rect.height - view, 1);
+    const progress = Math.min(1, Math.max(0, (view - rect.top) / span));
+    const idx = Math.min(lines.length - 1, Math.floor(progress * lines.length));
+    if (idx === last) return;
+    last = idx;
+    mounted.setActiveCallout(lines[idx] ?? null);
+  };
+
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+  calloutSyncCleanup = () => {
+    window.removeEventListener('scroll', onScroll);
+    mounted.setActiveCallout(null);
+  };
 }
 
 function applyDocumentLang(): void {
@@ -615,6 +829,12 @@ function onPopState(): void {
 applyDocumentLang();
 renderShell();
 window.addEventListener('popstate', onPopState);
+window.addEventListener('keydown', onCmdkKeydown);
+document.querySelector('#cmdk-input')?.addEventListener('input', (event) => {
+  cmdkState.query = (event.target as HTMLInputElement).value;
+  cmdkState.active = 0;
+  paintCmdkList();
+});
 window.addEventListener('resize', () => {
   // Keep desktop sidebar expanded; don't fight an intentional mobile open state on tiny resizes.
   if (isDesktopNav()) syncNavDrawerOpen();
