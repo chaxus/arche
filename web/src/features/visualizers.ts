@@ -5,19 +5,22 @@ export type VisualizerKind = 'rope' | 'gqa' | 'kv';
 type Copy = {
   hint: string;
   posLabel: string;
+  keyLabel: string;
   queryLabel: string;
   kvLabel: string;
   stepLabel: string;
   caption: (state: Record<string, number>) => string;
   noCache?: string;
   withCache?: string;
+  showNoCache?: string;
 };
 
 const EN: Record<VisualizerKind, Copy> = {
   rope: {
     hint: 'Drag two positions. RoPE rotates Q and K — their relative distance falls out of the angle between them.',
     posLabel: 'Query position',
-    queryLabel: 'Key position',
+    keyLabel: 'Key position',
+    queryLabel: '',
     kvLabel: '',
     stepLabel: '',
     caption: ({ qPos, kPos, rel, deg }) =>
@@ -26,6 +29,7 @@ const EN: Record<VisualizerKind, Copy> = {
   gqa: {
     hint: 'Fewer KV heads than query heads: each KV head is shared by a group of queries (Llama 3.2 1B style: 32 Q / 8 KV).',
     posLabel: '',
+    keyLabel: '',
     queryLabel: 'Query heads (shown)',
     kvLabel: 'KV heads',
     stepLabel: '',
@@ -35,6 +39,7 @@ const EN: Record<VisualizerKind, Copy> = {
   kv: {
     hint: 'Prefill writes the prompt once. Decode only appends. Toggle the gray “no cache” row to feel the recompute tax.',
     posLabel: '',
+    keyLabel: '',
     queryLabel: '',
     kvLabel: '',
     stepLabel: 'Decode step',
@@ -42,6 +47,7 @@ const EN: Record<VisualizerKind, Copy> = {
       `cache holds ${cached} positions after ${step} new token(s). Without cache you’d redo ~${recompute} attentions over the prompt.`,
     noCache: 'No cache (recompute)',
     withCache: 'With KV cache',
+    showNoCache: 'Show no-cache row',
   },
 };
 
@@ -49,7 +55,8 @@ const CN: Record<VisualizerKind, Copy> = {
   rope: {
     hint: '拖两个位置。RoPE 旋转 Q 和 K——相对距离会从夹角里读出来。',
     posLabel: 'Query 位置',
-    queryLabel: 'Key 位置',
+    keyLabel: 'Key 位置',
+    queryLabel: '',
     kvLabel: '',
     stepLabel: '',
     caption: ({ qPos, kPos, rel, deg }) =>
@@ -58,6 +65,7 @@ const CN: Record<VisualizerKind, Copy> = {
   gqa: {
     hint: 'KV 头少于 query 头：每个 KV 头被一组 query 共享（Llama 3.2 1B：32 Q / 8 KV）。',
     posLabel: '',
+    keyLabel: '',
     queryLabel: '展示的 Query 头',
     kvLabel: 'KV 头',
     stepLabel: '',
@@ -65,8 +73,9 @@ const CN: Record<VisualizerKind, Copy> = {
       `${q} 个 query 头共享 ${kv} 个 KV 头 → 每组 ${group} 个。解码时 cache 更小。`,
   },
   kv: {
-    hint: 'Prefill 写一次 prompt；Decode 只追加。灰行是「无 cache」——感受重算成本。',
+    hint: 'Prefill 写一次 prompt；Decode 只追加。可开关灰行「无 cache」，对比重算成本。',
     posLabel: '',
+    keyLabel: '',
     queryLabel: '',
     kvLabel: '',
     stepLabel: '解码步数',
@@ -74,6 +83,7 @@ const CN: Record<VisualizerKind, Copy> = {
       `新增 ${step} 个 token 后 cache 有 ${cached} 格；无 cache 大约要重做 ~${recompute} 次对 prompt 的注意力。`,
     noCache: '无 cache（重算）',
     withCache: '有 KV cache',
+    showNoCache: '显示无 cache 行',
   },
 };
 
@@ -113,7 +123,7 @@ function mountRope(root: HTMLElement, localeId: string): void {
   kRange.max = '16';
   kRange.value = '7';
   kRange.className = 'viz-range';
-  const kLabel = el('label', 'viz-label', copy.queryLabel);
+  const kLabel = el('label', 'viz-label', copy.keyLabel);
   kLabel.append(kRange);
 
   controls.append(qLabel, kLabel);
@@ -282,7 +292,13 @@ function mountKv(root: HTMLElement, localeId: string): void {
   range.className = 'viz-range';
   const label = el('label', 'viz-label', copy.stepLabel);
   label.append(range);
-  controls.append(label);
+
+  const toggle = el('label', 'viz-label viz-toggle');
+  const check = el('input') as HTMLInputElement;
+  check.type = 'checkbox';
+  check.checked = true;
+  toggle.append(check, document.createTextNode(` ${copy.showNoCache ?? ''}`));
+  controls.append(label, toggle);
 
   const withLabel = el('p', 'viz-row-label', copy.withCache ?? '');
   const row = el('div', 'viz-kv-row');
@@ -292,20 +308,23 @@ function mountKv(root: HTMLElement, localeId: string): void {
 
   const render = () => {
     const step = Number(range.value);
+    const showNoCache = check.checked;
     row.replaceChildren();
     noRow.replaceChildren();
     for (let i = 0; i < promptLen; i += 1) {
       const cell = el('div', 'viz-kv-cell prefill', `P${i}`);
       cell.style.setProperty('--i', String(i));
       row.append(cell);
-      noRow.append(el('div', 'viz-kv-cell prefill is-ghost', `P${i}`));
+      if (showNoCache) noRow.append(el('div', 'viz-kv-cell prefill is-ghost', `P${i}`));
     }
     for (let i = 0; i < step; i += 1) {
       const cell = el('div', 'viz-kv-cell decode', `D${i}`);
       cell.style.setProperty('--i', String(promptLen + i));
       row.append(cell);
-      noRow.append(el('div', 'viz-kv-cell decode is-ghost', `D${i}`));
+      if (showNoCache) noRow.append(el('div', 'viz-kv-cell decode is-ghost', `D${i}`));
     }
+    noLabel.hidden = !showNoCache;
+    noRow.hidden = !showNoCache;
     // Without cache: each decode step re-attends over the whole prompt + earlier tokens.
     const recompute = promptLen * Math.max(step, 1);
     caption.textContent = copy.caption({
@@ -317,6 +336,7 @@ function mountKv(root: HTMLElement, localeId: string): void {
   };
 
   range.addEventListener('input', render);
+  check.addEventListener('change', render);
   root.append(hint, controls, withLabel, row, noLabel, noRow, caption);
   render();
 }

@@ -169,8 +169,8 @@ function renderShell(): void {
         </div>
         <div class="topbar-actions">
           <button type="button" class="search-trigger" id="search-open" aria-label="${ui.searchOpen}">
-            <span>${ui.searchOpen}</span>
-            <kbd>${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd>
+            <span class="search-trigger-label">${ui.searchOpen}</span>
+            <kbd>${modKeyHint()}</kbd>
           </button>
           <r-select
             id="locale-select"
@@ -249,8 +249,34 @@ function stackFigureSvg(): string {
   `;
 }
 
-type CmdkState = { open: boolean; query: string; active: number; results: Chapter[] };
-const cmdkState: CmdkState = { open: false, query: '', active: 0, results: [] };
+type CmdkState = {
+  open: boolean;
+  query: string;
+  active: number;
+  results: Chapter[];
+  restoreFocus: HTMLElement | null;
+};
+const cmdkState: CmdkState = {
+  open: false,
+  query: '',
+  active: 0,
+  results: [],
+  restoreFocus: null,
+};
+
+function escapeHtml(s: string): string {
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function modKeyHint(): string {
+  const uaData = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData;
+  const platform = uaData?.platform ?? navigator.userAgent;
+  return /mac|iphone|ipad/i.test(platform) ? '⌘K' : 'Ctrl K';
+}
 
 function filterChapters(query: string): Chapter[] {
   const q = query.trim().toLowerCase();
@@ -263,22 +289,25 @@ function filterChapters(query: string): Chapter[] {
 
 function paintCmdkList(): void {
   const list = document.querySelector('#cmdk-list') as HTMLElement | null;
+  const input = document.querySelector('#cmdk-input') as HTMLInputElement | null;
   if (!list) return;
   cmdkState.results = filterChapters(cmdkState.query);
   if (cmdkState.results.length === 0) {
-    list.innerHTML = `<p class="cmdk-empty">${ui.searchEmpty}</p>`;
+    list.innerHTML = `<p class="cmdk-empty">${escapeHtml(ui.searchEmpty)}</p>`;
+    input?.removeAttribute('aria-activedescendant');
     return;
   }
   if (cmdkState.active >= cmdkState.results.length) cmdkState.active = 0;
   list.innerHTML = cmdkState.results
     .map((chapter, idx) => {
       const active = idx === cmdkState.active ? ' is-active' : '';
+      const optionId = `cmdk-option-${idx}`;
       return `
-        <button type="button" class="cmdk-item${active}" role="option" data-id="${chapter.id}" aria-selected="${idx === cmdkState.active}">
-          <span class="cmdk-ep">${chapter.ep}</span>
+        <button type="button" class="cmdk-item${active}" role="option" id="${optionId}" data-id="${escapeHtml(chapter.id)}" aria-selected="${idx === cmdkState.active}" tabindex="-1">
+          <span class="cmdk-ep">${escapeHtml(chapter.ep)}</span>
           <span>
-            <span class="cmdk-title">${chapter.title}</span>
-            <span class="cmdk-summary">${chapter.summary}</span>
+            <span class="cmdk-title">${escapeHtml(chapter.title)}</span>
+            <span class="cmdk-summary">${escapeHtml(chapter.summary)}</span>
           </span>
         </button>
       `;
@@ -292,29 +321,58 @@ function paintCmdkList(): void {
         selectChapter(id);
       }
     });
+    node.addEventListener('mousemove', () => {
+      const idx = Number((node as HTMLElement).id.replace('cmdk-option-', ''));
+      if (!Number.isFinite(idx) || idx === cmdkState.active) return;
+      cmdkState.active = idx;
+      list.querySelectorAll('.cmdk-item').forEach((item, i) => {
+        const on = i === idx;
+        item.classList.toggle('is-active', on);
+        item.setAttribute('aria-selected', String(on));
+      });
+      input?.setAttribute('aria-activedescendant', `cmdk-option-${idx}`);
+    });
   });
-  const activeEl = list.querySelector('.cmdk-item.is-active') as HTMLElement | null;
+  const activeId = `cmdk-option-${cmdkState.active}`;
+  input?.setAttribute('aria-activedescendant', activeId);
+  const activeEl = list.querySelector(`#${activeId}`) as HTMLElement | null;
   activeEl?.scrollIntoView({ block: 'nearest' });
 }
 
 function openCmdk(): void {
   const overlay = document.querySelector('#cmdk') as HTMLElement | null;
+  const panel = document.querySelector('.cmdk-panel') as HTMLElement | null;
   const input = document.querySelector('#cmdk-input') as HTMLInputElement | null;
-  if (!overlay || !input) return;
+  const shell = document.querySelector('.shell') as HTMLElement | null;
+  if (!overlay || !input || !panel) return;
   cmdkState.open = true;
   cmdkState.query = '';
   cmdkState.active = 0;
+  cmdkState.restoreFocus =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null;
   overlay.hidden = false;
+  document.body.classList.add('cmdk-open');
+  shell?.setAttribute('inert', '');
   input.value = '';
+  input.setAttribute('aria-controls', 'cmdk-list');
+  input.setAttribute('aria-autocomplete', 'list');
   paintCmdkList();
   window.requestAnimationFrame(() => input.focus());
 }
 
 function closeCmdk(): void {
   const overlay = document.querySelector('#cmdk') as HTMLElement | null;
+  const shell = document.querySelector('.shell') as HTMLElement | null;
   if (!overlay) return;
   cmdkState.open = false;
   overlay.hidden = true;
+  document.body.classList.remove('cmdk-open');
+  shell?.removeAttribute('inert');
+  const restore = cmdkState.restoreFocus;
+  cmdkState.restoreFocus = null;
+  window.requestAnimationFrame(() => {
+    (restore ?? (document.querySelector('#search-open') as HTMLElement | null))?.focus();
+  });
 }
 
 function onCmdkKeydown(event: KeyboardEvent): void {
@@ -329,6 +387,12 @@ function onCmdkKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     event.preventDefault();
     closeCmdk();
+    return;
+  }
+  if (event.key === 'Tab') {
+    event.preventDefault();
+    const input = document.querySelector('#cmdk-input') as HTMLInputElement | null;
+    input?.focus();
     return;
   }
   if (event.key === 'ArrowDown') {
@@ -666,18 +730,6 @@ function renderArticle(chapter: Chapter): void {
             ? `<details class="fix-box"><summary>${ui.fixHeading}</summary><div class="panel" id="fix-host"></div></details>`
             : ''
         }
-        <div class="chapter-nav">
-          <r-button id="prev-chapter" type="text" ${prev ? '' : 'disabled'}>${ui.prevChapter}${
-            prev ? `: ${prev.title}` : ''
-          }</r-button>
-          <r-button id="next-chapter" type="primary" ${next ? '' : 'disabled'}>${ui.nextChapter}${
-            next ? `: ${next.title}` : ''
-          }</r-button>
-        </div>
-        <p class="footer-note">
-          ${scriptLine}${ui.siteLabel}:
-          <a href="${pageUrl(chapter.id, locale)}">${ORIGIN.replace('https://', '')}${pagePath(chapter.id, locale)}</a>
-        </p>
       </div>
       <aside class="instrument-rail" id="instrument-rail" aria-label="${ui.sourceHeading}">
         <div class="src-wrap" id="src-host" hidden></div>
@@ -685,6 +737,18 @@ function renderArticle(chapter: Chapter): void {
         <div class="math-wrap" id="math-host" hidden></div>
         <p class="rail-empty" id="rail-empty" hidden>${ui.railReadingOnly}</p>
       </aside>
+      <div class="chapter-nav">
+        <r-button id="prev-chapter" type="text" ${prev ? '' : 'disabled'}>${ui.prevChapter}${
+          prev ? `: ${prev.title}` : ''
+        }</r-button>
+        <r-button id="next-chapter" type="primary" ${next ? '' : 'disabled'}>${ui.nextChapter}${
+          next ? `: ${next.title}` : ''
+        }</r-button>
+      </div>
+      <p class="footer-note">
+        ${scriptLine}${ui.siteLabel}:
+        <a href="${pageUrl(chapter.id, locale)}">${ORIGIN.replace('https://', '')}${pagePath(chapter.id, locale)}</a>
+      </p>
     </div>
   `;
 
@@ -735,9 +799,13 @@ function renderArticle(chapter: Chapter): void {
   wireLessonCalloutSync(mountedSource);
 
   document.querySelector('#mark-done')?.addEventListener('click', () => {
+    const btn = document.querySelector('#mark-done') as HTMLElement | null;
     markDone(chapter.id);
+    btn?.classList.add('mark-done-pulse');
     renderNav(chapter.id);
-    renderArticle(chapter);
+    window.setTimeout(() => {
+      renderArticle(chapter);
+    }, 220);
   });
   document.querySelector('#prev-chapter')?.addEventListener('click', () => {
     if (prev) selectChapter(prev.id);
@@ -756,26 +824,52 @@ function wireLessonCalloutSync(
   calloutSyncCleanup = null;
   if (!mounted || mounted.calloutLines.length === 0) return;
 
-  const copy = document.querySelector('.lesson-copy') as HTMLElement | null;
   const mdHost = document.querySelector('#md-host') as HTMLElement | null;
-  if (!copy || !mdHost) return;
+  if (!mdHost) return;
 
   const lines = mounted.calloutLines;
   let last = -1;
+  const applyIndex = (idx: number) => {
+    const next = Math.min(lines.length - 1, Math.max(0, idx));
+    if (next === last) return;
+    last = next;
+    mounted.setActiveCallout(lines[next] ?? null);
+  };
+
+  const headings = () =>
+    Array.from(mdHost.querySelectorAll('h3, h2')).filter(
+      (node) => node instanceof HTMLElement,
+    ) as HTMLElement[];
+
   const onScroll = () => {
+    const hs = headings();
+    if (hs.length > 0) {
+      const probe = Math.min(window.innerHeight * 0.28, 220);
+      let idx = 0;
+      for (let i = 0; i < hs.length; i += 1) {
+        if (hs[i]!.getBoundingClientRect().top <= probe) idx = i;
+      }
+      // Map heading index onto available callouts.
+      const mapped =
+        hs.length <= 1
+          ? 0
+          : Math.round((idx / (hs.length - 1)) * (lines.length - 1));
+      applyIndex(mapped);
+      return;
+    }
     const rect = mdHost.getBoundingClientRect();
     const view = Math.min(window.innerHeight * 0.35, 280);
     const span = Math.max(rect.height - view, 1);
     const progress = Math.min(1, Math.max(0, (view - rect.top) / span));
-    const idx = Math.min(lines.length - 1, Math.floor(progress * lines.length));
-    if (idx === last) return;
-    last = idx;
-    mounted.setActiveCallout(lines[idx] ?? null);
+    applyIndex(Math.floor(progress * lines.length));
   };
 
+  // Markdown may hydrate asynchronously; retry heading discovery briefly.
+  const boot = window.setTimeout(onScroll, 80);
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });
   calloutSyncCleanup = () => {
+    window.clearTimeout(boot);
     window.removeEventListener('scroll', onScroll);
     mounted.setActiveCallout(null);
   };

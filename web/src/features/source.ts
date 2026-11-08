@@ -260,7 +260,16 @@ export function mountSource(
     });
     if (line == null) return;
     const target = body.querySelector(`.wt-line[data-line="${line}"]`) as HTMLElement | null;
-    target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!target) return;
+    const code = body.querySelector('.wt-code') as HTMLElement | null;
+    if (!code) return;
+    const codeRect = code.getBoundingClientRect();
+    const lineRect = target.getBoundingClientRect();
+    const fullyVisible =
+      lineRect.top >= codeRect.top + 4 && lineRect.bottom <= codeRect.bottom - 4;
+    if (!fullyVisible) {
+      target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   };
 
   return {

@@ -735,10 +735,6 @@ r-theme-switch {
     gap: 20px;
   }
 
-  .home-figure {
-    order: -1;
-  }
-
   .home-brand {
     font-size: clamp(2.6rem, 14vw, 3.4rem);
   }
@@ -849,6 +845,12 @@ r-theme-switch {
   gap: 6px;
   font-size: 12px;
   color: var(--ran-color-text-secondary, #666);
+}
+
+.viz-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }
 
 .viz-range {
@@ -1122,15 +1124,21 @@ r-theme-switch {
 .lesson-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  grid-template-areas:
+    'copy rail'
+    'nav rail'
+    'footer rail';
   gap: clamp(18px, 2.5vw, 28px);
   align-items: start;
 }
 
 .lesson-copy {
+  grid-area: copy;
   min-width: 0;
 }
 
 .instrument-rail {
+  grid-area: rail;
   position: sticky;
   top: 12px;
   align-self: start;
@@ -1142,6 +1150,15 @@ r-theme-switch {
   flex-direction: column;
   gap: 12px;
   padding: 2px;
+}
+
+.lesson-layout > .chapter-nav {
+  grid-area: nav;
+  margin-top: 8px;
+}
+
+.lesson-layout > .footer-note {
+  grid-area: footer;
 }
 
 .instrument-rail .src-wrap,
@@ -1163,6 +1180,11 @@ r-theme-switch {
 @media (max-width: 800px) {
   .lesson-layout {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      'copy'
+      'rail'
+      'nav'
+      'footer';
   }
 
   .instrument-rail {
@@ -1309,8 +1331,43 @@ r-theme-switch {
 
 @media (max-width: 800px) {
   .search-trigger {
-    flex: 1 1 8rem;
+    flex: 0 1 auto;
     min-width: 0;
+    padding: 6px 8px;
+  }
+
+  .search-trigger .search-trigger-label {
+    display: none;
+  }
+}
+
+.mark-done-pulse {
+  animation: mark-done-pop 420ms var(--arche-ease);
+}
+
+@keyframes mark-done-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+body.cmdk-open {
+  overflow: hidden;
+}
+
+.shell[inert] {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark-done-pulse {
+    animation: none;
   }
 }
 
