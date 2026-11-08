@@ -1,5 +1,8 @@
 """ep01 — Overview: modern dense trunk, not GPT-2 archaeology.
 
+If you are new: activate `.venv`, `cd` to the repo root, then run this file.
+You should see config numbers (layers, heads, dim)—not a chatbot.
+
 Run:
     python chapters/01-inference/ep01_overview.py
 """

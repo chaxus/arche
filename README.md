@@ -4,9 +4,11 @@
 
 Hand-write a **modern dense** decoder (Llama 3.2 lineage) in PyTorch, then the frontier add-ons that matter next: **KV cache**, **RoPE scaling**, **MoE**, **MLA**, plus inference engineering and tiny **pretrain / SFT / DPO** loops. Load open weights. No GPT-2 archaeology.
 
+**New to programming?** Start on the learning site at **Part 0 — Start here** (no Python assumed): [arche.chaxus.com](https://arche.chaxus.com) → first nav section, or `?c=start-welcome`. Then run `python chapters/00-start/ep00_check_setup.py`.
+
 - Architecture target: **Llama 3.2 1B** (same family as 3B), plus MoE / MLA primers
-- Pedagogy: one runnable chapter per module
-- Learning site: **[arche.chaxus.com](https://arche.chaxus.com)** (ranui, EN / 中文，chapter progress + demos)
+- Pedagogy: Part 0 onboarding + one runnable chapter per module (EN / 中文)
+- Learning site: **[arche.chaxus.com](https://arche.chaxus.com)** (ranui, progress, demos, prev/next)
 - License: [Apache-2.0](LICENSE)
 
 ## Why not GPT-2
@@ -33,6 +35,7 @@ pip install -r requirements.txt
 Run chapters (each script is standalone):
 
 ```bash
+python chapters/00-start/ep00_check_setup.py
 python chapters/01-inference/ep01_overview.py
 python chapters/01-inference/ep03_embedding.py
 python chapters/01-inference/ep04_rmsnorm.py
@@ -120,6 +123,8 @@ Automatic deploy on `main` (workflow `.github/workflows/deploy-pages.yml`) needs
 Without those secrets the deploy job is skipped; CI tests still run.
 
 ## Curriculum
+
+Site Part 0 (start here): welcome → what an LLM does → setup → terminal → reading code → map (`chapters/00-start/ep00_check_setup.py`).
 
 | # | Topic | Script |
 | --- | --- | --- |
