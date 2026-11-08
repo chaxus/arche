@@ -10,9 +10,8 @@ on:
 
 jobs:
   deploy:
-    # Token-only: for this Cloudflare token, setting CLOUDFLARE_ACCOUNT_ID
+    # Token-only auth: do not set CLOUDFLARE_ACCOUNT_ID — with this token it
     # makes Pages API return 7003; wrangler resolves the account from the token.
-    if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
