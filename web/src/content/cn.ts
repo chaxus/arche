@@ -1,6 +1,8 @@
 import type { Chapter } from './types';
+import { PART0_CN } from './part0-cn';
 
 export const CHAPTERS_CN: Chapter[] = [
+  ...PART0_CN,
   {
     id: 'overview',
     ep: '01',

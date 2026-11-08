@@ -28,7 +28,7 @@ let ui = uiFor(locale);
 let chapters = chaptersFor(locale);
 
 const params = new URLSearchParams(location.search);
-let activeChapterId = params.get('c') ?? chapters[0]?.id ?? 'overview';
+let activeChapterId = params.get('c') ?? chapters[0]?.id ?? 'start-welcome';
 
 function homeHref(target: LocaleDef = locale): string {
   return localeHref('/', target);
